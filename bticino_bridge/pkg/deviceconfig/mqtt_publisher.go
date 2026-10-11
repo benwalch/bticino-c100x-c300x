@@ -1,4 +1,4 @@
-// Package deviceconfig proporciona funciones para publicar config del dispositivo via MQTT
+// Package deviceconfig provides functions to publish device config via MQTT
 package deviceconfig
 
 import (
@@ -9,13 +9,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// MQTTPublisherInterface define la interfaz para publicar en MQTT
+// MQTTPublisherInterface defines the interface for publishing to MQTT
 type MQTTPublisherInterface interface {
 	Publish(topic, payload string, retain bool)
 	IsConnected() bool
 }
 
-// DeviceMQTTPublisher publica la configuración del dispositivo en MQTT
+// DeviceMQTTPublisher publishes the device configuration to MQTT
 type DeviceMQTTPublisher struct {
 	logger      *logrus.Logger
 	publisher   MQTTPublisherInterface
@@ -24,7 +24,7 @@ type DeviceMQTTPublisher struct {
 	stopCh      chan bool
 }
 
-// NewDeviceMQTTPublisher crea un nuevo publisher de config del dispositivo
+// NewDeviceMQTTPublisher creates a new device config publisher
 func NewDeviceMQTTPublisher(logger *logrus.Logger, publisher MQTTPublisherInterface, topicPrefix string) *DeviceMQTTPublisher {
 	if topicPrefix == "" {
 		topicPrefix = "bticino"
@@ -37,7 +37,7 @@ func NewDeviceMQTTPublisher(logger *logrus.Logger, publisher MQTTPublisherInterf
 	}
 }
 
-// Start inicia la publicación periódica de config del dispositivo
+// Start starts periodic publishing of device config
 func (p *DeviceMQTTPublisher) Start(interval time.Duration) {
 	p.ticker = time.NewTicker(interval)
 	p.logger.Info("Starting device config MQTT publisher")
@@ -55,7 +55,7 @@ func (p *DeviceMQTTPublisher) Start(interval time.Duration) {
 	}()
 }
 
-// Stop detiene la publicación
+// Stop stops publishing
 func (p *DeviceMQTTPublisher) Stop() {
 	if p.ticker != nil {
 		p.ticker.Stop()
@@ -63,7 +63,7 @@ func (p *DeviceMQTTPublisher) Stop() {
 	p.stopCh <- true
 }
 
-// PublishAll publica toda la configuración del dispositivo
+// PublishAll publishes the whole device configuration
 func (p *DeviceMQTTPublisher) PublishAll() {
 	p.publishAll()
 }
@@ -73,7 +73,7 @@ func (p *DeviceMQTTPublisher) publishAll() {
 		return
 	}
 
-	// Leer configuración del dispositivo
+	// Read device configuration
 	paths := struct {
 		ConfXML      string
 		ASWMSettings string
@@ -92,7 +92,7 @@ func (p *DeviceMQTTPublisher) publishAll() {
 		return
 	}
 
-	// Publicar cada sección
+	// Publish each section
 	p.publishSystemConfig(cfg)
 	p.publishAnsweringMachine(cfg)
 	p.publishRingtones(cfg)
@@ -101,7 +101,7 @@ func (p *DeviceMQTTPublisher) publishAll() {
 	p.publishCameras(cfg)
 }
 
-// publishSystemConfig publica la configuración del sistema
+// publishSystemConfig publishes the system configuration
 func (p *DeviceMQTTPublisher) publishSystemConfig(cfg *Config) {
 	prefix := p.topicPrefix
 
@@ -134,7 +134,7 @@ func (p *DeviceMQTTPublisher) publishSystemConfig(cfg *Config) {
 	}, true)
 }
 
-// publishAnsweringMachine publica el estado del contestador
+// publishAnsweringMachine publishes the answering machine state
 func (p *DeviceMQTTPublisher) publishAnsweringMachine(cfg *Config) {
 	prefix := p.topicPrefix + "/answering"
 
@@ -147,7 +147,7 @@ func (p *DeviceMQTTPublisher) publishAnsweringMachine(cfg *Config) {
 	}, true)
 }
 
-// publishRingtones publica la configuración de timbres
+// publishRingtones publishes the ringtone configuration
 func (p *DeviceMQTTPublisher) publishRingtones(cfg *Config) {
 	prefix := p.topicPrefix + "/audio/ringtone"
 
@@ -181,7 +181,7 @@ func (p *DeviceMQTTPublisher) publishRingtones(cfg *Config) {
 	}, true)
 }
 
-// publishVolumes publica la configuración de volúmenes
+// publishVolumes publishes the volume configuration
 func (p *DeviceMQTTPublisher) publishVolumes(cfg *Config) {
 	prefix := p.topicPrefix + "/audio/volume"
 
@@ -211,7 +211,7 @@ func (p *DeviceMQTTPublisher) publishVolumes(cfg *Config) {
 	}, true)
 }
 
-// publishDisplay publica la configuración del display
+// publishDisplay publishes the display configuration
 func (p *DeviceMQTTPublisher) publishDisplay(cfg *Config) {
 	prefix := p.topicPrefix + "/display"
 
@@ -225,7 +225,7 @@ func (p *DeviceMQTTPublisher) publishDisplay(cfg *Config) {
 	}, true)
 }
 
-// publishCameras publica la configuración de cámaras
+// publishCameras publishes the camera configuration
 func (p *DeviceMQTTPublisher) publishCameras(cfg *Config) {
 	prefix := p.topicPrefix + "/camera"
 
@@ -240,7 +240,7 @@ func (p *DeviceMQTTPublisher) publishCameras(cfg *Config) {
 	}
 }
 
-// publishJSON publica un objeto JSON
+// publishJSON publishes a JSON object
 func (p *DeviceMQTTPublisher) publishJSON(topic string, data map[string]interface{}, retain bool) {
 	jsonBytes, err := json.Marshal(data)
 	if err != nil {
@@ -250,7 +250,7 @@ func (p *DeviceMQTTPublisher) publishJSON(topic string, data map[string]interfac
 	p.publisher.Publish(topic, string(jsonBytes), retain)
 }
 
-// GetAllTopics retorna todos los topics que se publican
+// GetAllTopics returns all published topics
 func (p *DeviceMQTTPublisher) GetAllTopics() []string {
 	return []string{
 		p.topicPrefix + "/system/language",
@@ -273,11 +273,11 @@ func (p *DeviceMQTTPublisher) GetAllTopics() []string {
 		p.topicPrefix + "/audio/volume/sip",
 		p.topicPrefix + "/display/brightness",
 		p.topicPrefix + "/display/clean_time",
-		// Cámaras dinámicas
+		// Dynamic cameras
 	}
 }
 
-// VerifyTopicos verifica que los topics están siendo publicados (para testing)
+// VerifyTopicos verifies that topics are being published (for testing)
 func VerifyTopicos() {
 	fmt.Println("Device Config MQTT Topics:")
 	fmt.Println("- bticino/system/language")

@@ -1,17 +1,17 @@
-// avmedia_capture.go contiene la captura de vídeo COOPERATIVA compartida por el
-// snapshot y la sonda de diagnóstico.
+// avmedia_capture.go holds the COOPERATIVE video capture shared by the
+// snapshot and the diagnostic probe.
 //
-// Patrón (validado en dispositivo real el 2026-07-07):
-//   - Se lanza un pipeline gst-launch que decodifica H.264→JPEG leyendo RTP de
-//     un puerto UDP local (udpsrc ! rtph264depay ! h264parse ! imxvpudec ! jpegenc).
-//   - Se pide UNA sola vez (sin reintentos) a bt_av_media que duplique su RTP de
-//     vídeo hacia ese puerto (*7*300). NO se hace self-INVITE ni se toca SIP.
-//   - Solo produce imagen si hay una sesión de vídeo nativa activa (botón del
-//     "ojo"/autoencendido o una llamada real); en reposo bt_av_media responde
-//     NACK y no llega RTP.
+// Pattern (validated on a real device on 2026-07-07):
+//   - A gst-launch pipeline is started that decodes H.264→JPEG reading RTP from
+//     a local UDP port (udpsrc ! rtph264depay ! h264parse ! imxvpudec ! jpegenc).
+//   - bt_av_media is asked A single time (no retries) to duplicate its video RTP
+//     to that port (*7*300). NO self-INVITE is done and SIP is not touched.
+//   - It only yields an image if a native video session is active ("eye"
+//     button/self-switch-on or a real call); when idle bt_av_media answers
+//     NACK and no RTP arrives.
 //
-// Este es el patrón seguro: blast radius de un único comando, cooperativo con el
-// firmware nativo (no compite por /dev/video0).
+// This is the safe pattern: blast radius of a single command, cooperative with the
+// native firmware (it does not compete for /dev/video0).
 package sip
 
 import (
@@ -33,23 +33,23 @@ var (
 	jpegEOI = []byte{0xFF, 0xD9}
 )
 
-// captureResult resume una captura cooperativa.
+// captureResult summarizes a cooperative capture.
 type captureResult struct {
-	ack      bool   // *7*300 respondió *#*1## (ACK)
-	ackError string // vacío si ACK; si no, el error/NACK
-	frames   int    // fotogramas JPEG decodificados
-	jpeg     []byte // mejor fotograma (el último completo), nil si ninguno
+	ack      bool   // *7*300 answered *#*1## (ACK)
+	ackError string // empty if ACK; otherwise the error/NACK
+	frames   int    // decoded JPEG frames
+	jpeg     []byte // best frame (the last complete one), nil if none
 }
 
-// captureCooperative decodifica un fotograma pidiendo a bt_av_media que duplique
-// su RTP de vídeo al puerto UDP indicado (un único *7*300, sin reintentos ni
-// self-INVITE). warmupFrames es cuántos fotogramas acumular antes de quedarse
-// con el último (el decoder produce ruido hasta un IDR limpio). timeout cubre el
-// sondeo tras enviar el comando.
+// captureCooperative decodes a frame by asking bt_av_media to duplicate
+// its video RTP to the given UDP port (a single *7*300, no retries and no
+// self-INVITE). warmupFrames is how many frames to accumulate before keeping
+// the last one (the decoder produces noise until a clean IDR). timeout covers the
+// polling after sending the command.
 func captureCooperative(own *openwebnet.Client, port, warmupFrames int, timeout time.Duration, logger *logrus.Logger) (captureResult, error) {
 	res := captureResult{}
 	if own == nil {
-		return res, fmt.Errorf("cliente OpenWebNet no disponible")
+		return res, fmt.Errorf("OpenWebNet client not available")
 	}
 	if timeout <= 0 {
 		timeout = 8 * time.Second
@@ -61,8 +61,8 @@ func captureCooperative(own *openwebnet.Client, port, warmupFrames int, timeout 
 	tmp := filepath.Join(os.TempDir(), fmt.Sprintf("bticino_cap_%d.jpg.partial", port))
 	_ = os.Remove(tmp)
 
-	// 1) Lanzar el pipeline de decodificación PRIMERO (udpsrc debe tener el
-	//    puerto abierto antes de que bt_av_media empiece a enviar).
+	// 1) Start the decoding pipeline FIRST (udpsrc must have the
+	//    port bound before bt_av_media starts sending).
 	cmd := exec.Command("gst-launch-1.0",
 		"udpsrc", fmt.Sprintf("port=%d", port),
 		"caps=application/x-rtp,media=(string)video,clock-rate=(int)90000,encoding-name=(string)H264,payload=(int)96",
@@ -75,7 +75,7 @@ func captureCooperative(own *openwebnet.Client, port, warmupFrames int, timeout 
 	stderrBuf := &bytes.Buffer{}
 	cmd.Stderr = stderrBuf
 	if err := cmd.Start(); err != nil {
-		return res, fmt.Errorf("no se pudo lanzar el pipeline de captura: %w", err)
+		return res, fmt.Errorf("failed to launch capture pipeline: %w", err)
 	}
 	defer func() {
 		_ = cmd.Process.Signal(syscall.SIGTERM)
@@ -90,18 +90,18 @@ func captureCooperative(own *openwebnet.Client, port, warmupFrames int, timeout 
 		_ = os.Remove(tmp)
 	}()
 
-	// Margen para que udpsrc bindee el puerto
+	// Margin for udpsrc to bind the port
 	time.Sleep(300 * time.Millisecond)
 
-	// 2) Enviar UN ÚNICO *7*300 (ActivateVideoStream ya no reintenta)
-	logger.Infof("captura cooperativa: *7*300 único → 127.0.0.1:%d", port)
+	// 2) Send A SINGLE *7*300 (ActivateVideoStream no longer retries)
+	logger.Infof("cooperative capture: single *7*300 → 127.0.0.1:%d", port)
 	if err := own.ActivateVideoStream("127.0.0.1", port, true); err != nil {
 		res.ackError = err.Error()
 	} else {
 		res.ack = true
 	}
 
-	// 3) Sondear el fichero buscando fotogramas JPEG completos
+	// 3) Poll the file looking for complete JPEG frames
 	deadline := time.Now().Add(timeout)
 	var lastComplete []byte
 	for time.Now().Before(deadline) {
@@ -116,19 +116,19 @@ func captureCooperative(own *openwebnet.Client, port, warmupFrames int, timeout 
 			lastComplete = last
 		}
 		if n >= warmupFrames && lastComplete != nil {
-			break // el decoder ya pasó un IDR limpio
+			break // the decoder has already passed a clean IDR
 		}
 	}
 	res.jpeg = lastComplete
 
 	if res.frames == 0 && stderrBuf.Len() > 0 {
-		logger.Warnf("captura cooperativa: pipeline stderr: %s", stderrBuf.String())
+		logger.Warnf("cooperative capture: pipeline stderr: %s", stderrBuf.String())
 	}
 	return res, nil
 }
 
-// scanJPEGFrames recorre un buffer de JPEGs concatenados (SOI FFD8 ... EOI FFD9)
-// y devuelve cuantos fotogramas completos contiene y una copia del ultimo.
+// scanJPEGFrames walks a buffer of concatenated JPEGs (SOI FFD8 ... EOI FFD9)
+// and returns how many complete frames it holds and a copy of the last one.
 func scanJPEGFrames(data []byte) (count int, last []byte) {
 	pos := 0
 	for {
@@ -139,7 +139,7 @@ func scanJPEGFrames(data []byte) (count int, last []byte) {
 		soi += pos
 		eoi := bytes.Index(data[soi+2:], jpegEOI)
 		if eoi < 0 {
-			break // JPEG incompleto (fotograma en curso de escritura)
+			break // Incomplete JPEG (frame being written)
 		}
 		end := soi + 2 + eoi + 2
 		count++

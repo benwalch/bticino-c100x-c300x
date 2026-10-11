@@ -193,7 +193,7 @@ func (ml *MulticastListener) messageHandler() {
 			continue
 		}
 
-		// Process the message (raw bytes: los datagramas son binarios)
+		// Process the message (raw bytes: datagrams are binary)
 		ml.processMessage(buffer[:n], remoteAddr)
 	}
 }
@@ -238,8 +238,8 @@ func (ml *MulticastListener) processMessage(data []byte, remoteAddr *net.UDPAddr
 }
 
 // parseMessage parses a BTicino multicast datagram.
-// Primero intenta el formato binario estructurado del syslog interno de BTicino;
-// si no encaja, cae al parseo de texto plano (comportamiento historico).
+// First tries the structured binary format of the internal BTicino syslog;
+// if it does not fit, falls back to plain-text parsing (historic behavior).
 func (ml *MulticastListener) parseMessage(datagram []byte) *BTicinoMessage {
 	message := &BTicinoMessage{
 		Timestamp: time.Now(),
@@ -247,22 +247,22 @@ func (ml *MulticastListener) parseMessage(datagram []byte) *BTicinoMessage {
 		Parsed:    false,
 	}
 
-	// Formato binario del syslog multicast (verificado en puerto 7667):
-	//   [0:8]  cabecera binaria
-	//   [8:]   nombre de sistema terminado en NUL ("OPEN", "ASWM", "REGISTRATION", ...)
-	//   tras el nombre: ~13 bytes de metadatos y el mensaje terminado en NUL
+	// Binary format of the multicast syslog (verified on port 7667):
+	//   [0:8]  binary header
+	//   [8:]   NUL-terminated system name ("OPEN", "ASWM", "REGISTRATION", ...)
+	//   after the name: ~13 bytes of metadata and the NUL-terminated message
 	if system, msg, ok := parseBinaryDatagram(datagram); ok {
 		message.System = system
 		message.Message = msg
 		message.Parsed = true
 		if system == "OPEN" {
-			// Extraer solo el frame OpenWebNet *...## del mensaje
+			// Extract only the OpenWebNet frame *...## from the message
 			message.Message = ml.extractOpenWebNetMessage(msg)
 		}
 		return message
 	}
 
-	// Fallback: parseo de texto plano
+	// Fallback: plain-text parsing
 	data := strings.TrimSpace(message.Raw)
 
 	// Look for system identifiers (based on observed BTicino patterns)
@@ -293,19 +293,19 @@ func (ml *MulticastListener) parseMessage(datagram []byte) *BTicinoMessage {
 	return message
 }
 
-// parseBinaryDatagram extrae (system, message) de un datagrama binario del
-// syslog multicast de BTicino (239.255.76.67:7667).
+// parseBinaryDatagram extracts (system, message) from a binary datagram of the
+// BTicino multicast syslog (239.255.76.67:7667).
 //
-// Estructura observada:
-//   - Cabecera binaria de 8 bytes.
-//   - Nombre de sistema ASCII terminado en NUL a partir del offset 8.
-//   - Tras el nombre, 13 bytes de metadatos binarios y el mensaje terminado
-//     en NUL (la busqueda del NUL final empieza en +12 para tolerar mensajes
-//     de un solo byte).
+// Observed structure:
+//   - 8-byte binary header.
+//   - NUL-terminated ASCII system name starting at offset 8.
+//   - After the name, 13 bytes of binary metadata and the message terminated
+//     in NUL (the search for the trailing NUL starts at +12 to tolerate
+//     single-byte messages).
 //
-// Casos especiales:
-//   - "REGISTRATION": lleva 4 bytes extra de metadatos (busqueda desde +16).
-//   - "LCM_SELF_TEST": el mensaje empieza inmediatamente tras el nombre.
+// Special cases:
+//   - "REGISTRATION": carries 4 extra metadata bytes (search from +16).
+//   - "LCM_SELF_TEST": the message starts immediately after the name.
 func parseBinaryDatagram(datagram []byte) (system, msg string, ok bool) {
 	if len(datagram) < 16 {
 		return "", "", false
@@ -346,7 +346,7 @@ func parseBinaryDatagram(datagram []byte) (system, msg string, ok bool) {
 	return system, string(datagram[msgStart:msgEnd]), true
 }
 
-// isPrintableASCII devuelve true si s solo contiene ASCII imprimible.
+// isPrintableASCII returns true if s only contains printable ASCII.
 func isPrintableASCII(s string) bool {
 	for i := 0; i < len(s); i++ {
 		if s[i] < 0x20 || s[i] > 0x7e {

@@ -55,23 +55,23 @@ type MQTTBridge struct {
 	connectTime        time.Time
 	lastDisconnectTime time.Time
 	reconnectAttempts  int32
-	connectionEvents   []ConnectionEvent // Ring buffer de últimos eventos
+	connectionEvents   []ConnectionEvent // Ring buffer of recent events
 	cePos              int
 	ceFull             bool
 
-	// Cámara del timbre (opcional): captura cooperativa de un snapshot al sonar
-	// el timbre / entrar una llamada, publicada en <prefix>/camera/doorbell.
+	// Doorbell camera (optional): cooperative snapshot capture on doorbell
+	// ring / incoming call, published to <prefix>/camera/doorbell.
 	cameraEnabled bool
 	cameraCapture func() ([]byte, error)
-	cameraMu      sync.Mutex // serializa capturas (evita solapamiento timbre+llamada)
+	cameraMu      sync.Mutex // serializes captures (avoids doorbell+call overlap)
 
-	wifiOnce sync.Once // arranca el monitor WiFi una sola vez
+	wifiOnce sync.Once // starts the WiFi monitor only once
 }
 
-// SetCameraCapture habilita la entidad de cámara del timbre y registra la
-// función de captura (snapshot cooperativo). Debe llamarse ANTES de Start()
-// para que la entidad se incluya en el discovery. Al sonar el timbre o entrar
-// una llamada, el bridge captura un JPEG y lo publica en <prefix>/camera/doorbell.
+// SetCameraCapture enables the doorbell camera entity and registers the
+// capture function (cooperative snapshot). Must be called BEFORE Start()
+// so the entity is included in discovery. When the doorbell rings or a call
+// comes in, the bridge captures a JPEG and publishes it to <prefix>/camera/doorbell.
 func (b *MQTTBridge) SetCameraCapture(fn func() ([]byte, error)) {
 	b.mu.Lock()
 	b.cameraCapture = fn
@@ -79,10 +79,10 @@ func (b *MQTTBridge) SetCameraCapture(fn func() ([]byte, error)) {
 	b.mu.Unlock()
 }
 
-// captureDoorbellPhoto captura un snapshot cooperativo (si la cámara está
-// habilitada) y lo publica en <prefix>/camera/doorbell en base64. Se ejecuta en
-// segundo plano y se serializa: si ya hay una captura en curso, se ignora (evita
-// solapar timbre + llamada, que dispararían dos *7*300 a la vez).
+// captureDoorbellPhoto captures a cooperative snapshot (if the camera is
+// enabled) and publishes it to <prefix>/camera/doorbell in base64. It runs in
+// the background and is serialized: if a capture is already in progress, it is
+// ignored (avoids overlapping doorbell + call, which would fire two *7*300 at once).
 func (b *MQTTBridge) captureDoorbellPhoto(reason string) {
 	b.mu.RLock()
 	enabled := b.cameraEnabled
@@ -94,24 +94,24 @@ func (b *MQTTBridge) captureDoorbellPhoto(reason string) {
 
 	go func() {
 		if !b.cameraMu.TryLock() {
-			b.logger.Debug("Camera: captura en curso, se ignora la nueva petición")
+			b.logger.Debug("Camera: capture in progress, ignoring new request")
 			return
 		}
 		defer b.cameraMu.Unlock()
 
-		b.logger.Infof("Camera: capturando snapshot del timbre (motivo: %s)", reason)
+		b.logger.Infof("Camera: capturing doorbell snapshot (reason: %s)", reason)
 		jpeg, err := capture()
 		if err != nil {
-			b.logger.WithError(err).Warn("Camera: no se pudo capturar el snapshot del timbre")
+			b.logger.WithError(err).Warn("Camera: could not capture doorbell snapshot")
 			return
 		}
 		encoded := base64.StdEncoding.EncodeToString(jpeg)
 		b.publish(b.dataPrefix()+"/camera/doorbell", encoded, true)
-		b.logger.Infof("Camera: foto del timbre publicada (%d bytes)", len(jpeg))
+		b.logger.Infof("Camera: doorbell photo published (%d bytes)", len(jpeg))
 	}()
 }
 
-// ConnectionEvent representa un evento de conexión MQTT
+// ConnectionEvent represents an MQTT connection event
 type ConnectionEvent struct {
 	Timestamp time.Time `json:"timestamp"`
 	Type      string    `json:"type"` // "connect", "disconnect", "reconnect"
@@ -220,7 +220,7 @@ func (b *MQTTBridge) IsConnected() bool {
 // addConnectionEvent adds a connection event to the ring buffer
 func (b *MQTTBridge) addConnectionEvent(eventType string, success bool, message string) {
 	if b.connectionEvents == nil {
-		b.connectionEvents = make([]ConnectionEvent, 20) // Max 20 eventos
+		b.connectionEvents = make([]ConnectionEvent, 20) // Max 20 events
 	}
 	b.connectionEvents[b.cePos] = ConnectionEvent{
 		Timestamp: time.Now(),
@@ -287,7 +287,7 @@ func (b *MQTTBridge) SetCommandHandler(ch *bticino_commands.BTicinoCommandHandle
 	b.commandHandler = ch
 }
 
-// SetDeviceConfigPublisher inicializa el publicador de configuración del dispositivo vía MQTT
+// SetDeviceConfigPublisher initializes the device config publisher via MQTT
 func (b *MQTTBridge) SetDeviceConfigPublisher(interval time.Duration) {
 	if !b.IsConnected() {
 		b.logger.Warn("Cannot start device config publisher: MQTT not connected")
@@ -332,8 +332,8 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 		"sw_version":   "Bridge v" + version.GetVersion(),
 	}
 
-	// configuration_url: enlace "Visitar" en HA hacia el dashboard web del
-	// dispositivo. Detectamos la IP LAN automáticamente.
+	// configuration_url: "Visit" link in HA to the device web dashboard.
+	// We detect the LAN IP automatically.
 	if ip := localOutboundIP(); ip != "" {
 		device["configuration_url"] = fmt.Sprintf("http://%s:%d/", ip, b.config.Web.Port)
 	}
@@ -346,11 +346,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	entityCount := 0
 
-	// --- 1. Lock: Puerta ---
+	// --- 1. Lock: Door ---
 	b.discovery("lock", "bticino_door", map[string]interface{}{
-		"name":           "Puerta",
-		"unique_id":      "bticino_c300x_door_lock",
-		"object_id":      "bticino_puerta",
+		"name":           "Door",
+		"unique_id":      "bticino_intercom_door_lock",
+		"object_id":      "bticino_door",
 		"command_topic":  dp + "/lock/set",
 		"state_topic":    dp + "/lock/state",
 		"payload_lock":   "LOCK",
@@ -364,11 +364,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 2. Switch: Contestador ---
+	// --- 2. Switch: Answering Machine ---
 	b.discovery("switch", "bticino_voicemail", map[string]interface{}{
-		"name":          "Contestador",
-		"unique_id":     "bticino_c300x_voicemail",
-		"object_id":     "bticino_contestador",
+		"name":          "Answering Machine",
+		"unique_id":     "bticino_intercom_voicemail",
+		"object_id":     "bticino_voicemail",
 		"command_topic": dp + "/voicemail/set",
 		"state_topic":   dp + "/voicemail/state",
 		"payload_on":    "ON",
@@ -381,11 +381,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 3. Switch: Sonido Timbre ---
+	// --- 3. Switch: Doorbell Sound ---
 	b.discovery("switch", "bticino_doorbell_sound", map[string]interface{}{
-		"name":          "Sonido Timbre",
-		"unique_id":     "bticino_c300x_doorbell_sound",
-		"object_id":     "bticino_sonido_timbre",
+		"name":          "Ringtone",
+		"unique_id":     "bticino_intercom_doorbell_sound",
+		"object_id":     "bticino_doorbell_sound",
 		"command_topic": dp + "/doorbellsound/set",
 		"state_topic":   dp + "/doorbellsound/state",
 		"payload_on":    "ON",
@@ -398,11 +398,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 4. Switch: Pantalla ---
+	// --- 4. Switch: Display ---
 	b.discovery("switch", "bticino_display", map[string]interface{}{
-		"name":          "Pantalla",
-		"unique_id":     "bticino_c300x_display",
-		"object_id":     "bticino_pantalla",
+		"name":          "Display",
+		"unique_id":     "bticino_intercom_display",
+		"object_id":     "bticino_display",
 		"command_topic": dp + "/display/set",
 		"state_topic":   dp + "/display/state",
 		"payload_on":    "ON",
@@ -415,16 +415,16 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 5. Switch: Silencio (ELIMINADO - integrado en doorbell_sound) ---
-	// El control de silencio del altavoz ya está integrado en doorbell_sound
-	// cuando se graba una nota de voz, el GPIO 180 se desactiva automáticamente
+	// --- 5. Switch: Mute (REMOVED - merged into doorbell_sound) ---
+	// Speaker mute control is already integrated into doorbell_sound
+	// when a voice note is recorded, GPIO 180 is deactivated automatically
 	// entityCount++
 
-	// --- 6. Button: Luz Escalera ---
+	// --- 6. Button: Staircase Light ---
 	b.discovery("button", "bticino_staircase_light", map[string]interface{}{
-		"name":          "Luz Escalera",
-		"unique_id":     "bticino_c300x_staircase_light",
-		"object_id":     "bticino_luz_escalera",
+		"name":          "Staircase Light",
+		"unique_id":     "bticino_intercom_staircase_light",
+		"object_id":     "bticino_staircase_light",
 		"command_topic": dp + "/light/set",
 		"payload_press": "PRESS",
 		"icon":          "mdi:stairs",
@@ -433,11 +433,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 7. Button: Abrir Puerta ---
+	// --- 7. Button: Open Door ---
 	b.discovery("button", "bticino_door_open", map[string]interface{}{
-		"name":          "Abrir Puerta",
-		"unique_id":     "bticino_c300x_door_open",
-		"object_id":     "bticino_abrir_puerta",
+		"name":          "Door Opener",
+		"unique_id":     "bticino_intercom_door_open",
+		"object_id":     "bticino_door_open",
 		"command_topic": dp + "/door/open",
 		"payload_press": "PRESS",
 		"icon":          "mdi:door-open",
@@ -446,11 +446,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 8. Sensor: Temperatura ---
+	// --- 8. Sensor: Temperature ---
 	b.discovery("sensor", "bticino_temperature", map[string]interface{}{
-		"name":                "Temperatura Dispositivo",
-		"unique_id":           "bticino_c300x_temperature",
-		"object_id":           "bticino_temperatura",
+		"name":                "Device Temperature",
+		"unique_id":           "bticino_intercom_temperature",
+		"object_id":           "bticino_temperature",
 		"state_topic":         dp + "/sensor/temperature",
 		"unit_of_measurement": "\u00b0C",
 		"device_class":        "temperature",
@@ -461,11 +461,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 9. Sensor: Mensajes Nuevos ---
+	// --- 9. Sensor: New Messages ---
 	b.discovery("sensor", "bticino_new_messages", map[string]interface{}{
-		"name":         "Mensajes Nuevos",
-		"unique_id":    "bticino_c300x_new_messages",
-		"object_id":    "bticino_mensajes_nuevos",
+		"name":         "New Messages",
+		"unique_id":    "bticino_intercom_new_messages",
+		"object_id":    "bticino_new_messages",
 		"state_topic":  dp + "/sensor/new_messages",
 		"icon":         "mdi:message-badge",
 		"device":       device,
@@ -473,11 +473,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 10. Sensor: Total Mensajes ---
+	// --- 10. Sensor: Total Messages ---
 	b.discovery("sensor", "bticino_total_messages", map[string]interface{}{
-		"name":         "Total Mensajes",
-		"unique_id":    "bticino_c300x_total_messages",
-		"object_id":    "bticino_total_mensajes",
+		"name":         "Total Messages",
+		"unique_id":    "bticino_intercom_total_messages",
+		"object_id":    "bticino_total_messages",
 		"state_topic":  dp + "/sensor/total_messages",
 		"icon":         "mdi:message-text-clock",
 		"device":       device,
@@ -485,11 +485,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 11. Sensor: Almacenamiento Usado ---
+	// --- 11. Sensor: Storage Used ---
 	b.discovery("sensor", "bticino_storage", map[string]interface{}{
-		"name":                "Almacenamiento Contestador",
-		"unique_id":           "bticino_c300x_storage",
-		"object_id":           "bticino_almacenamiento",
+		"name":                "Answering Machine Storage",
+		"unique_id":           "bticino_intercom_storage",
+		"object_id":           "bticino_storage",
 		"state_topic":         dp + "/sensor/storage_used",
 		"unit_of_measurement": "%",
 		"icon":                "mdi:harddisk",
@@ -498,11 +498,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 12. Sensor: Teclado (ultimo boton pulsado) ---
+	// --- 12. Sensor: Keypad (last button pressed) ---
 	b.discovery("sensor", "bticino_keypad", map[string]interface{}{
-		"name":         "Teclado",
-		"unique_id":    "bticino_c300x_keypad",
-		"object_id":    "bticino_teclado",
+		"name":         "Keypad",
+		"unique_id":    "bticino_intercom_keypad",
+		"object_id":    "bticino_keypad",
 		"state_topic":  dp + "/sensor/keypad",
 		"icon":         "mdi:dialpad",
 		"device":       device,
@@ -510,11 +510,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 13. Binary Sensor: Timbre (doorbell) ---
+	// --- 13. Binary Sensor: Doorbell ---
 	b.discovery("binary_sensor", "bticino_doorbell", map[string]interface{}{
-		"name":         "Timbre",
-		"unique_id":    "bticino_c300x_doorbell",
-		"object_id":    "bticino_timbre",
+		"name":         "Doorbell",
+		"unique_id":    "bticino_intercom_doorbell",
+		"object_id":    "bticino_doorbell",
 		"state_topic":  dp + "/doorbell/state",
 		"payload_on":   "ON",
 		"payload_off":  "OFF",
@@ -557,11 +557,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 		entityCount++
 	}
 
-	// --- 21. Sensor: Evento Bus OpenWebNet (ultimo evento raw) ---
+	// --- 21. Sensor: OpenWebNet Bus Event (last raw event) ---
 	b.discovery("sensor", "bticino_bus_event", map[string]interface{}{
-		"name":         "Evento Bus OWN",
-		"unique_id":    "bticino_c300x_bus_event",
-		"object_id":    "bticino_evento_bus",
+		"name":         "OWN Bus Event",
+		"unique_id":    "bticino_intercom_bus_event",
+		"object_id":    "bticino_bus_event",
 		"state_topic":  dp + "/sensor/bus_event",
 		"icon":         "mdi:bus-electric",
 		"device":       device,
@@ -569,11 +569,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 22. Binary Sensor: Estado SIP ---
+	// --- 22. Binary Sensor: SIP Status ---
 	b.discovery("binary_sensor", "bticino_sip_status", map[string]interface{}{
-		"name":         "Estado SIP",
-		"unique_id":    "bticino_c300x_sip_status",
-		"object_id":    "bticino_estado_sip",
+		"name":         "SIP Status",
+		"unique_id":    "bticino_intercom_sip_status",
+		"object_id":    "bticino_sip_status",
 		"state_topic":  dp + "/sensor/sip_status",
 		"payload_on":   "ON",
 		"payload_off":  "OFF",
@@ -584,11 +584,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 23. Sensor: Diagnostico Sistema ---
+	// --- 23. Sensor: System Diagnostics ---
 	b.discovery("sensor", "bticino_system_diag", map[string]interface{}{
-		"name":         "Diagnostico Sistema",
-		"unique_id":    "bticino_c300x_system_diag",
-		"object_id":    "bticino_diagnostico",
+		"name":         "System Diagnostics",
+		"unique_id":    "bticino_intercom_system_diag",
+		"object_id":    "bticino_system_diag",
 		"state_topic":  dp + "/sensor/system_diag",
 		"icon":         "mdi:heart-pulse",
 		"device":       device,
@@ -598,8 +598,8 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- 24. Sensor: Multicast ---
 	b.discovery("sensor", "bticino_multicast", map[string]interface{}{
-		"name":         "Mensajes Multicast",
-		"unique_id":    "bticino_c300x_multicast",
+		"name":         "Multicast Messages",
+		"unique_id":    "bticino_intercom_multicast",
 		"object_id":    "bticino_multicast",
 		"state_topic":  dp + "/sensor/multicast_count",
 		"icon":         "mdi:access-point-network",
@@ -626,11 +626,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 		entityCount++
 	}
 
-	// --- 38. Sensor: Registro de Actividad ---
+	// --- 38. Sensor: Activity Log ---
 	b.discovery("sensor", "bticino_activity_log", map[string]interface{}{
-		"name":                  "Registro de Actividad",
-		"unique_id":             "bticino_c300x_activity_log",
-		"object_id":             "bticino_actividad",
+		"name":                  "Activity Log",
+		"unique_id":             "bticino_intercom_activity_log",
+		"object_id":             "bticino_activity_log",
 		"state_topic":           dp + "/sensor/activity_log",
 		"json_attributes_topic": dp + "/sensor/activity_log/attributes",
 		"icon":                  "mdi:timeline-text",
@@ -639,11 +639,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 39. Sensor: Informacion del Sistema (WHO=13) ---
+	// --- 39. Sensor: System Information (WHO=13) ---
 	b.discovery("sensor", "bticino_system_info", map[string]interface{}{
-		"name":                  "Informacion Sistema",
-		"unique_id":             "bticino_c300x_system_info",
-		"object_id":             "bticino_info_sistema",
+		"name":                  "System Information",
+		"unique_id":             "bticino_intercom_system_info",
+		"object_id":             "bticino_system_info",
 		"state_topic":           dp + "/sensor/system_info",
 		"json_attributes_topic": dp + "/sensor/system_info/attributes",
 		"icon":                  "mdi:information-outline",
@@ -652,17 +652,17 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- Cerraduras adicionales (dinamico, segun configuracion) ---
+	// --- Additional locks (dynamic, per configuration) ---
 	for i, lock := range b.config.AdditionalLocks {
 		whereStr := fmt.Sprintf("%d", lock.Where)
 		objID := fmt.Sprintf("bticino_lock_%d", lock.Where)
 		name := lock.Name
 		if name == "" {
-			name = fmt.Sprintf("Cerradura %d", i+1)
+			name = fmt.Sprintf("Lock %d", i+1)
 		}
 		b.discovery("lock", objID, map[string]interface{}{
 			"name":           name,
-			"unique_id":      fmt.Sprintf("bticino_c300x_lock_%d", lock.Where),
+			"unique_id":      fmt.Sprintf("bticino_intercom_lock_%d", lock.Where),
 			"object_id":      objID,
 			"command_topic":  dp + "/lock/" + whereStr + "/set",
 			"state_topic":    dp + "/lock/" + whereStr + "/state",
@@ -680,13 +680,13 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	b.logger.Infof("MQTT: Published %d Home Assistant discovery entities", entityCount)
 
-	// ==================== DEVICE CONFIG ENTITIES (Fase 4) ====================
+	// ==================== DEVICE CONFIG ENTITIES (Phase 4) ====================
 
 	// --- Sensor: Language ---
 	b.discovery("sensor", "bticino_language", map[string]interface{}{
-		"name":           "Idioma Sistema",
-		"unique_id":      "bticino_c300x_language",
-		"object_id":      "bticino_idioma",
+		"name":           "System Language",
+		"unique_id":      "bticino_intercom_language",
+		"object_id":      "bticino_language",
 		"state_topic":    dp + "/system/language",
 		"value_template": "{{ value_json.language }}",
 		"icon":           "mdi:translate",
@@ -697,8 +697,8 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Sensor: Timezone ---
 	b.discovery("sensor", "bticino_timezone", map[string]interface{}{
-		"name":           "Zona Horaria",
-		"unique_id":      "bticino_c300x_timezone",
+		"name":           "Time Zone",
+		"unique_id":      "bticino_intercom_timezone",
 		"object_id":      "bticino_timezone",
 		"state_topic":    dp + "/system/timezone",
 		"value_template": "{{ value_json.timezone }}",
@@ -710,8 +710,8 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Sensor: NTP Server ---
 	b.discovery("sensor", "bticino_ntp", map[string]interface{}{
-		"name":           "Servidor NTP",
-		"unique_id":      "bticino_c300x_ntp",
+		"name":           "NTP Server",
+		"unique_id":      "bticino_intercom_ntp",
 		"object_id":      "bticino_ntp",
 		"state_topic":    dp + "/system/timezone",
 		"value_template": "{{ value_json.ntp_server }}",
@@ -723,8 +723,8 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Sensor: Datetime ---
 	b.discovery("sensor", "bticino_datetime", map[string]interface{}{
-		"name":           "Fecha y Hora Sistema",
-		"unique_id":      "bticino_c300x_datetime",
+		"name":           "System Date and Time",
+		"unique_id":      "bticino_intercom_datetime",
 		"object_id":      "bticino_datetime",
 		"state_topic":    dp + "/system/datetime",
 		"value_template": "{{ value_json.datetime }}",
@@ -736,9 +736,9 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Sensor: Answering Machine Status ---
 	b.discovery("sensor", "bticino_answering_status", map[string]interface{}{
-		"name":           "Estado Contestador",
-		"unique_id":      "bticino_c300x_answering_status",
-		"object_id":      "bticino_answering",
+		"name":           "Answering Machine Status",
+		"unique_id":      "bticino_intercom_answering_status",
+		"object_id":      "bticino_answering_status",
 		"state_topic":    dp + "/answering/state",
 		"value_template": "{{ value_json.activated }}",
 		"icon":           "mdi:voicemail",
@@ -749,8 +749,8 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Sensor: Answering Memory ---
 	b.discovery("sensor", "bticino_answering_memory", map[string]interface{}{
-		"name":           "Memoria Contestador",
-		"unique_id":      "bticino_c300x_answering_memory",
+		"name":           "Answering Machine Memory",
+		"unique_id":      "bticino_intercom_answering_memory",
 		"object_id":      "bticino_answering_memory",
 		"state_topic":    dp + "/answering/state",
 		"value_template": "{{ value_json.memory_used }}",
@@ -760,10 +760,10 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- Sensor: Ringtone S0 (Placa exterior) ---
+	// --- Sensor: Ringtone S0 (entrance panel) ---
 	b.discovery("sensor", "bticino_ringtone_s0", map[string]interface{}{
-		"name":           "Timbre Placa Exterior",
-		"unique_id":      "bticino_c300x_ringtone_s0",
+		"name":           "Entrance Doorbell",
+		"unique_id":      "bticino_intercom_ringtone_s0",
 		"object_id":      "bticino_ringtone_s0",
 		"state_topic":    dp + "/audio/ringtone/s0",
 		"value_template": "{{ value_json.value }}",
@@ -775,8 +775,8 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Sensor: Volume S0 ---
 	b.discovery("sensor", "bticino_volume_s0", map[string]interface{}{
-		"name":           "Volumen S0",
-		"unique_id":      "bticino_c300x_volume_s0",
+		"name":           "S0 Volume",
+		"unique_id":      "bticino_intercom_volume_s0",
 		"object_id":      "bticino_volume_s0",
 		"state_topic":    dp + "/audio/volume/s0",
 		"value_template": "{{ value_json.value }}",
@@ -788,8 +788,8 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Sensor: Volume Door ---
 	b.discovery("sensor", "bticino_volume_door", map[string]interface{}{
-		"name":           "Volumen Puerta",
-		"unique_id":      "bticino_c300x_volume_door",
+		"name":           "Door Volume",
+		"unique_id":      "bticino_intercom_volume_door",
 		"object_id":      "bticino_volume_door",
 		"state_topic":    dp + "/audio/volume/door",
 		"value_template": "{{ value_json.value }}",
@@ -801,8 +801,8 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Sensor: Display Brightness ---
 	b.discovery("sensor", "bticino_display_brightness", map[string]interface{}{
-		"name":           "Brillo Display",
-		"unique_id":      "bticino_c300x_display_brightness",
+		"name":           "Display Brightness",
+		"unique_id":      "bticino_intercom_display_brightness",
 		"object_id":      "bticino_display_brightness",
 		"state_topic":    dp + "/display/brightness",
 		"value_template": "{{ value_json.value }}",
@@ -814,9 +814,9 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Sensor: Camera 20 Brightness ---
 	b.discovery("sensor", "bticino_camera_20_brightness", map[string]interface{}{
-		"name":           "Brillo Camara 20",
-		"unique_id":      "bticino_c300x_camera_20_brightness",
-		"object_id":      "bticino_camera_20",
+		"name":           "Camera Brightness",
+		"unique_id":      "bticino_intercom_camera_20_brightness",
+		"object_id":      "bticino_camera_20_brightness",
 		"state_topic":    dp + "/camera/20/config",
 		"value_template": "{{ value_json.brightness }}",
 		"icon":           "mdi:cctv",
@@ -825,11 +825,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- Sensor: Estado de llamada (INCOMING/CONNECTED/IDLE) ---
+	// --- Sensor: Call state (INCOMING/CONNECTED/IDLE) ---
 	b.discovery("sensor", "bticino_call_state", map[string]interface{}{
-		"name":         "Estado llamada",
-		"unique_id":    "bticino_c300x_call_state",
-		"object_id":    "bticino_estado_llamada",
+		"name":         "Call Status",
+		"unique_id":    "bticino_intercom_call_state",
+		"object_id":    "bticino_call_state",
 		"state_topic":  dp + "/call/state",
 		"icon":         "mdi:phone",
 		"device":       device,
@@ -837,11 +837,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- Sensor: Quién llama ---
+	// --- Sensor: Caller ---
 	b.discovery("sensor", "bticino_call_caller", map[string]interface{}{
-		"name":         "Quién llama",
-		"unique_id":    "bticino_c300x_call_caller",
-		"object_id":    "bticino_quien_llama",
+		"name":         "Caller",
+		"unique_id":    "bticino_intercom_call_caller",
+		"object_id":    "bticino_call_caller",
 		"state_topic":  dp + "/call/caller",
 		"icon":         "mdi:account-voice",
 		"device":       device,
@@ -849,11 +849,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- Binary Sensor: Timbre de rellano (floor doorbell) ---
+	// --- Binary Sensor: Landing doorbell (floor doorbell) ---
 	b.discovery("binary_sensor", "bticino_doorbell_floor", map[string]interface{}{
-		"name":         "Timbre rellano",
-		"unique_id":    "bticino_c300x_doorbell_floor",
-		"object_id":    "bticino_timbre_rellano",
+		"name":         "Landing Doorbell",
+		"unique_id":    "bticino_intercom_doorbell_floor",
+		"object_id":    "bticino_doorbell_floor",
 		"state_topic":  dp + "/doorbell_floor/state",
 		"payload_on":   "ON",
 		"payload_off":  "OFF",
@@ -864,11 +864,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- Event: Timbre (placa exterior) ---
+	// --- Event: Doorbell (entrance panel) ---
 	b.discovery("event", "bticino_event_doorbell", map[string]interface{}{
-		"name":         "Timbre (evento)",
-		"unique_id":    "bticino_c300x_event_doorbell",
-		"object_id":    "bticino_evento_timbre",
+		"name":         "Doorbell (Event)",
+		"unique_id":    "bticino_intercom_event_doorbell",
+		"object_id":    "bticino_event_doorbell",
 		"state_topic":  dp + "/event/doorbell",
 		"event_types":  []string{"pressed"},
 		"device_class": "doorbell",
@@ -878,11 +878,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- Event: Timbre de rellano ---
+	// --- Event: Landing doorbell ---
 	b.discovery("event", "bticino_event_doorbell_floor", map[string]interface{}{
-		"name":         "Timbre rellano (evento)",
-		"unique_id":    "bticino_c300x_event_doorbell_floor",
-		"object_id":    "bticino_evento_timbre_rellano",
+		"name":         "Landing Doorbell (Event)",
+		"unique_id":    "bticino_intercom_event_doorbell_floor",
+		"object_id":    "bticino_event_doorbell_floor",
 		"state_topic":  dp + "/event/doorbell_floor",
 		"event_types":  []string{"pressed"},
 		"device_class": "doorbell",
@@ -892,11 +892,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- Event: Llamada (incoming/connected/ended) ---
+	// --- Event: Call (incoming/connected/ended) ---
 	b.discovery("event", "bticino_event_call", map[string]interface{}{
-		"name":         "Llamada (evento)",
-		"unique_id":    "bticino_c300x_event_call",
-		"object_id":    "bticino_evento_llamada",
+		"name":         "Call (Event)",
+		"unique_id":    "bticino_intercom_event_call",
+		"object_id":    "bticino_event_call",
 		"state_topic":  dp + "/event/call",
 		"event_types":  []string{"incoming", "connected", "ended"},
 		"icon":         "mdi:phone-ring",
@@ -905,11 +905,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- Event: frame del bus OpenWebNet (raw) ---
+	// --- Event: OpenWebNet bus frame (raw) ---
 	b.discovery("event", "bticino_event_bus_own", map[string]interface{}{
-		"name":         "Evento Bus OWN",
-		"unique_id":    "bticino_c300x_event_bus_own",
-		"object_id":    "bticino_evento_bus_own",
+		"name":         "OWN Bus Event",
+		"unique_id":    "bticino_intercom_event_bus_own",
+		"object_id":    "bticino_event_bus_own",
 		"state_topic":  dp + "/event/bus_own",
 		"event_types":  []string{"frame"},
 		"icon":         "mdi:bus-alert",
@@ -918,13 +918,13 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- Sensor: IP (Diagnostic) — extraído de los atributos de system_info ---
+	// --- Sensor: IP (Diagnostic) — extracted from system_info attributes ---
 	b.discovery("sensor", "bticino_ip_address", map[string]interface{}{
-		"name":           "Dirección IP",
-		"unique_id":      "bticino_c300x_ip",
-		"object_id":      "bticino_ip",
+		"name":           "IP Address",
+		"unique_id":      "bticino_intercom_ip",
+		"object_id":      "bticino_ip_address",
 		"state_topic":    dp + "/sensor/system_info/attributes",
-		"value_template": "{{ value_json.ip_address | default('desconocida') }}",
+		"value_template": "{{ value_json.ip_address | default('unknown') }}",
 		"icon":           "mdi:ip-network",
 		"device":         device,
 		"availability":   avail,
@@ -933,22 +933,22 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Sensor: MAC (Diagnostic) ---
 	b.discovery("sensor", "bticino_mac_address", map[string]interface{}{
-		"name":           "Dirección MAC",
-		"unique_id":      "bticino_c300x_mac",
-		"object_id":      "bticino_mac",
+		"name":           "MAC Address",
+		"unique_id":      "bticino_intercom_mac",
+		"object_id":      "bticino_mac_address",
 		"state_topic":    dp + "/sensor/system_info/attributes",
-		"value_template": "{{ value_json.mac_address | default('desconocida') }}",
+		"value_template": "{{ value_json.mac_address | default('unknown') }}",
 		"icon":           "mdi:network",
 		"device":         device,
 		"availability":   avail,
 	})
 	entityCount++
 
-	// --- Sensor: Señal WiFi (Diagnostic) ---
+	// --- Sensor: WiFi Signal (Diagnostic) ---
 	b.discovery("sensor", "bticino_wifi_signal", map[string]interface{}{
-		"name":                "Señal WiFi",
-		"unique_id":           "bticino_c300x_wifi_signal",
-		"object_id":           "bticino_wifi",
+		"name":                "Wi-Fi Signal",
+		"unique_id":           "bticino_intercom_wifi_signal",
+		"object_id":           "bticino_wifi_signal",
 		"state_topic":         dp + "/sensor/wifi_signal",
 		"unit_of_measurement": "%",
 		"icon":                "mdi:wifi",
@@ -957,11 +957,11 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- Button: Marcar todos los mensajes como leídos ---
+	// --- Button: Mark all messages as read ---
 	b.discovery("button", "bticino_mark_all_read", map[string]interface{}{
-		"name":          "Marcar todos leídos",
-		"unique_id":     "bticino_c300x_mark_all_read",
-		"object_id":     "bticino_marcar_todos_leidos",
+		"name":          "Mark All as Read",
+		"unique_id":     "bticino_intercom_mark_all_read",
+		"object_id":     "bticino_mark_all_read",
 		"command_topic": dp + "/messages/markallread/set",
 		"payload_press": "PRESS",
 		"icon":          "mdi:email-open-multiple",
@@ -970,12 +970,12 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- Buttons: reinicio del sistema (Configuration) — solo si están habilitados ---
+	// --- Buttons: system restart (Configuration) — only if enabled ---
 	if b.config.MQTT.EnableSystemButtons {
 		b.discovery("button", "bticino_restart_bridge", map[string]interface{}{
-			"name":            "Reiniciar bridge",
-			"unique_id":       "bticino_c300x_restart_bridge",
-			"object_id":       "bticino_reiniciar_bridge",
+			"name":            "Restart Bridge",
+			"unique_id":       "bticino_intercom_restart_bridge",
+			"object_id":       "bticino_restart_bridge",
 			"command_topic":   dp + "/system/restart_bridge/set",
 			"payload_press":   "PRESS",
 			"entity_category": "config",
@@ -986,9 +986,9 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 		entityCount++
 
 		b.discovery("button", "bticino_reboot_device", map[string]interface{}{
-			"name":            "Reiniciar dispositivo",
-			"unique_id":       "bticino_c300x_reboot_device",
-			"object_id":       "bticino_reiniciar_dispositivo",
+			"name":            "Restart Device",
+			"unique_id":       "bticino_intercom_reboot_device",
+			"object_id":       "bticino_reboot_device",
 			"command_topic":   dp + "/system/reboot/set",
 			"payload_press":   "PRESS",
 			"entity_category": "config",
@@ -1000,15 +1000,15 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 		entityCount++
 	}
 
-	// --- Camera: foto del timbre (solo si hay captura cableada) ---
+	// --- Camera: doorbell snapshot (only if capture is wired up) ---
 	b.mu.RLock()
 	cameraEnabled := b.cameraEnabled
 	b.mu.RUnlock()
 	if cameraEnabled {
 		b.discovery("camera", "bticino_doorbell_camera", map[string]interface{}{
-			"name":           "Cámara timbre",
-			"unique_id":      "bticino_c300x_doorbell_camera",
-			"object_id":      "bticino_camara_timbre",
+			"name":           "Doorbell Camera",
+			"unique_id":      "bticino_intercom_doorbell_camera",
+			"object_id":      "bticino_doorbell_camera",
 			"topic":          dp + "/camera/doorbell",
 			"image_encoding": "b64",
 			"icon":           "mdi:doorbell-video",
@@ -1021,9 +1021,9 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	b.logger.Infof("MQTT: Published %d Home Assistant discovery entities (total with device config)", entityCount)
 }
 
-// diagnosticEntities son los object_id que deben ir a la sección "Diagnostic"
-// de Home Assistant. Lo demás (cerraduras, switches, botones de acción y los
-// sensores operativos como mensajes/timbre/llamada) queda en Controls/Sensors.
+// diagnosticEntities are the object_ids that belong in the "Diagnostic"
+// section of Home Assistant. Everything else (locks, switches, action buttons
+// and operational sensors like messages/doorbell/call) stays in Controls/Sensors.
 var diagnosticEntities = map[string]bool{
 	"bticino_temperature": true, "bticino_storage": true, "bticino_keypad": true,
 	"bticino_bus_event": true, "bticino_system_diag": true, "bticino_multicast": true,
@@ -1035,8 +1035,8 @@ var diagnosticEntities = map[string]bool{
 	"bticino_ip_address": true, "bticino_mac_address": true, "bticino_wifi_signal": true,
 }
 
-// entityCategory decide la entity_category de HA a partir del object_id. Los
-// LEDs (bticino_led_*) y GPIO (bticino_gpio_*) también son diagnóstico.
+// entityCategory decides the HA entity_category from the object_id. The
+// LEDs (bticino_led_*) and GPIO (bticino_gpio_*) are diagnostic too.
 func entityCategory(objectID string) string {
 	if diagnosticEntities[objectID] ||
 		strings.HasPrefix(objectID, "bticino_led_") ||
@@ -1103,13 +1103,13 @@ func (b *MQTTBridge) subscribeToCommands() {
 	sub(dp+"/command/send", b.handleRawCommand)
 	sub(dp+"/messages/markallread/set", b.handleMarkAllReadCommand)
 
-	// Botones de reinicio del sistema (solo si están habilitados)
+	// System restart buttons (only if enabled)
 	if b.config.MQTT.EnableSystemButtons {
 		sub(dp+"/system/restart_bridge/set", b.handleRestartBridgeCommand)
 		sub(dp+"/system/reboot/set", b.handleRebootDeviceCommand)
 	}
 
-	// Suscribir a comandos de cerraduras adicionales
+	// Subscribe to additional lock commands
 	for _, lock := range b.config.AdditionalLocks {
 		whereStr := fmt.Sprintf("%d", lock.Where)
 		lockWhere := lock.Where // capture for closure
@@ -1285,13 +1285,13 @@ func (b *MQTTBridge) handleLightCommand(client pahomqtt.Client, msg pahomqtt.Mes
 	}()
 }
 
-// publishWiFiSignal lee la intensidad de la señal WiFi vía connmanctl y la
-// publica (%). connmanctl services lista los servicios; el conectado empieza por
-// '*'; connmanctl services <id> incluye una línea "Strength = NN".
+// publishWiFiSignal reads the WiFi signal strength via connmanctl and publishes
+// it (%). connmanctl services lists the services; the connected one starts with
+// '*'; connmanctl services <id> includes a "Strength = NN" line.
 func (b *MQTTBridge) publishWiFiSignal() {
 	out, err := exec.Command("connmanctl", "services").Output()
 	if err != nil {
-		b.logger.WithError(err).Debug("WiFi: 'connmanctl services' falló")
+		b.logger.WithError(err).Debug("WiFi: 'connmanctl services' failed")
 		return
 	}
 	svc := ""
@@ -1305,7 +1305,7 @@ func (b *MQTTBridge) publishWiFiSignal() {
 		}
 		svc = fields[len(fields)-1]
 		if strings.HasPrefix(strings.TrimSpace(line), "*") {
-			break // el conectado (marcado con *) tiene prioridad
+			break // the connected one (marked with *) takes priority
 		}
 	}
 	if svc == "" {
@@ -1314,7 +1314,7 @@ func (b *MQTTBridge) publishWiFiSignal() {
 
 	det, err := exec.Command("connmanctl", "services", svc).Output()
 	if err != nil {
-		b.logger.WithError(err).Debug("WiFi: 'connmanctl services <id>' falló")
+		b.logger.WithError(err).Debug("WiFi: 'connmanctl services <id>' failed")
 		return
 	}
 	for _, line := range strings.Split(string(det), "\n") {
@@ -1328,7 +1328,7 @@ func (b *MQTTBridge) publishWiFiSignal() {
 	}
 }
 
-// wifiMonitorLoop republica la señal WiFi periódicamente.
+// wifiMonitorLoop republishes the WiFi signal periodically.
 func (b *MQTTBridge) wifiMonitorLoop(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -1340,31 +1340,31 @@ func (b *MQTTBridge) wifiMonitorLoop(interval time.Duration) {
 	}
 }
 
-// handleRestartBridgeCommand reinicia el propio proceso bticino_bridge: lanza un
-// relanzamiento desacoplado (setsid) tras una breve pausa y sale. Hay un hueco de
-// ~2s sin instancia (sin solape).
+// handleRestartBridgeCommand restarts the bticino_bridge process itself: launches a
+// detached relaunch (setsid) after a brief pause and exits. There is a ~2s gap
+// with no instance (no overlap).
 func (b *MQTTBridge) handleRestartBridgeCommand(client pahomqtt.Client, msg pahomqtt.Message) {
 	if !b.config.MQTT.EnableSystemButtons {
 		return
 	}
-	b.logger.Warn("MQTT: reinicio del bridge solicitado")
+	b.logger.Warn("MQTT: bridge restart requested")
 	b.incCommands()
 	system.RestartBridgeAsync(b.logger)
 }
 
-// handleRebootDeviceCommand reinicia TODO el videoportero (/sbin/reboot).
+// handleRebootDeviceCommand reboots the whole video door phone (/sbin/reboot).
 func (b *MQTTBridge) handleRebootDeviceCommand(client pahomqtt.Client, msg pahomqtt.Message) {
 	if !b.config.MQTT.EnableSystemButtons {
 		return
 	}
-	b.logger.Warn("MQTT: REINICIO DEL DISPOSITIVO solicitado (/sbin/reboot)")
+	b.logger.Warn("MQTT: DEVICE REBOOT requested (/sbin/reboot)")
 	b.incCommands()
 	system.RebootDeviceAsync(b.logger)
 }
 
-// publishEvent publica un disparo de entidad Event de HA en <prefix>/event/<sub>.
-// El payload es JSON con event_type (obligatorio para la plataforma event de HA)
-// más atributos opcionales. No retenido (los eventos son momentáneos).
+// publishEvent publishes an HA Event entity trigger to <prefix>/event/<sub>.
+// The payload is JSON with event_type (mandatory for the HA event platform)
+// plus optional attributes. Not retained (events are momentary).
 func (b *MQTTBridge) publishEvent(sub, eventType string, extra map[string]interface{}) {
 	payload := map[string]interface{}{"event_type": eventType}
 	for k, v := range extra {
@@ -1377,19 +1377,19 @@ func (b *MQTTBridge) publishEvent(sub, eventType string, extra map[string]interf
 	b.publish(b.dataPrefix()+"/event/"+sub, string(data), false)
 }
 
-// handleMarkAllReadCommand marca todos los mensajes del contestador como leídos.
+// handleMarkAllReadCommand marks all answering machine messages as read.
 func (b *MQTTBridge) handleMarkAllReadCommand(client pahomqtt.Client, msg pahomqtt.Message) {
 	b.logger.Info("MQTT: Mark all messages as read")
 	b.incCommands()
 	if b.messageParser == nil {
-		b.logger.Warn("MarkAllRead: messageParser no disponible")
+		b.logger.Warn("MarkAllRead: messageParser not available")
 		return
 	}
 	updated, err := b.messageParser.MarkAllMessagesAsRead()
 	if err != nil {
-		b.logger.WithError(err).Warnf("MarkAllRead: fallo tras %d actualizados", updated)
+		b.logger.WithError(err).Warnf("MarkAllRead: failed after %d updated", updated)
 	}
-	b.logger.Infof("MarkAllRead: %d mensajes marcados como leídos", updated)
+	b.logger.Infof("MarkAllRead: %d messages marked as read", updated)
 	b.PublishMessageStats()
 }
 
@@ -1403,8 +1403,8 @@ func (b *MQTTBridge) handleRawCommand(client pahomqtt.Client, msg pahomqtt.Messa
 	}
 }
 
-// handleAdditionalLockCommand maneja el comando de desbloqueo de una cerradura adicional.
-// Usa el mismo patron press+release que la cerradura principal (WHERE=20).
+// handleAdditionalLockCommand handles the unlock command of an additional lock.
+// Uses the same press+release pattern as the main lock (WHERE=20).
 func (b *MQTTBridge) handleAdditionalLockCommand(where int, payload string) {
 	b.logger.WithFields(logrus.Fields{
 		"where":   where,
@@ -1464,8 +1464,8 @@ func (b *MQTTBridge) setupEventSubscriptions() {
 		b.publish(dp+"/doorbell/state", "ON", false)
 		b.publishEvent("doorbell", "pressed", nil)
 		b.incEvents()
-		// Al sonar el timbre la sesión de vídeo nativa suele estar activa: es el
-		// momento en que el snapshot cooperativo funciona.
+		// When the doorbell rings the native video session is usually active: this is
+		// when the cooperative snapshot works.
 		b.captureDoorbellPhoto("doorbell")
 	})
 
@@ -1507,7 +1507,7 @@ func (b *MQTTBridge) setupEventSubscriptions() {
 		b.incEvents()
 	})
 
-	// Floor/landing doorbell (timbre de rellano), distinct from the entrance panel
+	// Floor/landing doorbell (landing doorbell), distinct from the entrance panel
 	b.eventBus.Subscribe("doorbell.floor.pressed", func(event *events.Event) {
 		b.publish(dp+"/doorbell_floor/state", "ON", false)
 		b.publishEvent("doorbell_floor", "pressed", nil)
@@ -1593,13 +1593,13 @@ func (b *MQTTBridge) publishAllStates() {
 	b.publish(dp+"/call/state", "IDLE", true)
 	b.publish(dp+"/doorbell_floor/state", "OFF", true)
 
-	// WiFi signal: publicación inicial + arrancar el monitor periódico una vez
+	// WiFi signal: initial publish + start the periodic monitor once
 	go b.publishWiFiSignal()
 	b.wifiOnce.Do(func() { go b.wifiMonitorLoop(60 * time.Second) })
 
 	// New entities: SIP status, system diagnostics, multicast
 	b.publish(dp+"/sensor/sip_status", boolState(sip), true)
-	b.publish(dp+"/sensor/system_diag", "iniciando", true)
+	b.publish(dp+"/sensor/system_diag", "starting", true)
 	b.publish(dp+"/sensor/multicast_count", "0", true)
 
 	// GPIO pins initial state (all OFF until first read)
@@ -1620,16 +1620,16 @@ func (b *MQTTBridge) publishAllStates() {
 
 // ==================== DEVICE STATE QUERIES ====================
 
-// QueryVoicemailStatus consulta el estado real del contestador via *#8**40##.
-// Parsea la respuesta *#8**40*<vm_on>*<wm_on>*XXXX*X*XX## y actualiza el estado MQTT.
+// QueryVoicemailStatus queries the real answering machine state via *#8**40##.
+// Parses the *#8**40*<vm_on>*<wm_on>*XXXX*X*XX## response and updates the MQTT state.
 func (b *MQTTBridge) QueryVoicemailStatus() {
 	response, err := b.executeOWNWithResponse(bticino.CmdVoicemailStatusQuery)
 	if err != nil {
-		b.logger.WithError(err).Warn("No se pudo consultar estado del contestador")
+		b.logger.WithError(err).Warn("Could not query answering machine state")
 		return
 	}
 
-	// Regex para parsear: *#8**40*<vm_on>*<wm_on>*XXXX*X*XX##
+	// Regex to parse: *#8**40*<vm_on>*<wm_on>*XXXX*X*XX##
 	re := regexp.MustCompile(`\*#8\*\*40\*([01])\*([01])\*`)
 	matches := re.FindStringSubmatch(response)
 	if len(matches) >= 3 {
@@ -1644,21 +1644,21 @@ func (b *MQTTBridge) QueryVoicemailStatus() {
 		b.publish(b.dataPrefix()+"/voicemail/state", boolState(vmEnabled), true)
 
 		if changed {
-			b.logger.Infof("Estado contestador actualizado desde dispositivo: enabled=%v, welcome_msg=%v", vmEnabled, wmEnabled)
+			b.logger.Infof("Answering machine state updated from device: enabled=%v, welcome_msg=%v", vmEnabled, wmEnabled)
 		} else {
-			b.logger.Debugf("Estado contestador: enabled=%v, welcome_msg=%v (sin cambios)", vmEnabled, wmEnabled)
+			b.logger.Debugf("Answering machine state: enabled=%v, welcome_msg=%v (unchanged)", vmEnabled, wmEnabled)
 		}
 	} else {
-		b.logger.WithField("response", response).Debug("Respuesta de consulta voicemail no reconocida")
+		b.logger.WithField("response", response).Debug("Unrecognized voicemail query response")
 	}
 }
 
-// QueryBellStatus consulta el estado real del sonido del timbre via *#8**33##.
-// Respuesta: *#8**33*0## (muted) o *#8**33*1## (unmuted).
+// QueryBellStatus queries the real doorbell sound state via *#8**33##.
+// Response: *#8**33*0## (muted) or *#8**33*1## (unmuted).
 func (b *MQTTBridge) QueryBellStatus() {
 	response, err := b.executeOWNWithResponse(bticino.CmdBellQuery)
 	if err != nil {
-		b.logger.WithError(err).Warn("No se pudo consultar estado del timbre")
+		b.logger.WithError(err).Warn("Could not query doorbell state")
 		return
 	}
 
@@ -1669,7 +1669,7 @@ func (b *MQTTBridge) QueryBellStatus() {
 		b.mu.Unlock()
 		b.publish(b.dataPrefix()+"/doorbellsound/state", "OFF", true)
 		if changed {
-			b.logger.Info("Estado timbre actualizado desde dispositivo: muted (OFF)")
+			b.logger.Info("Doorbell state updated from device: muted (OFF)")
 		}
 	} else if strings.Contains(response, "*#8**33*1##") {
 		b.mu.Lock()
@@ -1678,14 +1678,14 @@ func (b *MQTTBridge) QueryBellStatus() {
 		b.mu.Unlock()
 		b.publish(b.dataPrefix()+"/doorbellsound/state", "ON", true)
 		if changed {
-			b.logger.Info("Estado timbre actualizado desde dispositivo: unmuted (ON)")
+			b.logger.Info("Doorbell state updated from device: unmuted (ON)")
 		}
 	} else {
-		b.logger.WithField("response", response).Debug("Respuesta de consulta timbre no reconocida")
+		b.logger.WithField("response", response).Debug("Unrecognized doorbell query response")
 	}
 }
 
-// UpdateBellState actualiza el estado del timbre desde un evento del bus OWN (tiempo real).
+// UpdateBellState updates the doorbell state from a real-time OWN bus event.
 func (b *MQTTBridge) UpdateBellState(on bool) {
 	b.mu.Lock()
 	b.doorbellSoundOn = on
@@ -1693,7 +1693,7 @@ func (b *MQTTBridge) UpdateBellState(on bool) {
 	b.publish(b.dataPrefix()+"/doorbellsound/state", boolState(on), true)
 }
 
-// UpdateVoicemailState actualiza el estado del contestador desde un evento del bus OWN (tiempo real).
+// UpdateVoicemailState updates the answering machine state from a real-time OWN bus event.
 func (b *MQTTBridge) UpdateVoicemailState(enabled bool) {
 	b.mu.Lock()
 	b.voicemailEnabled = enabled
@@ -1701,12 +1701,12 @@ func (b *MQTTBridge) UpdateVoicemailState(enabled bool) {
 	b.publish(b.dataPrefix()+"/voicemail/state", boolState(enabled), true)
 }
 
-// PublishAdditionalLockEvent publica un evento de cerradura adicional detectado en el bus OWN.
+// PublishAdditionalLockEvent publishes an additional lock event detected on the OWN bus.
 func (b *MQTTBridge) PublishAdditionalLockEvent(whereID string, state string) {
 	dp := b.dataPrefix()
 	b.publish(fmt.Sprintf("%s/lock/%s/state", dp, whereID), state, true)
 
-	// Auto re-lock despues de 5 segundos (mismo patron que cerradura principal)
+	// Auto re-lock after 5 seconds (same pattern as main lock)
 	if state == "UNLOCKED" {
 		go func() {
 			time.Sleep(5 * time.Second)
@@ -1715,12 +1715,12 @@ func (b *MQTTBridge) PublishAdditionalLockEvent(whereID string, state string) {
 	}
 }
 
-// QuerySystemInfo consulta informacion del sistema via comandos WHO=13.
-// Parsea las respuestas y publica como JSON en el sensor system_info.
+// QuerySystemInfo queries system information via WHO=13 commands.
+// Parses the responses and publishes them as JSON on the system_info sensor.
 func (b *MQTTBridge) QuerySystemInfo() {
 	info := make(map[string]string)
 
-	// Definicion de queries: {constante, clave, prefijo_respuesta}
+	// Query definition: {constant, key, response_prefix}
 	queries := []struct {
 		cmd    string
 		key    string
@@ -1739,58 +1739,58 @@ func (b *MQTTBridge) QuerySystemInfo() {
 	for _, q := range queries {
 		response, err := b.executeOWNWithResponse(q.cmd)
 		if err != nil {
-			b.logger.WithError(err).WithField("query", q.key).Warn("Error en consulta WHO=13")
+			b.logger.WithError(err).WithField("query", q.key).Warn("Error in WHO=13 query")
 			continue
 		}
 
-		// Parsear respuesta: buscar la linea que empieza con el prefijo
+		// Parse response: look for the line starting with the prefix
 		for _, line := range strings.Split(response, "\n") {
 			line = strings.TrimSpace(line)
 			if strings.HasPrefix(line, q.prefix) {
-				// Extraer valor: quitar prefijo y ## final
+				// Extract value: strip prefix and trailing ##
 				value := strings.TrimPrefix(line, q.prefix)
 				value = strings.TrimSuffix(value, "##")
 
 				if q.isMAC {
-					// MAC: convertir octetos decimales a hex con ':'
+					// MAC: convert decimal octets to hex with ':'
 					info[q.key] = parseMAC(value)
 				} else {
-					// IP y versiones: reemplazar * por .
+					// IP and versions: replace * with .
 					info[q.key] = strings.ReplaceAll(value, "*", ".")
 				}
 				break
 			}
 		}
 
-		// Delay entre comandos para respetar timing BTicino
+		// Delay between commands to respect BTicino timing
 		time.Sleep(bticino.CommandRetryDelay)
 	}
 
 	if len(info) == 0 {
-		b.logger.Warn("No se obtuvo informacion del sistema (WHO=13)")
+		b.logger.Warn("No system information obtained (WHO=13)")
 		return
 	}
 
-	// Publicar como JSON en el sensor
+	// Publish as JSON on the sensor
 	jsonData, err := json.Marshal(info)
 	if err != nil {
-		b.logger.WithError(err).Error("Error serializando info sistema")
+		b.logger.WithError(err).Error("Error serializing system info")
 		return
 	}
 
 	dp := b.dataPrefix()
-	// Publicar resumen como estado principal del sensor
-	summary := "desconocido"
+	// Publish summary as the main sensor state
+	summary := "unknown"
 	if fw, ok := info["firmware_version"]; ok {
 		summary = fw
 	}
 	b.publish(dp+"/sensor/system_info", summary, true)
 	b.publish(dp+"/sensor/system_info/attributes", string(jsonData), true)
 
-	b.logger.WithField("info", info).Info("Informacion del sistema publicada")
+	b.logger.WithField("info", info).Info("System information published")
 }
 
-// parseMAC convierte octetos decimales separados por * a formato MAC hex (AA:BB:CC:DD:EE:FF)
+// parseMAC converts *-separated decimal octets to hex MAC format (AA:BB:CC:DD:EE:FF)
 func parseMAC(starSeparated string) string {
 	parts := strings.Split(starSeparated, "*")
 	hexParts := make([]string, 0, len(parts))
@@ -1887,16 +1887,16 @@ func (b *MQTTBridge) PublishGPIOStates(states map[int]bool) {
 }
 
 // PublishActivityLog publishes a human-readable activity event to the activity_log sensor.
-// description: texto legible (ej. "Timbre: llamada desde placa exterior")
-// eventType: tipo maquina (ej. "doorbell_ring", "door_open", "camera_activated")
-// rawCommand: comando OWN original (ej. "*8*1#1#4#21*16##")
+// description: human-readable text (e.g. "Doorbell: call from entrance panel")
+// eventType: machine type (e.g. "doorbell_ring", "door_open", "camera_activated")
+// rawCommand: original OWN command (e.g. "*8*1#1#4#21*16##")
 func (b *MQTTBridge) PublishActivityLog(description, eventType, rawCommand string) {
 	dp := b.dataPrefix()
 
-	// Publicar estado principal (texto legible, no retained para que sea evento)
+	// Publish main state (readable text, not retained so it acts as an event)
 	b.publish(dp+"/sensor/activity_log", description, false)
 
-	// Publicar atributos JSON para automatizaciones
+	// Publish JSON attributes for automations
 	attrs := map[string]interface{}{
 		"event_type":  eventType,
 		"raw_command": rawCommand,
@@ -1941,23 +1941,23 @@ func (b *MQTTBridge) ExecuteCommand(command string) (bool, error) {
 	return b.executeOWN(command)
 }
 
-// executeOWNWithResponse envia un comando OWN abriendo una sesion de comandos TCP dedicada
-// al puerto 20000. Cada llamada abre una conexion nueva, envia *99*0## para abrir sesion,
-// luego envia el comando y lee la respuesta (dato + ACK) en el mismo socket.
-// Esto es necesario porque port 30006 solo devuelve ACK/NACK sin datos de respuesta.
+// executeOWNWithResponse sends an OWN command by opening a dedicated TCP command session
+// to port 20000. Each call opens a new connection, sends *99*0## to open a session,
+// then sends the command and reads the response (data + ACK) on the same socket.
+// This is needed because port 30006 only returns ACK/NACK without response data.
 func (b *MQTTBridge) executeOWNWithResponse(command string) (string, error) {
 	b.logger.WithField("command", command).Debug("Executing OWN query via TCP command session (port 20000)")
 
-	// Conectar a puerto 20000 con timeout de 5s
+	// Connect to port 20000 with a 5s timeout
 	conn, err := net.DialTimeout("tcp", "127.0.0.1:20000", 5*time.Second)
 	if err != nil {
-		return "", fmt.Errorf("error conectando a puerto 20000: %w", err)
+		return "", fmt.Errorf("error connecting to port 20000: %w", err)
 	}
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
 
-	// readMessage lee un mensaje OWN terminado en ## del socket
+	// readMessage reads a ##-terminated OWN message from the socket
 	readMessage := func(timeout time.Duration) (string, error) {
 		conn.SetReadDeadline(time.Now().Add(timeout))
 		var msg strings.Builder
@@ -1974,61 +1974,61 @@ func (b *MQTTBridge) executeOWNWithResponse(command string) (string, error) {
 		}
 	}
 
-	// Paso 1: Leer greeting del servidor
+	// Step 1: Read server greeting
 	greeting, err := readMessage(3 * time.Second)
 	if err != nil {
-		return "", fmt.Errorf("error leyendo greeting: %w", err)
+		return "", fmt.Errorf("error reading greeting: %w", err)
 	}
 	b.logger.WithField("greeting", greeting).Debug("OWN query session greeting")
 
-	// Si requiere autenticacion (*98*2##), no soportamos queries via TCP en este caso
+	// If it requires authentication (*98*2##), we do not support queries via TCP in that case
 	if strings.Contains(greeting, "*98*") {
-		return "", fmt.Errorf("servidor requiere autenticacion HMAC, query no soportada")
+		return "", fmt.Errorf("server requires HMAC authentication, query not supported")
 	}
 
-	// Paso 2: Enviar apertura de sesion de comandos *99*0##
+	// Step 2: Send command-session open *99*0##
 	_, err = conn.Write([]byte("*99*0##"))
 	if err != nil {
-		return "", fmt.Errorf("error enviando sesion de comandos: %w", err)
+		return "", fmt.Errorf("error sending command session: %w", err)
 	}
 
-	// Paso 3: Leer respuesta a sesion (debe ser *#*1## = ACK)
+	// Step 3: Read session response (must be *#*1## = ACK)
 	sessionResp, err := readMessage(3 * time.Second)
 	if err != nil {
-		return "", fmt.Errorf("error leyendo respuesta de sesion: %w", err)
+		return "", fmt.Errorf("error reading session response: %w", err)
 	}
 	if !strings.Contains(sessionResp, "*#*1##") {
-		return "", fmt.Errorf("sesion de comandos rechazada: %s", sessionResp)
+		return "", fmt.Errorf("command session rejected: %s", sessionResp)
 	}
 
-	// Paso 4: Enviar el comando de consulta
+	// Step 4: Send the query command
 	_, err = conn.Write([]byte(command))
 	if err != nil {
-		return "", fmt.Errorf("error enviando comando %s: %w", command, err)
+		return "", fmt.Errorf("error sending command %s: %w", command, err)
 	}
 
-	// Paso 5: Leer respuesta(s) - puede ser dato + ACK o NACK
-	// Leer primer mensaje (puede ser el dato o directamente ACK/NACK)
+	// Step 5: Read response(s) - may be data + ACK or NACK
+	// Read first message (may be the data or directly ACK/NACK)
 	firstResp, err := readMessage(3 * time.Second)
 	if err != nil {
-		return "", fmt.Errorf("error leyendo respuesta a %s: %w", command, err)
+		return "", fmt.Errorf("error reading response to %s: %w", command, err)
 	}
 
-	// Si es NACK, el comando no fue entendido
+	// If NACK, the command was not understood
 	if firstResp == "*#*0##" {
-		return "", fmt.Errorf("comando %s rechazado (NACK)", command)
+		return "", fmt.Errorf("command %s rejected (NACK)", command)
 	}
 
-	// Si es ACK directamente (sin dato), devolver vacio
+	// If plain ACK (no data), return empty
 	if firstResp == "*#*1##" {
 		return "", nil
 	}
 
-	// Es el dato de respuesta. Intentar leer el ACK que sigue
+	// It is the response data. Try to read the ACK that follows
 	result := firstResp
 	ackResp, err := readMessage(2 * time.Second)
 	if err == nil {
-		b.logger.WithField("ack", ackResp).Debug("ACK recibido tras dato de query")
+		b.logger.WithField("ack", ackResp).Debug("ACK received after query data")
 	}
 
 	b.logger.WithFields(logrus.Fields{

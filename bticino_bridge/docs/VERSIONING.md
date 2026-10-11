@@ -1,23 +1,23 @@
 # BTicino Bridge - Versioning & Deploy Guide
 
-**Fecha**: 2026-03-27  
-**Versión Actual**: 0.14.2
+**Date**: 2026-03-27  
+**Current Version**: 0.14.2
 
 ---
 
-## 📋 **Cómo Funciona la Versión**
+## 📋 **How Versioning Works**
 
-### **1. Archivo VERSION**
+### **1. VERSION File**
 
-El archivo `VERSION` en la raíz del proyecto contiene el número de versión:
+The `VERSION` file at the project root contains the version number:
 
 ```
 0.14.2
 ```
 
-### **2. Lectura en Runtime**
+### **2. Runtime Reading**
 
-El binario lee el archivo `VERSION` desde el directorio donde está ubicado:
+The binary reads the `VERSION` file from the directory where it is located:
 
 ```go
 // pkg/version/version.go
@@ -25,10 +25,10 @@ func GetVersionFromFile() (string, error) {
     execDir := filepath.Dir(os.Executable())
     
     // Busca VERSION en:
-    // 1. Mismo directorio que el binario
-    // 2. Directorio padre
+    // 1. Same directory as the binary
+    // 2. Parent directory
     // 3. Dos niveles arriba
-    // 4. Directorio actual de trabajo
+    // 4. Current working directory
     
     versionPaths := []string{
         filepath.Join(execDir, "VERSION"),
@@ -41,7 +41,7 @@ func GetVersionFromFile() (string, error) {
 }
 ```
 
-### **3. Flujo de Versión**
+### **3. Version Flow**
 
 ```
 1. Developer actualiza VERSION (ej: 0.14.2)
@@ -50,10 +50,10 @@ func GetVersionFromFile() (string, error) {
        ↓
 3. make build (compila binario)
        ↓
-4. ./scripts/deploy.sh (deploy a dispositivo)
+4. ./scripts/deploy.sh (deploy to device)
        ↓
    a. Copia binario
-   b. Copia archivo VERSION ← ¡IMPORTANTE!
+   b. Copy VERSION file ← IMPORTANT!
    c. Reinicia servicio
        ↓
 5. Binario lee VERSION en startup
@@ -63,80 +63,80 @@ func GetVersionFromFile() (string, error) {
 
 ---
 
-## 🚀 **Deploy Automático**
+## 🚀 **Automatic Deploy**
 
-### **Comando**:
+### **Command**:
 ```bash
 ./scripts/deploy.sh
 ```
 
-### **Qué hace**:
+### **What it does**:
 1. ✅ Build web frontend (`npm run build`)
 2. ✅ Build Go binary (`go build`)
-3. ✅ SSH al dispositivo
-4. ✅ Backup del binario anterior
-5. ✅ Transferencia del nuevo binario
-6. ✅ **Transferencia del archivo VERSION** ← ¡CRÍTICO!
-7. ✅ Activación del nuevo binario
-8. ✅ Restart del servicio
-9. ✅ Verificación
+3. ✅ SSH to the device
+4. ✅ Previous binary backup
+5. ✅ New binary transfer
+6. ✅ **VERSION file transfer** ← CRITICAL!
+7. ✅ New binary activation
+8. ✅ Service restart
+9. ✅ Verification
 
 ---
 
-## 🐛 **Problemas Comunes**
+## 🐛 **Common Problems**
 
-### **1. Versión incorrecta en dispositivo**
+### **1. Wrong version on device**
 
-**Síntoma**: La API muestra versión anterior
+**Symptom**: the API shows a previous version
 
-**Causa**: El archivo `VERSION` no se copió al dispositivo
+**Cause**: the `VERSION` file wasn't copied to the device
 
-**Solución**:
+**Solution**:
 ```bash
 # Copiar manualmente
 cat VERSION | ssh bticino "cat > /home/bticino/cfg/extra/VERSION"
 
-# Reiniciar servicio
+# Restart service
 ssh bticino "pkill -9 bticino_bridge && cd /home/bticino/cfg/extra && ./bticino_bridge -config config.yaml &"
 
-# Verificar
+# Verify
 curl http://192.168.1.38:8082/api/status | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])"
 ```
 
-### **2. Versión 0.0.0**
+### **2. Version 0.0.0**
 
-**Síntoma**: API muestra `{"version": "0.0.0"}`
+**Symptom**: API shows `{"version": "0.0.0"}`
 
-**Causa**: No existe archivo `VERSION` en el dispositivo
+**Cause**: no `VERSION` file exists on the device
 
-**Solución**:
+**Solution**:
 ```bash
-# Crear archivo VERSION
+# Create VERSION file
 echo "0.14.2" | ssh bticino "cat > /home/bticino/cfg/extra/VERSION"
 
-# Reiniciar
+# Restart
 ssh bticino "pkill -9 bticino_bridge && cd /home/bticino/cfg/extra && ./bticino_bridge -config config.yaml &"
 ```
 
 ---
 
-## 📝 **Proceso de Release**
+## 📝 **Release Process**
 
-### **1. Actualizar Versión**:
+### **1. Update Version**:
 ```bash
 echo "0.14.3" > VERSION
 git add VERSION
 git commit -m "bump version to 0.14.3"
 ```
 
-### **2. Actualizar CHANGELOG**:
+### **2. Update CHANGELOG**:
 ```bash
 # Editar CHANGELOG.md
 git add CHANGELOG.md
 git commit -m "docs: Update CHANGELOG for 0.14.3"
 ```
 
-### **3. Build y Test**:
+### **3. Build and Test**:
 ```bash
 make build
 ./bticino_bridge -version
@@ -147,7 +147,7 @@ make build
 ./scripts/deploy.sh
 ```
 
-### **5. Verificar**:
+### **5. Verify**:
 ```bash
 # API
 curl http://192.168.1.38:8082/api/status
@@ -168,31 +168,31 @@ git push origin main
 
 ---
 
-## 🔍 **Archivos Involucrados**
+## 🔍 **Files Involved**
 
-| Archivo | Propósito | Ubicación |
+| File | Purpose | Location |
 |---------|-----------|-----------|
-| `VERSION` | Número de versión | Raíz del proyecto |
-| `CHANGELOG.md` | Historial de cambios | Raíz del proyecto |
-| `pkg/version/version.go` | Lógica de lectura | Código Go |
-| `scripts/deploy.sh` | Deploy automático | Scripts |
-| `/home/bticino/cfg/extra/VERSION` | Versión en dispositivo | Dispositivo |
+| `VERSION` | Version number | Project root |
+| `CHANGELOG.md` | Change history | Project root |
+| `pkg/version/version.go` | Reading logic | Go code |
+| `scripts/deploy.sh` | Automatic deploy | Scripts |
+| `/home/bticino/cfg/extra/VERSION` | Version on device | Device |
 
 ---
 
-## ✅ **Checklist de Deploy**
+## ✅ **Deploy Checklist**
 
-- [ ] 1. Actualizar archivo `VERSION`
-- [ ] 2. Actualizar `CHANGELOG.md`
-- [ ] 3. Commit de cambios
+- [ ] 1. Update the `VERSION` file
+- [ ] 2. Update `CHANGELOG.md`
+- [ ] 3. Commit changes
 - [ ] 4. `make build`
-- [ ] 5. Verificar versión local
+- [ ] 5. Verify local version
 - [ ] 6. `./scripts/deploy.sh`
-- [ ] 7. Verificar versión en dispositivo
-- [ ] 8. Verificar Web UI
-- [ ] 9. Git tag y push
+- [ ] 7. Verify version on device
+- [ ] 8. Verify Web UI
+- [ ] 9. Git tag and push
 
 ---
 
-**Estado**: ✅ **DOCUMENTADO**  
-**Versión Actual**: 0.14.2
+**Status**: ✅ **DOCUMENTED**  
+**Current Version**: 0.14.2

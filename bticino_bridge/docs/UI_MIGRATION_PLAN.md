@@ -1,55 +1,55 @@
 # BTicino Bridge - UI Modernization Plan
 
-**Fecha**: 2026-03-27  
-**Versión Actual**: v0.14.2 (HTML embebido en Go)  
-**Estado**: 📋 **PLANIFICANDO MIGRACIÓN**
+**Date**: 2026-03-27  
+**Current Version**: v0.14.2 (HTML embedded in Go)  
+**Status**: 📋 **PLANNING MIGRATION**
 
 ---
 
-## 📊 Estado Actual de la UI
+## 📊 Current UI Status
 
-| Aspecto | Estado Actual | Problemas |
+| Aspect | Current Status | Problems |
 |---------|---------------|-----------|
-| **Tecnología** | HTML + CSS + JS embebido en Go | ❌ Difícil de mantener |
-| **Líneas de código** | 4802 líneas en server.go | ❌ Todo en un archivo |
-| **Templates** | 5 templates HTML embebidos | ❌ Sin reutilización |
-| **Build** | Go build simple | ✅ Rápido pero limitado |
-| **Hot Reload** | ❌ No disponible | ❌ Requiere recompilar |
-| **Componentes** | ❌ No hay | ❌ Todo copiado/pegado |
+| **Technology** | HTML + CSS + JS embedded in Go | ❌ Hard to maintain |
+| **Lines of code** | 4802 lines in server.go | ❌ Everything in one file |
+| **Templates** | 5 embedded HTML templates | ❌ No reuse |
+| **Build** | Simple Go build | ✅ Fast but limited |
+| **Hot Reload** | ❌ Not available | ❌ Requires recompiling |
+| **Components** | ❌ None | ❌ Everything copy-pasted |
 
 ---
 
-## 🎯 Objetivos de la Migración
+## 🎯 Migration Goals
 
-1. ✅ **Framework moderno** (Vue+Quasar o Svelte)
-2. ✅ **Separación de concerns** (backend Go, frontend JS)
-3. ✅ **Componentes reutilizables**
-4. ✅ **Hot reload** en desarrollo
-5. ✅ **Build automático** en deploy
-6. ✅ **Un único script de deploy**
+1. ✅ **Modern framework** (Vue+Quasar or Svelte)
+2. ✅ **Separation of concerns** (Go backend, JS frontend)
+3. ✅ **Reusable components**
+4. ✅ **Hot reload** in development
+5. ✅ **Automatic build** on deploy
+6. ✅ **Single deploy script**
 
 ---
 
-## 🔍 Comparativa: Vue+Quasar vs Svelte
+## 🔍 Comparison: Vue+Quasar vs Svelte
 
 ### **Vue 3 + Quasar Framework**
 
-#### ✅ **Ventajas**:
-- 🟢 **Maduro** - Vue 3 estable desde 2020
-- 🟢 **Quasar** - Componentes Material Design listos
-- 🟢 **Ecosistema grande** - Muchos plugins, librerías
-- 🟢 **TypeScript** - Soporte nativo excelente
-- 🟢 **DevTools** - Vue DevTools muy completas
-- 🟢 **Comunidad** - Muy grande en España/Latam
-- 🟢 **Trabajo** - Más demanda laboral
+#### ✅ **Advantages**:
+- 🟢 **Mature** - Vue 3 stable since 2020
+- 🟢 **Quasar** - Ready-made Material Design components
+- 🟢 **Large ecosystem** - Many plugins, libraries
+- 🟢 **TypeScript** - Excellent native support
+- 🟢 **DevTools** - Very complete Vue DevTools
+- 🟢 **Community** - Very large in Spain/Latam
+- 🟢 **Jobs** - Higher job demand
 
-#### ❌ **Desventajas**:
-- 🔴 **Peso** - ~100KB (Vue) + ~200KB (Quasar)
-- 🔴 **Complejidad** - Curva de aprendizaje media
-- 🔴 **Build** - Requiere Node.js + Vite/Webpack
-- 🔴 **Runtime** - Virtual DOM (más lento que Svelte)
+#### ❌ **Disadvantages**:
+- 🔴 **Weight** - ~100KB (Vue) + ~200KB (Quasar)
+- 🔴 **Complexity** - Medium learning curve
+- 🔴 **Build** - Requires Node.js + Vite/Webpack
+- 🔴 **Runtime** - Virtual DOM (slower than Svelte)
 
-#### 📦 **Tamaño Bundle**:
+#### 📦 **Bundle Size**:
 ```
 Production build: ~350-400KB (gzipped: ~120KB)
 ```
@@ -58,75 +58,75 @@ Production build: ~350-400KB (gzipped: ~120KB)
 
 ### **Svelte + SvelteKit**
 
-#### ✅ **Ventajas**:
-- 🟢 **Ligero** - ~2KB runtime (vs 300KB Vue)
-- 🟢 **Rápido** - Sin Virtual DOM, compile-time
-- 🟢 **Simple** - Menos boilerplate, más intuitivo
-- 🟢 **SvelteKit** - Framework completo (como Next.js)
-- 🟢 **Build** - Más simple, menos configuración
-- 🟢 **Reactivity** - Más natural (sin reactive(), ref())
+#### ✅ **Advantages**:
+- 🟢 **Lightweight** - ~2KB runtime (vs 300KB Vue)
+- 🟢 **Fast** - No Virtual DOM, compile-time
+- 🟢 **Simple** - Less boilerplate, more intuitive
+- 🟢 **SvelteKit** - Full framework (like Next.js)
+- 🟢 **Build** - Simpler, less configuration
+- 🟢 **Reactivity** - More natural (no reactive(), ref())
 
-#### ❌ **Desventajas**:
-- 🔴 **Joven** - Svelte 4 estable desde 2023
-- 🔴 **Ecosistema** - Menos librerías que Vue
-- 🔴 **TypeScript** - Soporte bueno pero no excelente
-- 🔴 **Comunidad** - Más pequeña (aunque creciendo)
-- 🔴 **Trabajo** - Menos demanda (por ahora)
+#### ❌ **Disadvantages**:
+- 🔴 **Young** - Svelte 4 stable since 2023
+- 🔴 **Ecosystem** - Fewer libraries than Vue
+- 🔴 **TypeScript** - Good but not excellent support
+- 🔴 **Community** - Smaller (though growing)
+- 🔴 **Jobs** - Less demand (for now)
 
-#### 📦 **Tamaño Bundle**:
+#### 📦 **Bundle Size**:
 ```
 Production build: ~10-15KB (gzipped: ~5KB)
 ```
 
 ---
 
-## 📊 Comparativa Directa
+## 📊 Direct Comparison
 
-| Característica | Vue+Quasar | Svelte | Ganador |
+| Feature | Vue+Quasar | Svelte | Winner |
 |----------------|------------|--------|---------|
-| **Tamaño** | ~350KB | ~10KB | 🏆 **Svelte** |
-| **Rendimiento** | Bueno | Excelente | 🏆 **Svelte** |
-| **Curva aprendizaje** | Media | Baja | 🏆 **Svelte** |
-| **Componentes UI** | Quasar (100+) | Svelte Material (30) | 🏆 **Vue** |
-| **Ecosistema** | Grande | Mediano | 🏆 **Vue** |
-| **TypeScript** | Excelente | Bueno | 🏆 **Vue** |
-| **DevTools** | Excelentes | Buenas | 🏆 **Vue** |
+| **Size** | ~350KB | ~10KB | 🏆 **Svelte** |
+| **Performance** | Good | Excellent | 🏆 **Svelte** |
+| **Learning curve** | Medium | Low | 🏆 **Svelte** |
+| **UI Components** | Quasar (100+) | Svelte Material (30) | 🏆 **Vue** |
+| **Ecosystem** | Large | Medium | 🏆 **Vue** |
+| **TypeScript** | Excellent | Good | 🏆 **Vue** |
+| **DevTools** | Excellent | Good | 🏆 **Vue** |
 | **Build time** | ~5-10s | ~2-5s | 🏆 **Svelte** |
-| **Comunidad ES** | Muy grande | Pequeña | 🏆 **Vue** |
-| **Demanda laboral** | Alta | Media | 🏆 **Vue** |
+| **ES Community** | Very large | Small | 🏆 **Vue** |
+| **Job demand** | High | Medium | 🏆 **Vue** |
 
 ---
 
-## 🎯 **Recomendación para BTicino Bridge**
+## 🎯 **Recommendation for BTicino Bridge**
 
-### **Para este proyecto específico**: 🏆 **SVELTE**
+### **For this specific project**: 🏆 **SVELTE**
 
-**Razones**:
-1. ✅ **Tamaño crítico** - 10KB vs 350KB (dispositivo embebido)
-2. ✅ **Simplicidad** - Menos complejidad = menos bugs
-3. ✅ **Rendimiento** - Sin Virtual DOM, más rápido en hardware limitado
-4. ✅ **Build simple** - Fácil de integrar con Go
-5. ✅ **Curva baja** - Más rápido de implementar
+**Reasons**:
+1. ✅ **Critical size** - 10KB vs 350KB (embedded device)
+2. ✅ **Simplicity** - Less complexity = fewer bugs
+3. ✅ **Performance** - No Virtual DOM, faster on limited hardware
+4. ✅ **Simple build** - Easy to integrate with Go
+5. ✅ **Low learning curve** - Faster to implement
 
-**Vue+Quasar sería mejor si**:
-- Necesitás muchos componentes UI complejos
-- El equipo ya conoce Vue
-- Priorizás ecosistema sobre tamaño
+**Vue+Quasar would be better if**:
+- You need many complex UI components
+- The team already knows Vue
+- You prioritize ecosystem over size
 
 ---
 
-## 🚀 **Plan de Migración a Svelte**
+## 🚀 **Migration Plan to Svelte**
 
-### **Fase 1: Setup (2-3 horas)**
+### **Phase 1: Setup (2-3 hours)**
 
 ```bash
-# 1. Crear proyecto Svelte
+# 1. Create Svelte project
 cd bticino_bridge
 npm create svelte@latest web
 cd web
 npm install
 
-# 2. Instalar dependencias
+# 2. Install dependencies
 npm install -D @sveltejs/vite-plugin-svelte
 npm install svelte-material-ui
 
@@ -151,24 +151,24 @@ web/
 
 ---
 
-### **Fase 2: Componentes (4-6 horas)**
+### **Phase 2: Components (4-6 hours)**
 
-**Componentes a crear**:
-1. ✅ `Dashboard.svelte` - Estado del sistema
-2. ✅ `Settings.svelte` - Configuración principal
-3. ✅ `ConfigTab.svelte` - Tabs de configuración
+**Components to create**:
+1. ✅ `Dashboard.svelte` - System status
+2. ✅ `Settings.svelte` - Main configuration
+3. ✅ `ConfigTab.svelte` - Configuration tabs
 4. ✅ `DeviceTab.svelte` - Device (NTP, Language, etc.)
-5. ✅ `Messages.svelte` - Mensajes
-6. ✅ `Controls.svelte` - Controles
+5. ✅ `Messages.svelte` - Messages
+6. ✅ `Controls.svelte` - Controls
 7. ✅ `Logs.svelte` - Logs viewer
 
 ---
 
-### **Fase 3: Integración con Go (2-3 horas)**
+### **Phase 3: Go Integration (2-3 hours)**
 
-**Modificar `pkg/webserver/server.go`**:
+**Modify `pkg/webserver/server.go`**:
 ```go
-// Servir archivos estáticos desde web/dist/
+// Serve static files from web/dist/
 func (ws *WebServer) handleStatic(w http.ResponseWriter, r *http.Request) {
     http.ServeFile(w, r, "web/dist"+r.URL.Path)
 }
@@ -181,9 +181,9 @@ mux.HandleFunc("/api/device/ntp", ws.handleAPIDeviceNTP)
 
 ---
 
-### **Fase 4: Build Automático (1-2 horas)**
+### **Phase 4: Automatic Build (1-2 hours)**
 
-**Modificar `Makefile`**:
+**Modify `Makefile`**:
 ```makefile
 build: build-web build-go
 
@@ -199,12 +199,12 @@ deploy: build
 
 ---
 
-### **Fase 5: Unificar Deploy (1 hora)**
+### **Phase 5: Unify Deploy (1 hour)**
 
-**Modificar `scripts/deploy_auto.sh`**:
+**Modify `scripts/deploy_auto.sh`**:
 ```bash
 #!/bin/bash
-# Deploy automático UNIFICADO
+# UNIFIED automatic deploy
 
 echo "[1/3] Building web frontend..."
 cd web && npm install && npm run build
@@ -219,7 +219,7 @@ echo "[3/3] Deploying to device..."
 
 ---
 
-## 📁 **Estructura Final del Proyecto**
+## 📁 **Final Project Structure**
 
 ```
 bticino_bridge/
@@ -259,7 +259,7 @@ bticino_bridge/
 
 ---
 
-## 🎯 **Makefile Actualizado**
+## 🎯 **Updated Makefile**
 
 ```makefile
 .PHONY: build build-web build-go deploy clean test
@@ -281,7 +281,7 @@ build-go:
 	GOOS=linux GOARCH=arm GOARM=7 go build -o bticino_bridge ./cmd/main.go
 	@echo "✅ Go binary built (bticino_bridge)"
 
-# Deploy a dispositivo
+# Deploy to device
 deploy: build
 	@echo "🚀 Deploying to device..."
 	./scripts/deploy_auto.sh
@@ -309,37 +309,37 @@ clean:
 
 ---
 
-## 📊 **Comparativa: Antes vs Después**
+## 📊 **Comparison: Before vs After**
 
-| Aspecto | Antes (HTML embebido) | Después (Svelte) | Mejora |
+| Aspect | Before (embedded HTML) | After (Svelte) | Improvement |
 |---------|----------------------|------------------|--------|
-| **Tamaño UI** | Embebido en Go (14MB total) | Separado (14MB + 10KB) | ✅ Más limpio |
-| **Build time** | 10s (solo Go) | 15s (Go + Svelte) | ⚠️ +5s |
-| **Hot reload** | ❌ No | ✅ Sí (SvelteKit) | ✅ Excelente |
-| **Componentes** | ❌ No | ✅ Reutilizables | ✅ Excelente |
-| **Mantenimiento** | ❌ Difícil (todo en server.go) | ✅ Fácil (separado) | ✅ Excelente |
-| **TypeScript** | ❌ No | ✅ Opcional | ✅ Bueno |
-| **DevTools** | ❌ Browser DevTools | ✅ Svelte DevTools | ✅ Excelente |
+| **UI Size** | Embedded in Go (14MB total) | Separate (14MB + 10KB) | ✅ Cleaner |
+| **Build time** | 10s (Go only) | 15s (Go + Svelte) | ⚠️ +5s |
+| **Hot reload** | ❌ No | ✅ Yes (SvelteKit) | ✅ Excellent |
+| **Components** | ❌ No | ✅ Reusable | ✅ Excellent |
+| **Maintenance** | ❌ Hard (everything in server.go) | ✅ Easy (separate) | ✅ Excellent |
+| **TypeScript** | ❌ No | ✅ Optional | ✅ Good |
+| **DevTools** | ❌ Browser DevTools | ✅ Svelte DevTools | ✅ Excellent |
 
 ---
 
-## 🚀 **Próximos Pasos Inmediatos**
+## 🚀 **Immediate Next Steps**
 
-### **1. Decidir framework** (HOY):
-- [ ] ¿Svelte o Vue+Quasar?
-- [ ] **Recomendación**: Svelte (por tamaño y simplicidad)
+### **1. Decide framework** (TODAY):
+- [ ] Svelte or Vue+Quasar?
+- [ ] **Recommendation**: Svelte (for size and simplicity)
 
-### **2. Setup inicial** (MAÑANA):
-- [ ] Crear proyecto Svelte
-- [ ] Instalar dependencias
-- [ ] Configurar Vite
+### **2. Initial setup** (TOMORROW):
+- [ ] Create Svelte project
+- [ ] Install dependencies
+- [ ] Configure Vite
 
-### **3. Primer componente** (2 DÍAS):
+### **3. First component** (2 DAYS):
 - [ ] Dashboard.svelte
-- [ ] Conectar con API `/api/status`
-- [ ] Testear hot reload
+- [ ] Connect to `/api/status` API
+- [ ] Test hot reload
 
-### **4. Migrar tabs** (3-5 DÍAS):
+### **4. Migrate tabs** (3-5 DAYS):
 - [ ] Settings.svelte
 - [ ] DeviceTab.svelte
 - [ ] ConfigTab.svelte
@@ -347,15 +347,15 @@ clean:
 - [ ] Controls.svelte
 - [ ] Logs.svelte
 
-### **5. Integrar con Go** (6-7 DÍAS):
-- [ ] Modificar server.go para servir web/dist/
-- [ ] Actualizar Makefile
-- [ ] Unificar deploy script
+### **5. Integrate with Go** (6-7 DAYS):
+- [ ] Modify server.go to serve web/dist/
+- [ ] Update Makefile
+- [ ] Unify deploy script
 
-### **6. Testing** (8-9 DÍAS):
-- [ ] Test en dispositivo real
+### **6. Testing** (8-9 DAYS):
+- [ ] Test on real device
 - [ ] Performance testing
-- [ ] Documentar
+- [ ] Document
 
 ---
 
@@ -363,12 +363,12 @@ clean:
 
 ```
 Actual (HTML embebido):
-├── server.go: 4802 líneas
+├── server.go: 4802 lines
 ├── Binario: 14MB (con HTML/CSS/JS embebido)
 └── Total: 14MB
 
 Svelte (propuesto):
-├── Go backend: ~3000 líneas (sin HTML)
+├── Go backend: ~3000 lines (no HTML)
 ├── Svelte frontend: ~10KB (gzipped)
 ├── Binario: 13MB (sin HTML embebido)
 └── Total: 13MB + 10KB
@@ -376,14 +376,14 @@ Svelte (propuesto):
 
 ---
 
-## ✅ **Conclusión**
+## ✅ **Conclusion**
 
-**Recomendación**: **Svelte** para este proyecto específico.
+**Recommendation**: **Svelte** for this specific project.
 
-**Razones principales**:
-1. ✅ **Tamaño** - 10KB vs 350KB (crítico para dispositivo embebido)
-2. ✅ **Simplicidad** - Menos complejidad = menos bugs
-3. ✅ **Rendimiento** - Sin Virtual DOM
-4. ✅ **Build simple** - Fácil integración con Go
+**Main reasons**:
+1. ✅ **Size** - 10KB vs 350KB (critical for embedded device)
+2. ✅ **Simplicity** - Less complexity = fewer bugs
+3. ✅ **Performance** - No Virtual DOM
+4. ✅ **Simple build** - Easy Go integration
 
-**¿Comenzamos con el setup de Svelte?**
+**Shall we start with the Svelte setup?**

@@ -177,8 +177,8 @@ type WebServer struct {
 	sseClients         map[chan []byte]bool // SSE clients for real-time updates
 	sseMu              sync.Mutex
 	talkback           *sip.TalkbackInjector // Talk-back (upstream audio) injector — experimental
-	restartBridgeFunc  func()                // Acción de reinicio del bridge (inyectable en tests)
-	rebootDeviceFunc   func()                // Acción de reboot del device (inyectable en tests)
+	restartBridgeFunc  func()                // Bridge restart action (injectable in tests)
+	rebootDeviceFunc   func()                // Device reboot action (injectable in tests)
 }
 
 // NewWebServer creates a new web server instance
@@ -323,9 +323,9 @@ func (ws *WebServer) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/webrtc/stop", ws.handleAPIWebRTCStop)
 	mux.HandleFunc("/api/webrtc/status", ws.handleAPIWebRTCStatus)
 
-	// Serve Svelte static files. En el device el deploy copia el contenido de
-	// dist/ directamente en web/; en desarrollo existe web/dist y se sirve ESE
-	// directorio (nunca web/ entero, que expondría src/ y node_modules/).
+	// Serve Svelte static files. On the device the deploy copies the contents of
+	// dist/ directly into web/; in development web/dist exists and THAT directory
+	// is served (never the whole web/, which would expose src/ and node_modules/).
 	webRoot := "web"
 	if st, err := os.Stat("web/dist"); err == nil && st.IsDir() {
 		webRoot = "web/dist"
@@ -352,13 +352,13 @@ func (ws *WebServer) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/device/languages", ws.handleAPIDeviceLanguages)
 	mux.HandleFunc("/api/device/save", ws.handleAPIDeviceSave)
 
-	// Device config (Fase 1: Sincronización QML → Bridge)
+	// Device config (Phase 1: QML → Bridge synchronization)
 	mux.HandleFunc("/api/config/device", ws.handleAPIDeviceConfig)
 	mux.HandleFunc("/api/config/language", ws.handleAPILanguage)
 	mux.HandleFunc("/api/config/sip-accounts", ws.handleAPISIPAccounts)
 
-	// (UI legacy retirado: sus claves snake_case no coincidían con el backend
-	// y un guardado parcial podía mutilar la config — auditoría 2026-08-19)
+	// (Legacy UI removed: its snake_case keys did not match the backend
+	// and a partial save could mangle the config — audit 2026-08-19)
 
 	// Swagger UI
 	mux.Handle("/api/docs/", http.StripPrefix("/api/docs/", http.FileServer(http.Dir("docs"))))
@@ -615,7 +615,7 @@ func (ws *WebServer) handleVideoProbe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Cabeceras de diagnóstico siempre presentes
+	// Diagnostic headers always present
 	if report != nil {
 		if ack, ok := report["ack"].(bool); ok {
 			w.Header().Set("X-Probe-Ack", strconv.FormatBool(ack))
@@ -636,7 +636,7 @@ func (ws *WebServer) handleVideoProbe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Sin imagen: devolver el informe en JSON
+	// No image: return the report as JSON
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusServiceUnavailable)
 	ws.writeJSON(w, map[string]interface{}{"report": report})
@@ -670,7 +670,7 @@ func (ws *WebServer) handleAudioProbe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 200 si llegó RTP, 503 si no
+	// 200 if RTP arrived, 503 if not
 	packets := 0
 	if report != nil {
 		if p, ok := report["packets"].(int); ok {

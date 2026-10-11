@@ -1,4 +1,4 @@
-// Package deviceconfig proporciona un watcher para sincronización en tiempo real
+// Package deviceconfig provides a watcher for real-time synchronization
 package deviceconfig
 
 import (
@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// FileWatcher monitorea cambios en archivos de configuración del dispositivo
+// FileWatcher monitors changes in device configuration files
 type FileWatcher struct {
 	logger      *logrus.Logger
 	publisher   MQTTPublisherInterface
@@ -21,14 +21,14 @@ type FileWatcher struct {
 	lastPublish time.Time
 }
 
-// fileState representa el estado de un archivo vigilado
+// fileState represents the state of a watched file
 type fileState struct {
 	modTime  time.Time
 	checksum int64
 	size     int64
 }
 
-// NewFileWatcher crea un nuevo watcher de archivos
+// NewFileWatcher creates a new file watcher
 func NewFileWatcher(logger *logrus.Logger, publisher MQTTPublisherInterface, topicPrefix string) *FileWatcher {
 	if topicPrefix == "" {
 		topicPrefix = "bticino"
@@ -46,21 +46,21 @@ func NewFileWatcher(logger *logrus.Logger, publisher MQTTPublisherInterface, top
 		},
 		stopCh:      make(chan bool),
 		lastState:   make(map[string]fileState),
-		throttleDur: 2 * time.Second, // Throttle para evitar floods
+		throttleDur: 2 * time.Second, // Throttle to avoid floods
 	}
 }
 
-// Start inicia el watcher con polling
+// Start starts the watcher with polling
 func (w *FileWatcher) Start() {
 	w.logger.Info("Starting device config file watcher")
 
-	// Inicializar estado
+	// Initialize state
 	for _, path := range w.watchPaths {
 		if stat, err := os.Stat(path); err == nil {
 			w.lastState[path] = fileState{
 				modTime:  stat.ModTime(),
 				size:     stat.Size(),
-				checksum: stat.Size(), // Usar size como checksum simple
+				checksum: stat.Size(), // Use size as simple checksum
 			}
 		}
 	}
@@ -68,15 +68,15 @@ func (w *FileWatcher) Start() {
 	go w.pollLoop()
 }
 
-// Stop detiene el watcher
+// Stop stops the watcher
 func (w *FileWatcher) Stop() {
 	w.stopCh <- true
 	w.logger.Info("Device config file watcher stopped")
 }
 
-// pollLoop verifica cambios periódicamente
+// pollLoop checks for changes periodically
 func (w *FileWatcher) pollLoop() {
-	ticker := time.NewTicker(2 * time.Second) // Verificar cada 2 segundos
+	ticker := time.NewTicker(2 * time.Second) // Check every 2 seconds
 	defer ticker.Stop()
 
 	for {
@@ -89,7 +89,7 @@ func (w *FileWatcher) pollLoop() {
 	}
 }
 
-// checkChanges verifica si algún archivo ha cambiado
+// checkChanges checks whether any file has changed
 func (w *FileWatcher) checkChanges() {
 	if w.publisher == nil || !w.publisher.IsConnected() {
 		return
@@ -100,7 +100,7 @@ func (w *FileWatcher) checkChanges() {
 	for _, path := range w.watchPaths {
 		stat, err := os.Stat(path)
 		if err != nil {
-			// Archivo no existe o error
+			// File missing or error
 			continue
 		}
 
@@ -112,21 +112,21 @@ func (w *FileWatcher) checkChanges() {
 
 		lastState, exists := w.lastState[path]
 		if !exists || currentState.modTime.After(lastState.modTime) || currentState.size != lastState.size {
-			// Hay cambio
+			// There is a change
 			w.lastState[path] = currentState
 			changed = true
 			w.logger.Infof("Config file changed: %s", path)
 		}
 	}
 
-	// Throttle: no publicar más de una vez cada throttleDur
+	// Throttle: do not publish more than once per throttleDur
 	if changed && time.Since(w.lastPublish) > w.throttleDur {
 		w.publishConfigChange()
 		w.lastPublish = time.Now()
 	}
 }
 
-// publishConfigChange publica la configuración actualizada
+// publishConfigChange publishes the updated configuration
 func (w *FileWatcher) publishConfigChange() {
 	w.logger.Info("Publishing config change due to file modification")
 
@@ -148,13 +148,13 @@ func (w *FileWatcher) publishConfigChange() {
 		return
 	}
 
-	// Publicar inmediatamente (sin retain para eventos de cambio)
+	// Publish immediately (no retain for change events)
 	w.publishSystemChange(cfg)
 	w.publishAnsweringChange(cfg)
 	w.publishAudioChange(cfg)
 	w.publishDisplayChange(cfg)
 
-	// Publicar topic de notificación de cambio
+	// Publish change notification topic
 	w.publisher.Publish(w.topicPrefix+"/system/config_changed", time.Now().Format(time.RFC3339), false)
 
 	w.logger.Info("Config change published successfully")
@@ -187,12 +187,12 @@ func (w *FileWatcher) publishDisplayChange(cfg *Config) {
 	w.publisher.Publish(prefix+"/brightness", fmt.Sprintf(`{"value":%d,"change":"file_watcher"}`, cfg.Display.Brightness), false)
 }
 
-// GetWatchedFiles retorna los archivos que se están vigilando
+// GetWatchedFiles returns the files being watched
 func (w *FileWatcher) GetWatchedFiles() []string {
 	return w.watchPaths
 }
 
-// VerifyFileWatcher verifica la estructura del watcher (para testing)
+// VerifyFileWatcher verifies the watcher structure (for testing)
 func VerifyFileWatcher() {
 	fmt.Println("Device Config File Watcher")
 	fmt.Println("- Watch interval: 2 seconds")

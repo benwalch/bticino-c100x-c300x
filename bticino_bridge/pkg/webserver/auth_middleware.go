@@ -5,9 +5,9 @@ import (
 	"net/http"
 )
 
-// authMiddleware protege todo el servidor web con HTTP Basic Auth cuando
-// security.web_auth_required está activo. Comparación en tiempo constante.
-// Activado sin contraseña → 503 (fail-closed): nunca se abre en silencio.
+// authMiddleware protects the whole web server with HTTP Basic Auth when
+// security.web_auth_required is enabled. Constant-time comparison.
+// Enabled without password → 503 (fail-closed): never left silently open.
 func (ws *WebServer) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sec := ws.config.Security
@@ -16,7 +16,7 @@ func (ws *WebServer) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		if sec.WebPassword == "" {
-			ws.logger.Error("web_auth_required activo sin web_password — sirviendo 503 (fail-closed)")
+			ws.logger.Error("web_auth_required active without web_password — serving 503 (fail-closed)")
 			http.Error(w, "Web auth enabled but no password configured", http.StatusServiceUnavailable)
 			return
 		}

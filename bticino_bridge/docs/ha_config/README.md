@@ -89,10 +89,10 @@ type: custom: Picture Glance Card
 entities:
   - entity: sensor.videoportero_stream_status
     icon: mdi:doorbell
-    name: Timbre
+    name: Doorbell
   - entity: lock.bticino_main_door
     icon: mdi:door
-    name: Puerta
+    name: Door
 camera_entity: camera.videoportero
 title: Videoportero
 image: >-
@@ -120,18 +120,18 @@ cards:
 
   - type: entities
     entities:
-      - entity: binary_sensor.bticino_timbre
+      - entity: binary_sensor.bticino_doorbell
         icon: mdi:bell-ring
-        name: Timbre
+        name: Doorbell
       - entity: lock.bticino_main_door
         icon: mdi:door
-        name: Puerta Principal
+        name: Main Door
       - entity: switch.bticino_voicemail
         icon: mdi:voicemail
-        name: Contestador
+        name: Answering Machine
       - entity: sensor.bticino_temperature
         icon: mdi:thermometer
-        name: Temperatura
+        name: Temperature
 ```
 
 ### Card 2: With Custom WebRTC Camera
@@ -170,10 +170,10 @@ automation:
               http://192.168.1.38:1984/apiframe/videoportero?jpg
             actions:
               - action: "UNLOCK"
-                title: "Abrir Puerta"
+                title: "Open Door"
                 uri: "lovelace/0"
               - action: "VIEW"
-                title: "Ver Video"
+                title: "View Video"
                 uri: "camera://camera.videoportero"
 ```
 
@@ -184,7 +184,7 @@ automation:
 ```yaml
 button:
   - platform: mqtt
-    name: Abrir Puerta
+    name: Open Door
     command_topic: "bticino/commands/door"
     payload_press: "unlock"
     icon: mdi:door-open
@@ -192,7 +192,7 @@ button:
 # Or using lock entity
 lock:
   - platform: mqtt
-    name: Puerta Principal
+    name: Main Door
     state_topic: "bticino/status/door"
     command_topic: "bticino/commands/door"
     payload_lock: "lock"
@@ -226,7 +226,7 @@ cards:
       - type: horizontal-stack
         cards:
           - type: button
-            name: Abrir
+            name: Open
             icon: mdi:door-open
             tap_action:
               action: call-service
@@ -235,12 +235,12 @@ cards:
                 topic: bticino/commands/door
                 payload: unlock
           - type: button
-            name: Llamar
+            name: Call
             icon: mdi:phone
             tap_action:
               action: more-info
           - type: button
-            name: Captura
+            name: Snapshot
             icon: mdi:camera
             tap_action:
               action: call-service
@@ -251,16 +251,16 @@ cards:
 
   # Status and Info
   - type: entities
-    title: Estado
+    title: Status
     entities:
-      - entity: binary_sensor.bticino_timbre
-        name: Timbre
+      - entity: binary_sensor.bticino_doorbell
+        name: Doorbell
       - entity: sensor.bticino_temperature
-        name: Temperatura Dispositivo
+        name: Device Temperature
       - entity: sensor.bticino_uptime
-        name: Tiempo Activo
+        name: Uptime
       - entity: binary_sensor.bticino_sip_registered
-        name: SIP Registrado
+        name: SIP Registered
 ```
 
 ---

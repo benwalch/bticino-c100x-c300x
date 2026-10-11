@@ -1,4 +1,4 @@
-// Package deviceconfig proporciona parsers para archivos de configuración del dispositivo BTicino
+// Package deviceconfig provides parsers for BTicino device configuration files
 package deviceconfig
 
 import (
@@ -8,10 +8,10 @@ import (
 	"strings"
 )
 
-// TVCCSettings representa la estructura del archivo tvcc_settings.ini
+// TVCCSettings represents the structure of the tvcc_settings.ini file
 type TVCCSettings map[string]TVCCConfig
 
-// TVCCConfig configuración de una cámara específica
+// TVCCConfig configuration of a specific camera
 type TVCCConfig struct {
 	Brightness int `json:"brightness"`
 	Contrast   int `json:"contrast"`
@@ -19,7 +19,7 @@ type TVCCConfig struct {
 	Quality    int `json:"quality"`
 }
 
-// ReadTVCCSettings lee y parsea el archivo tvcc_settings.ini
+// ReadTVCCSettings reads and parses the tvcc_settings.ini file
 func ReadTVCCSettings(path string) (TVCCSettings, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -34,12 +34,12 @@ func ReadTVCCSettings(path string) (TVCCSettings, error) {
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		// Ignorar comentarios y líneas vacías
+		// Ignore comments and empty lines
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 
-		// Detectar sección [TVCC XX]
+		// Detect [TVCC XX] section
 		if strings.HasPrefix(line, "[") && strings.HasPrefix(line, "[TVCC") {
 			currentSection = strings.Trim(line, "[]")
 			settings[currentSection] = TVCCConfig{
@@ -51,7 +51,7 @@ func ReadTVCCSettings(path string) (TVCCSettings, error) {
 			continue
 		}
 
-		// Parsear key=value
+		// Parse key=value
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 || currentSection == "" {
 			continue
@@ -77,7 +77,7 @@ func ReadTVCCSettings(path string) (TVCCSettings, error) {
 	return settings, nil
 }
 
-// GetCameraConfig retorna la configuración de una cámara específica
+// GetCameraConfig returns the configuration of a specific camera
 func GetCameraConfig(path, cameraID string) (TVCCConfig, error) {
 	settings, err := ReadTVCCSettings(path)
 	if err != nil {
@@ -92,7 +92,7 @@ func GetCameraConfig(path, cameraID string) (TVCCConfig, error) {
 	return TVCCConfig{}, fmt.Errorf("camera %s not found", cameraID)
 }
 
-// GetAllCameraIDs retorna todos los IDs de cámaras configuradas
+// GetAllCameraIDs returns all configured camera IDs
 func GetAllCameraIDs(path string) ([]string, error) {
 	settings, err := ReadTVCCSettings(path)
 	if err != nil {
@@ -101,7 +101,7 @@ func GetAllCameraIDs(path string) ([]string, error) {
 
 	ids := make([]string, 0, len(settings))
 	for key := range settings {
-		// Extraer ID de "TVCC XX"
+		// Extract ID from "TVCC XX"
 		if len(key) > 5 {
 			ids = append(ids, key[5:])
 		}
@@ -110,12 +110,12 @@ func GetAllCameraIDs(path string) ([]string, error) {
 	return ids, nil
 }
 
-// TVCCGlobalSettings configuración global de TVCC
+// TVCCGlobalSettings global TVCC configuration
 type TVCCGlobalSettings struct {
 	Settings TVCCSettings `json:"settings"`
 }
 
-// ReadTVCCSettingsWithGlobal lee el archivo con la sección [Settings]
+// ReadTVCCSettingsWithGlobal reads the file with the [Settings] section
 func ReadTVCCSettingsWithGlobal(path string) (*TVCCGlobalSettings, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

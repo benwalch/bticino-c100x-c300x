@@ -324,10 +324,10 @@ func main() {
 			logger.Info("✅ MQTT Bridge: Real client created for Home Assistant integration")
 			logger.Infof("📡 MQTT Broker: %s:%d (user: %s)", cfg.MQTT.Host, cfg.MQTT.Port, cfg.MQTT.Username)
 
-			// Iniciar publicador de configuración del dispositivo vía MQTT (Fase 3)
+			// Start the device config publisher via MQTT (Phase 3)
 			go func() {
-				time.Sleep(5 * time.Second)                           // Esperar a que MQTT se conecte
-				mqttBridge.SetDeviceConfigPublisher(60 * time.Second) // Publicar cada 60s
+				time.Sleep(5 * time.Second)                           // Wait for MQTT to connect
+				mqttBridge.SetDeviceConfigPublisher(60 * time.Second) // Publish every 60s
 			}()
 		}
 	} else {
@@ -552,10 +552,10 @@ func main() {
 					"note":       res.Note,
 				}, jpeg, nil
 			})
-			logger.Info("   Video probe: POST /api/video/probe?confirm=yes (diagnóstico, *7*300 único)")
+			logger.Info("   Video probe: POST /api/video/probe?confirm=yes (diagnostic, single *7*300)")
 
-			// Sonda de audio cooperativa (diagnóstico): un único *7*300 tipo 2,
-			// mide el RTP Speex entrante. Igual de segura (un solo comando).
+			// Cooperative audio probe (diagnostics): a single type-2 *7*300,
+			// measures incoming Speex RTP. Equally safe (a single command).
 			webServer.SetAudioProbeFunc(func() (map[string]interface{}, error) {
 				res, err := sip.AudioProbe(ownForProbe, 6*time.Second, logger)
 				if err != nil {
@@ -570,7 +570,7 @@ func main() {
 					"note":         res.Note,
 				}, nil
 			})
-			logger.Info("   Audio probe: POST /api/audio/probe?confirm=yes (diagnóstico, *7*300 tipo audio)")
+			logger.Info("   Audio probe: POST /api/audio/probe?confirm=yes (diagnostic, audio-type *7*300)")
 		}
 
 		// Set recording path if configured
@@ -609,8 +609,8 @@ func main() {
 		}
 
 		// Create video stream manager only if SIP started AND on-demand video is
-		// enabled. Este componente auto-arranca vídeo (*7*32) al pulsar el timbre,
-		// así que por seguridad NO se crea si video_on_demand está desactivado.
+		// enabled. This component auto-starts video (*7*32) on doorbell press,
+		// so for safety it is NOT created when video_on_demand is disabled.
 		if sipStarted && sipClient != nil && cfg.Streaming.VideoOnDemand {
 			videoManager = sip.NewVideoStreamManager(sipClient, owClient, eventBus, logger)
 
@@ -665,12 +665,12 @@ func main() {
 	}
 
 	// ==================== INITIAL DEVICE STATE QUERIES ====================
-	// Consultar estado real del dispositivo al arranque (voicemail, timbre)
+	// Query real device state at startup (voicemail, doorbell)
 	if mqttBridge != nil {
 		go func() {
-			// Esperar 5s para que el bridge MQTT este completamente conectado
+			// Wait 5s for the MQTT bridge to be fully connected
 			time.Sleep(5 * time.Second)
-			logger.Info("Consultando estado inicial del dispositivo...")
+			logger.Info("Querying initial device state...")
 
 			mqttBridge.QueryBellStatus()
 			time.Sleep(bticino.CommandRetryDelay)
@@ -680,7 +680,7 @@ func main() {
 
 			mqttBridge.QuerySystemInfo()
 
-			logger.Info("Consulta de estado inicial completada")
+			logger.Info("Initial state query completed")
 		}()
 	}
 
@@ -702,16 +702,16 @@ func main() {
 	// ==================== COMPONENT 5.6: UDP Proxy (40004 -> 4000) ====================
 	var udpProxy *udpproxy.UDPProxy
 	if cfg.UDPProxy.Enabled {
-		logger.Infof("Inicializando UDP Proxy: puerto %d -> %d...", cfg.UDPProxy.ListenPort, cfg.UDPProxy.TargetPort)
+		logger.Infof("Initializing UDP Proxy: port %d -> %d...", cfg.UDPProxy.ListenPort, cfg.UDPProxy.TargetPort)
 		udpProxy = udpproxy.New(cfg.UDPProxy.ListenPort, cfg.UDPProxy.TargetPort, logger)
 		if err := udpProxy.Start(); err != nil {
-			logger.WithError(err).Warn("Fallo al iniciar UDP Proxy (no critico)")
+			logger.WithError(err).Warn("Failed to start UDP Proxy (non-critical)")
 			udpProxy = nil
 		} else {
-			logger.Infof("UDP Proxy: Reenviando %d -> %d", cfg.UDPProxy.ListenPort, cfg.UDPProxy.TargetPort)
+			logger.Infof("UDP Proxy: Forwarding %d -> %d", cfg.UDPProxy.ListenPort, cfg.UDPProxy.TargetPort)
 		}
 	} else {
-		logger.Info("UDP Proxy deshabilitado en configuracion")
+		logger.Info("UDP Proxy disabled in configuration")
 	}
 
 	// ==================== COMPONENT 6: Input Monitor (Physical Buttons) ====================
@@ -730,13 +730,13 @@ func main() {
 		buttonName := ""
 		switch evt.Key {
 		case bticino.KeyCodeKey:
-			buttonName = "llave"
+			buttonName = "key"
 		case bticino.KeyCodeStar:
-			buttonName = "estrella"
+			buttonName = "star"
 		case bticino.KeyCodeEye:
-			buttonName = "ojo"
+			buttonName = "eye"
 		case bticino.KeyCodePhone:
-			buttonName = "telefono"
+			buttonName = "phone"
 		default:
 			buttonName = evt.KeyName
 		}
@@ -754,19 +754,19 @@ func main() {
 		if mqttBridge != nil && evt.Action == "press" {
 			mqttBridge.PublishButtonPress(evt.Key, buttonName, evt.Action)
 
-			// Publicar al activity_log con descripcion legible
+			// Publish a human-readable description to the activity_log
 			var actDesc string
 			switch evt.Key {
 			case bticino.KeyCodeKey:
-				actDesc = "Boton llave pulsado (abrir puerta)"
+				actDesc = "Key button pressed (open door)"
 			case bticino.KeyCodeStar:
-				actDesc = "Boton estrella pulsado (luz escalera)"
+				actDesc = "Star button pressed (staircase light)"
 			case bticino.KeyCodeEye:
-				actDesc = "Boton ojo pulsado (activar camara)"
+				actDesc = "Eye button pressed (activate camera)"
 			case bticino.KeyCodePhone:
-				actDesc = "Boton telefono pulsado (comunicacion)"
+				actDesc = "Phone button pressed (intercom)"
 			default:
-				actDesc = fmt.Sprintf("Boton %s pulsado", buttonName)
+				actDesc = fmt.Sprintf("Button %s pressed", buttonName)
 			}
 			mqttBridge.PublishActivityLog(actDesc, "button_press", buttonName)
 		}
@@ -851,51 +851,51 @@ func main() {
 				}, "openwebnet_monitor")
 			}
 
-			// Detectar cambios de estado del timbre en tiempo real (eventos del bus)
+			// Detect real-time doorbell state changes (bus events)
 			if cmd.Raw == "*#8**33*0##" {
-				logger.Info("Estado timbre detectado en bus: muted (OFF)")
+				logger.Info("Doorbell state detected on bus: muted (OFF)")
 				if mqttBridge != nil {
 					mqttBridge.UpdateBellState(false)
 				}
 			} else if cmd.Raw == "*#8**33*1##" {
-				logger.Info("Estado timbre detectado en bus: unmuted (ON)")
+				logger.Info("Doorbell state detected on bus: unmuted (ON)")
 				if mqttBridge != nil {
 					mqttBridge.UpdateBellState(true)
 				}
 			}
 
-			// Detectar cambios de estado del contestador en tiempo real
-			// El dispositivo envia *8*91*## o *8*92*## (con WHERE vacio),
-			// ademas de la forma sin WHERE *8*91## / *8*92##.
-			// Usamos WHO=8 + WHAT=91/92 ya parseados para cubrir ambas variantes.
+			// Detect real-time answering machine state changes
+			// The device sends *8*91*## or *8*92*## (with empty WHERE),
+			// besides the WHERE-less form *8*91## / *8*92##.
+			// We use the already-parsed WHO=8 + WHAT=91/92 to cover both variants.
 			if cmd.WHO == "8" && cmd.WHAT == "91" {
-				logger.Info("Contestador activado detectado en bus")
+				logger.Info("Answering machine enabled detected on bus")
 				if mqttBridge != nil {
 					mqttBridge.UpdateVoicemailState(true)
 				}
 			} else if cmd.WHO == "8" && cmd.WHAT == "92" {
-				logger.Info("Contestador desactivado detectado en bus")
+				logger.Info("Answering machine disabled detected on bus")
 				if mqttBridge != nil {
 					mqttBridge.UpdateVoicemailState(false)
 				}
 			}
-			// Tambien detectar via respuesta de status *#8**40*...
+			// Also detect via *#8**40*... status response
 			if cmd.WHO == "8" && strings.HasPrefix(cmd.Raw, "*#8**40*") {
 				re := regexp.MustCompile(`\*#8\*\*40\*([01])\*`)
 				if m := re.FindStringSubmatch(cmd.Raw); len(m) >= 2 {
 					vmEnabled := m[1] == "1"
-					logger.WithField("voicemail_enabled", vmEnabled).Info("Estado contestador detectado en bus via WHO=8/40")
+					logger.WithField("voicemail_enabled", vmEnabled).Info("Answering machine state detected on bus via WHO=8/40")
 					if mqttBridge != nil {
 						mqttBridge.UpdateVoicemailState(vmEnabled)
 					}
 				}
 			}
 
-			// Detectar eventos de cerraduras adicionales (WHERE=21, 22)
+			// Detect additional lock events (WHERE=21, 22)
 			if cmd.WHO == "8" && (cmd.WHAT == "19" || cmd.WHAT == "20") {
 				if cmd.WHERE != "20" && cmd.WHERE != "16" {
-					// Es una cerradura adicional (no la principal WHERE=20 ni luz WHERE=16)
-					logger.WithField("where", cmd.WHERE).Infof("Evento cerradura adicional detectado: WHAT=%s", cmd.WHAT)
+					// It is an additional lock (not the main WHERE=20 nor light WHERE=16)
+					logger.WithField("where", cmd.WHERE).Infof("Additional lock event detected: WHAT=%s", cmd.WHAT)
 					if mqttBridge != nil {
 						if cmd.WHAT == "19" {
 							mqttBridge.PublishAdditionalLockEvent(cmd.WHERE, "UNLOCKED")
@@ -910,7 +910,7 @@ func main() {
 			if mqttBridge != nil {
 				mqttBridge.PublishOpenWebNetEvent(cmd.Raw, cmd.WHO, cmd.WHAT, cmd.WHERE)
 
-				// Reconocimiento de patrones OWN -> activity_log sensor
+				// OWN pattern recognition -> activity_log sensor
 				if desc, ok := bticino.OWNEventDescriptions[cmd.Raw]; ok {
 					eventType := "unknown"
 					if et, ok2 := bticino.OWNEventTypes[cmd.Raw]; ok2 {
@@ -1108,7 +1108,7 @@ func main() {
 
 				}
 
-				// Consultar estado del dispositivo cada 5 minutos (cada 10 ticks de 30s)
+				// Query device state every 5 minutes (every 10 ticks of 30s)
 				if mqttBridge != nil && tickCount%10 == 0 {
 					go func() {
 						mqttBridge.QueryBellStatus()
@@ -1284,11 +1284,11 @@ func main() {
 
 	// Stop UDP proxy
 	if udpProxy != nil {
-		logger.Info("Deteniendo UDP Proxy...")
+		logger.Info("Stopping UDP Proxy...")
 		if err := udpProxy.Stop(); err != nil {
-			logger.WithError(err).Error("Error deteniendo UDP Proxy")
+			logger.WithError(err).Error("Error stopping UDP Proxy")
 		} else {
-			logger.Info("UDP Proxy detenido")
+			logger.Info("UDP Proxy stopped")
 		}
 	}
 

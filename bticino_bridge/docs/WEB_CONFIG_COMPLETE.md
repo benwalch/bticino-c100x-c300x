@@ -1,40 +1,40 @@
 # Web Configuration Management - Implementation Complete ✅
 
-**Fecha**: 2026-03-25  
-**Versión**: v0.13.0  
-**Estado**: ✅ **COMPLETADO Y COMPILADO**
+**Date**: 2026-03-25  
+**Version**: v0.13.0  
+**Status**: ✅ **COMPLETE AND COMPILED**
 
 ---
 
-## 📊 Resumen de Implementación
+## 📊 Implementation Summary
 
-### **Backend (Go)** - ✅ 100% Completado
+### **Backend (Go)** - ✅ 100% Complete
 
-| Archivo | Líneas | Funcionalidad |
+| File | Lines | Functionality |
 |---------|--------|---------------|
-| `config_manager.go` | ~350 | Gestión de configuración, backups, validación |
-| `config_handlers.go` | ~250 | Endpoints API REST (8 endpoints) |
-| `server.go` (mod) | +400 | Handlers HTML/JS/CSS, rutas API |
-| **Total Backend** | **~1000** | **Completo y funcional** |
+| `config_manager.go` | ~350 | Configuration management, backups, validation |
+| `config_handlers.go` | ~250 | REST API endpoints (8 endpoints) |
+| `server.go` (mod) | +400 | HTML/JS/CSS handlers, API routes |
+| **Total Backend** | **~1000** | **Complete and working** |
 
 ---
 
-### **Frontend (HTML/CSS/JS)** - ✅ 100% Completado
+### **Frontend (HTML/CSS/JS)** - ✅ 100% Complete
 
-| Componente | Estado | Detalles |
+| Component | Status | Details |
 |------------|--------|----------|
-| **Settings Page HTML** | ✅ | 8 pestañas de configuración |
-| **CSS Styles** | ✅ | Diseño responsive, moderno |
-| **JavaScript UI** | ✅ | Carga, guardado, validación |
+| **Settings Page HTML** | ✅ | 8 configuration tabs |
+| **CSS Styles** | ✅ | Responsive, modern design |
+| **JavaScript UI** | ✅ | Loading, saving, validation |
 | **API Integration** | ✅ | Fetch API, async/await |
 
 ---
 
-## 🎯 Features Implementadas
+## 🎯 Implemented Features
 
-### **1. Pestañas de Configuración**
+### **1. Configuration Tabs**
 
-| Pestaña | Campos | Estado |
+| Tab | Fields | Status |
 |---------|--------|--------|
 | **Bridge** | Name, Version, Log Level | ✅ |
 | **OpenWebNet** | Host, Port, Timeout, Retry | ✅ |
@@ -48,76 +48,76 @@
 
 ---
 
-### **2. Botones de Acción**
+### **2. Action Buttons**
 
-| Botón | Función | Estado |
+| Button | Function | Status |
 |-------|---------|--------|
-| **✓ Validate** | Valida configuración sin guardar | ✅ |
-| **📦 Backup** | Crea backup instantáneo | ✅ |
-| **📂 Backups** | Lista backups disponibles | ✅ |
-| **📜 History** | Muestra historial de cambios | ✅ |
-| **🔄 Reload** | Recarga configuración desde servidor | ✅ |
-| **💾 Save** | Guarda cambios (activo solo si hay cambios) | ✅ |
+| **✓ Validate** | Validates configuration without saving | ✅ |
+| **📦 Backup** | Creates instant backup | ✅ |
+| **📂 Backups** | Lists available backups | ✅ |
+| **📜 History** | Shows change history | ✅ |
+| **🔄 Reload** | Reloads configuration from server | ✅ |
+| **💾 Save** | Saves changes (active only when there are changes) | ✅ |
 
 ---
 
 ### **3. API Endpoints**
 
-| Endpoint | Método | Función |
+| Endpoint | Method | Function |
 |----------|--------|---------|
-| `/api/config` | GET | Obtiene configuración actual |
-| `/api/config/save` | POST | Guarda configuración |
-| `/api/config/validate` | POST | Valida configuración |
-| `/api/config/backup` | POST | Crea backup |
-| `/api/config/backups` | GET | Lista backups |
-| `/api/config/restore` | POST | Restaura backup |
-| `/api/config/history` | GET | Historial de cambios |
-| `/api/config/reload` | POST | Solicita reload |
+| `/api/config` | GET | Gets current configuration |
+| `/api/config/save` | POST | Saves configuration |
+| `/api/config/validate` | POST | Validates configuration |
+| `/api/config/backup` | POST | Creates backup |
+| `/api/config/backups` | GET | Lists backups |
+| `/api/config/restore` | POST | Restores backup |
+| `/api/config/history` | GET | Change history |
+| `/api/config/reload` | POST | Requests reload |
 
 ---
 
 ## 🎨 UI Features
 
-### **Detección de Cambios**
-- ✅ Marca automáticamente cuando hay cambios
-- ✅ Botón Save se habilita/deshabilita
-- ✅ Previene navegación accidental con cambios sin guardar
-- ✅ Auto-save opcional cada 5 minutos
+### **Change Detection**
+- ✅ Automatically marks when there are changes
+- ✅ Save button enables/disables
+- ✅ Prevents accidental navigation with unsaved changes
+- ✅ Optional auto-save every 5 minutes
 
-### **Validación**
-- ✅ Puertos (1-65535)
-- ✅ Campos requeridos
-- ✅ HomeKit PIN (8 dígitos)
-- ✅ Validación en servidor
-- ✅ Mensajes de error/warning
+### **Validation**
+- ✅ Ports (1-65535)
+- ✅ Required fields
+- ✅ HomeKit PIN (8 digits)
+- ✅ Server-side validation
+- ✅ Error/warning messages
 
-### **UX Mejorado**
-- ✅ Loading overlay durante operaciones
+### **Improved UX**
+- ✅ Loading overlay during operations
 - ✅ Toast notifications
-- ✅ Confirmación antes de restaurar
-- ✅ Tabs navegables
-- ✅ Diseño responsive
+- ✅ Confirmation before restore
+- ✅ Navigable tabs
+- ✅ Responsive design
 
 ---
 
-## 📁 Archivos Creados/Modificados
+## 📁 Created/Modified Files
 
-### **Nuevos Archivos**:
+### **New Files**:
 ```
 pkg/webserver/
-├── config_manager.go          (350 líneas)
-├── config_handlers.go         (250 líneas)
-├── config_ui.js               (500+ líneas embebidas)
-└── config_ui.css              (300+ líneas embebidas)
+├── config_manager.go          (350 lines)
+├── config_handlers.go         (250 lines)
+├── config_ui.js               (500+ embedded lines)
+└── config_ui.css              (300+ embedded lines)
 ```
 
-### **Archivos Modificados**:
+### **Modified Files**:
 ```
-pkg/webserver/server.go        (+400 líneas)
-pkg/config/config.go           (+200 líneas para nuevos structs)
+pkg/webserver/server.go        (+400 lines)
+pkg/config/config.go           (+200 lines for new structs)
 ```
 
-**Total líneas agregadas**: ~2000 líneas
+**Total lines added**: ~2000 lines
 
 ---
 
@@ -130,29 +130,29 @@ go build -o bticino_bridge_v0.13.0 ./cmd/main.go
 ```
 
 ### **Pending Tests**:
-- [ ] Deploy en dispositivo real
-- [ ] Test de carga/guardado de configuración
-- [ ] Test de validación
-- [ ] Test de backup/restore
-- [ ] Test de hot reload
+- [ ] Deploy on real device
+- [ ] Configuration load/save test
+- [ ] Validation test
+- [ ] Backup/restore test
+- [ ] Hot reload test
 
 ---
 
 ## 🚀 Deploy Instructions
 
-### **1. Compilar**:
+### **1. Compile**:
 ```bash
 cd bticino_bridge
 go build -o bticino_bridge_v0.13.0 ./cmd/main.go
 ```
 
-### **2. Transferir**:
+### **2. Transfer**:
 ```bash
-# Usar método base64 o scp
+# Use base64 method or scp
 scp bticino_bridge_v0.13.0 root@192.168.1.38:/home/bticino/cfg/extra/
 ```
 
-### **3. Reiniciar**:
+### **3. Restart**:
 ```bash
 ssh bticino
 cd /home/bticino/cfg/extra
@@ -160,12 +160,12 @@ pkill -9 bticino_bridge
 nohup ./bticino_bridge_v0.13.0 -config config_streaming.yaml &
 ```
 
-### **4. Verificar**:
+### **4. Verify**:
 ```bash
-# Acceder vía navegador
+# Access via browser
 http://192.168.1.38:8082/settings
 
-# O vía API
+# Or via API
 curl http://192.168.1.38:8082/api/config
 ```
 
@@ -173,98 +173,98 @@ curl http://192.168.1.38:8082/api/config
 
 ## 📝 User Guide
 
-### **Cómo Editar Configuración**:
+### **How to Edit Configuration**:
 
-1. **Navegar a Settings**: `http://device-ip:8082/settings`
+1. **Go to Settings**: `http://device-ip:8082/settings`
 
-2. **Seleccionar Pestaña**: Bridge, SIP, MQTT, etc.
+2. **Select Tab**: Bridge, SIP, MQTT, etc.
 
-3. **Editar Campos**: Los cambios se marcan automáticamente
+3. **Edit Fields**: changes are marked automatically
 
-4. **Validar** (opcional): Click en "✓ Validate" para verificar
+4. **Validate** (optional): click "✓ Validate" to verify
 
-5. **Guardar**: Click en "💾 Save" (solo activo si hay cambios)
+5. **Save**: click "💾 Save" (only active when there are changes)
 
-6. **Reiniciar** (si es necesario): Algunas configs requieren restart
+6. **Restart** (if needed): some configs require restart
 
-### **Cómo Crear Backup**:
+### **How to Create a Backup**:
 
-1. Click en "📦 Backup"
-2. Se crea backup con timestamp
-3. Se guarda en `/home/bticino/cfg/extra/backups/`
+1. Click "📦 Backup"
+2. A timestamped backup is created
+3. It is saved to `/home/bticino/cfg/extra/backups/`
 
-### **Cómo Restaurar**:
+### **How to Restore**:
 
-1. Click en "📂 Backups"
-2. Seleccionar backup de la lista
-3. Click en "Restore"
-4. Confirmar
-5. El sistema reinicia automáticamente
+1. Click "📂 Backups"
+2. Select a backup from the list
+3. Click "Restore"
+4. Confirm
+5. The system restarts automatically
 
 ---
 
 ## 🔒 Security Considerations
 
 ### **Passwords**:
-- ✅ Se muestran como password (ocultos)
-- ✅ Se envían encriptados vía HTTPS (recomendado)
-- ⚠️ Se guardan en texto plano en config.yaml
+- ✅ Shown as password (hidden)
+- ✅ Sent encrypted via HTTPS (recommended)
+- ⚠️ Stored in plain text in config.yaml
 
-### **Recomendaciones**:
-1. Habilitar HTTPS en producción
-2. Implementar autenticación web
-3. Rate limiting en endpoints
-4. Audit log de cambios
+### **Recommendations**:
+1. Enable HTTPS in production
+2. Implement web authentication
+3. Rate limiting on endpoints
+4. Change audit log
 
 ---
 
-## 🎯 Próximas Mejoras (Opcional)
+## 🎯 Next Improvements (Optional)
 
-### **Prioridad Baja**:
-- [ ] Autenticación web (login)
-- [ ] HTTPS automático
-- [ ] Exportar/Importar configuración
-- [ ] Comparar configs (diff)
-- [ ] Rollback rápido
+### **Low Priority**:
+- [ ] Web authentication (login)
+- [ ] Automatic HTTPS
+- [ ] Export/Import configuration
+- [ ] Compare configs (diff)
+- [ ] Fast rollback
 
-### **Prioridad Muy Baja**:
-- [ ] Temas (dark/light mode)
+### **Very Low Priority**:
+- [ ] Themes (dark/light mode)
 - [ ] Multi-language
-- [ ] Wizard de configuración inicial
+- [ ] Initial configuration wizard
 
 ---
 
-## 📊 Métricas Finales
+## 📊 Final Metrics
 
-| Métrica | Valor |
+| Metric | Value |
 |---------|-------|
-| **Líneas de Código** | ~2000 |
-| **Endpoints API** | 8 |
-| **Pestañas UI** | 8 |
-| **Campos Configuración** | 40+ |
-| **Tiempo Desarrollo** | ~4 horas |
-| **Estado** | ✅ 100% Completo |
+| **Lines of Code** | ~2000 |
+| **API Endpoints** | 8 |
+| **UI Tabs** | 8 |
+| **Configuration Fields** | 40+ |
+| **Development Time** | ~4 hours |
+| **Status** | ✅ 100% Complete |
 
 ---
 
-## ✅ Checklist de Completitud
+## ✅ Completeness Checklist
 
-- [x] Config Manager implementado
-- [x] API Endpoints completos
-- [x] UI HTML/CSS/JS completa
-- [x] Validación implementada
-- [x] Backup/Restore funcional
-- [x] Historial de cambios
-- [x] Detección de cambios
+- [x] Config Manager implemented
+- [x] API Endpoints complete
+- [x] HTML/CSS/JS UI complete
+- [x] Validation implemented
+- [x] Backup/Restore working
+- [x] Change history
+- [x] Change detection
 - [x] Loading states
 - [x] Error handling
 - [x] Responsive design
-- [x] Build exitoso
-- [ ] Deploy en dispositivo (pendiente)
-- [ ] Testing en producción (pendiente)
+- [x] Successful build
+- [ ] Deploy on device (pending)
+- [ ] Production testing (pending)
 
 ---
 
-**Estado**: ✅ **IMPLEMENTACIÓN COMPLETADA**  
-**Próximo Paso**: Deploy y testing en dispositivo real  
-**ETA Testing**: Inmediato (binario listo)
+**Status**: ✅ **IMPLEMENTATION COMPLETE**  
+**Next Step**: Deploy and testing on real device  
+**ETA Testing**: Immediate (binary ready)

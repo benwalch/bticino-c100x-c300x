@@ -1,36 +1,37 @@
-# Backlog de features (BTicino bridge)
+# Feature backlog (BTicino bridge)
 
-Ideas y fases futuras, fuera del alcance activo. Cada una necesita su propio
-spec → plan antes de implementarse.
+Future ideas and phases, out of active scope. Each needs its own
+spec → plan before implementation.
 
-## Vídeo/audio (relacionado con el spec de vídeo en vivo)
+## Video/audio (related to the live-video spec)
 
-- **Audio en vivo (escuchar la puerta en HA).** Requiere que el bridge sea **parte
-  SIP** de la llamada (auto-answer como endpoint de audio) para que la puerta emita
-  Speex RTP; transcodificar Speex→Opus con el ffmpeg del device
-  (`/usr/local/bin/ffmpeg`, tiene libspeex+libopus) → go2rtc → HA. Base: cuenta SIP
-  standalone (200 OK verificado) + auto-answer de INVITEs existente.
-  Ver `_investigacion/docs/SPIKE_LISTEN_HA_2026-07-11.md`.
-- **Talk-back (hablar hacia la puerta).** `pkg/sip/talkback.go` + RE hecho; requiere
-  que el bridge posea la llamada (colisión SSRC si se inyecta en paralelo a la app).
-- **"Llamar a casa".** El bridge origina una llamada SIP al interfono (intercom
-  saliente). Su audio NO pasa por bt_av_media (confirmado en el spike).
+- **Live audio (listening to the door in HA).** Requires the bridge to be a **SIP
+  party** in the call (auto-answer as an audio endpoint) so the door emits
+  Speex RTP; transcode Speex→Opus with the device ffmpeg
+  (`/usr/local/bin/ffmpeg`, has libspeex+libopus) → go2rtc → HA. Base: standalone
+  SIP account (200 OK verified) + existing INVITE auto-answer.
+  See `_investigacion/docs/SPIKE_LISTEN_HA_2026-07-11.md`.
+- **Talk-back (speaking toward the door).** `pkg/sip/talkback.go` + RE done; requires
+  the bridge to own the call (SSRC collision if injected in parallel with the app).
+- **"Call home".** The bridge originates a SIP call to the intercom (outgoing
+  intercom). Its audio does NOT go through bt_av_media (confirmed in the spike).
 
-## Otras
+## Other
 
-- **Clasificador de eventos de acceso / cerradura por duración.** El bus OpenWebNet
-  emite eventos de cerradura (apertura → cierre + duración) de **cualquier piso**
-  (sin identificar el piso concreto — privacidad de edificio). Patrón empírico
-  observado por el usuario:
-  - **~2-3 s** → apertura tras telefonillo (visita a la que le abren).
-  - **~4 s** → apertura con **llave RFID** (típicamente residente llegando).
+- **Access/lock event classifier by duration.** The OpenWebNet bus
+  emits lock events (unlock → lock + duration) from **any floor**
+  (without identifying the specific floor — building privacy). Empirical pattern
+  observed by the user:
+  - **~2-3 s** → opening after intercom (a visitor being let in).
+  - **~4 s** → opening with an **RFID key** (typically an arriving resident).
 
-  **Valor:** publicar en HA un evento clasificado ("entrada con llave" vs "entrada por
-  telefonillo") para automatizaciones/notificaciones, señales de seguridad (apertura a
-  horas raras / con casa vacía) y un timeline "quién entró" correlacionado con nuestras
-  llamadas de timbre.
+  **Value:** publish a classified event in HA ("key entry" vs "intercom entry")
+  for automations/notifications, security signals (openings at odd hours / with
+  nobody home) and a "who came in" timeline correlated with our
+  doorbell calls.
 
-  **Caveats:** señal a **nivel de edificio** (no identifica piso); el umbral 2-3 s vs
-  4 s es heurística observada y **hay que validarla con datos reales** (puede variar
-  por puerta/persona/estación) antes de fiarla. La base ya existe parcialmente: el
-  bridge ya emite eventos `door.unlocked` y una entidad de cerradura en MQTT.
+  **Caveats:** a **building-level** signal (doesn't identify the floor); the 2-3 s
+  vs 4 s threshold is an observed heuristic and **must be validated with real data**
+  (it may vary by door/person/season) before relying on it. The groundwork partly
+  exists already: the bridge already emits `door.unlocked` events and a lock entity
+  over MQTT.

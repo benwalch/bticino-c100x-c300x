@@ -1,4 +1,4 @@
-// Package deviceconfig proporciona funciones para leer la configuración del dispositivo BTicino
+// Package deviceconfig provides functions to read the BTicino device configuration
 package deviceconfig
 
 import (
@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Config representa la configuración completa del dispositivo
+// Config represents the full device configuration
 type Config struct {
 	DeviceInfo DeviceInfo `json:"device_info"`
 	Language   string     `json:"language"`
@@ -24,14 +24,14 @@ type Config struct {
 	Timestamp  time.Time  `json:"timestamp"`
 }
 
-// DeviceInfo información del dispositivo
+// DeviceInfo device information
 type DeviceInfo struct {
 	Model   string `json:"model"`
 	IP      string `json:"ip"`
 	Version string `json:"version"`
 }
 
-// Answering configuración del contestador automático
+// Answering answering machine configuration
 type Answering struct {
 	Activated  bool   `json:"activated"`
 	RingEnable bool   `json:"ring_enabled"`
@@ -39,7 +39,7 @@ type Answering struct {
 	MemoryUsed string `json:"memory_used"`
 }
 
-// Ringtones configuración de tonos
+// Ringtones ringtone configuration
 type Ringtones struct {
 	S0       int `json:"s0"`
 	S1       int `json:"s1"`
@@ -52,7 +52,7 @@ type Ringtones struct {
 	S3       int `json:"s3"`
 }
 
-// Volumes configuración de volúmenes
+// Volumes volume configuration
 type Volumes struct {
 	S0       int `json:"s0"`
 	S1       int `json:"s1"`
@@ -62,13 +62,13 @@ type Volumes struct {
 	SIP      int `json:"sip"`
 }
 
-// Display configuración de display
+// Display display configuration
 type Display struct {
 	Brightness int `json:"brightness"`
 	CleanTime  int `json:"clean_time"`
 }
 
-// Cameras configuración de cámaras
+// Cameras camera configuration
 type Cameras map[string]CameraConfig
 
 type CameraConfig struct {
@@ -78,7 +78,7 @@ type CameraConfig struct {
 	Quality    int `json:"quality"`
 }
 
-// DevicePaths rutas de los archivos de configuración del dispositivo
+// DevicePaths paths of the device configuration files
 var DevicePaths = struct {
 	ConfXML      string
 	ASWMSettings string
@@ -91,7 +91,7 @@ var DevicePaths = struct {
 	SettingsXML:  "/home/bticino/cfg/extra/0/settings.xml",
 }
 
-// ReadConfig lee toda la configuración del dispositivo
+// ReadConfig reads the whole device configuration
 func ReadConfig(ip string) (*Config, error) {
 	cfg := &Config{
 		DeviceInfo: DeviceInfo{
@@ -102,7 +102,7 @@ func ReadConfig(ip string) (*Config, error) {
 		Timestamp: time.Now(),
 	}
 
-	// Leer conf.xml (Language, Timezone, NTP)
+	// Read conf.xml (Language, Timezone, NTP)
 	confXML, err := ReadConfXML(DevicePaths.ConfXML)
 	if err != nil {
 		return nil, fmt.Errorf("error reading conf.xml: %w", err)
@@ -112,11 +112,11 @@ func ReadConfig(ip string) (*Config, error) {
 	cfg.NTPServer = confXML.NTPServer
 	cfg.NTPAlgo = confXML.NTPalgo
 
-	// Intentar obtener datetime del sistema (si está disponible)
-	// Por ahora usamos el timestamp de lectura
+	// Try to get system datetime (if available)
+	// For now we use the read timestamp
 	cfg.DateTime = time.Now()
 
-	// Leer aswm_settings.ini (Answering Machine)
+	// Read aswm_settings.ini (Answering Machine)
 	aswm, err := ReadASWMSettings(DevicePaths.ASWMSettings)
 	if err != nil {
 		return nil, fmt.Errorf("error reading aswm_settings.ini: %w", err)
@@ -128,12 +128,12 @@ func ReadConfig(ip string) (*Config, error) {
 		MemoryUsed: aswm.Memused,
 	}
 
-	// Leer tvcc_settings.ini (Cámaras)
+	// Read tvcc_settings.ini (Cameras)
 	tvcc, err := ReadTVCCSettings(DevicePaths.TVCCSettings)
 	if err != nil {
 		return nil, fmt.Errorf("error reading tvcc_settings.ini: %w", err)
 	}
-	// Convertir TVCCSettings a Cameras
+	// Convert TVCCSettings to Cameras
 	cfg.Cameras = make(Cameras, len(tvcc))
 	for k, v := range tvcc {
 		cfg.Cameras[k] = CameraConfig{
@@ -144,7 +144,7 @@ func ReadConfig(ip string) (*Config, error) {
 		}
 	}
 
-	// Leer settings.xml (Ringtones, Volúmenes, Display)
+	// Read settings.xml (Ringtones, Volumes, Display)
 	settings, err := ReadSettingsXML(DevicePaths.SettingsXML)
 	if err != nil {
 		return nil, fmt.Errorf("error reading settings.xml: %w", err)
@@ -156,7 +156,7 @@ func ReadConfig(ip string) (*Config, error) {
 	return cfg, nil
 }
 
-// ReadConfigFromPaths lee la configuración usando rutas personalizadas
+// ReadConfigFromPaths reads the configuration using custom paths
 func ReadConfigFromPaths(paths struct {
 	ConfXML      string
 	ASWMSettings string
@@ -172,7 +172,7 @@ func ReadConfigFromPaths(paths struct {
 		Timestamp: time.Now(),
 	}
 
-	// Leer conf.xml
+	// Read conf.xml
 	if paths.ConfXML != "" {
 		confXML, err := ReadConfXML(paths.ConfXML)
 		if err != nil {
@@ -185,7 +185,7 @@ func ReadConfigFromPaths(paths struct {
 		cfg.DateTime = time.Now()
 	}
 
-	// Leer aswm_settings.ini
+	// Read aswm_settings.ini
 	if paths.ASWMSettings != "" {
 		aswm, err := ReadASWMSettings(paths.ASWMSettings)
 		if err != nil {
@@ -199,13 +199,13 @@ func ReadConfigFromPaths(paths struct {
 		}
 	}
 
-	// Leer tvcc_settings.ini
+	// Read tvcc_settings.ini
 	if paths.TVCCSettings != "" {
 		tvcc, err := ReadTVCCSettings(paths.TVCCSettings)
 		if err != nil {
 			return nil, fmt.Errorf("error reading tvcc_settings.ini: %w", err)
 		}
-		// Convertir TVCCSettings a Cameras
+		// Convert TVCCSettings to Cameras
 		cfg.Cameras = make(Cameras, len(tvcc))
 		for k, v := range tvcc {
 			cfg.Cameras[k] = CameraConfig{
@@ -217,7 +217,7 @@ func ReadConfigFromPaths(paths struct {
 		}
 	}
 
-	// Leer settings.xml
+	// Read settings.xml
 	if paths.SettingsXML != "" {
 		settings, err := ReadSettingsXML(paths.SettingsXML)
 		if err != nil {
@@ -231,28 +231,28 @@ func ReadConfigFromPaths(paths struct {
 	return cfg, nil
 }
 
-// FileExists verifica si un archivo existe
+// FileExists checks whether a file exists
 func FileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
 
-// GetBaseDir retorna el directorio base del dispositivo
+// GetBaseDir returns the device base directory
 func GetBaseDir() string {
 	return "/home/bticino"
 }
 
-// GetConfigDir retorna el directorio de configuración
+// GetConfigDir returns the configuration directory
 func GetConfigDir() string {
 	return "/home/bticino/cfg"
 }
 
-// GetExtraConfigDir retorna el directorio de configuración extra
+// GetExtraConfigDir returns the extra configuration directory
 func GetExtraConfigDir() string {
 	return "/home/bticino/cfg/extra"
 }
 
-// NormalizePath normaliza una ruta del dispositivo (remueve /home/bticino/ si es necesario)
+// NormalizePath normalizes a device path (removes /home/bticino/ if needed)
 func NormalizePath(path string) string {
 	homeDir := GetBaseDir()
 	if strings.HasPrefix(path, homeDir+"/") {

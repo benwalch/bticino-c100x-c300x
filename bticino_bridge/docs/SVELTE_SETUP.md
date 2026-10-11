@@ -1,12 +1,12 @@
 # BTicino Bridge - Svelte UI Setup
 
-**Fecha**: 2026-03-27  
-**Versión**: v0.15.0 (Svelte)  
-**Estado**: ✅ **SETUP COMPLETADO**
+**Date**: 2026-03-27  
+**Version**: v0.15.0 (Svelte)  
+**Status**: ✅ **SETUP COMPLETE**
 
 ---
 
-## 📁 Estructura del Proyecto
+## 📁 Project Structure
 
 ```
 bticino_bridge/
@@ -19,7 +19,7 @@ bticino_bridge/
 │   ├── vite.config.js
 │   └── svelte.config.js
 ├── scripts/
-│   └── deploy.sh           # 🆡 Deploy único (build + deploy)
+│   └── deploy.sh           # 🆡 Single deploy (build + deploy)
 ├── Makefile                # 🆡 Con build Svelte
 └── docs/
     └── SVELTE_SETUP.md     # Este archivo
@@ -29,7 +29,7 @@ bticino_bridge/
 
 ## 🚀 Quick Start
 
-### **1. Instalar dependencias**:
+### **1. Install dependencies**:
 ```bash
 cd bticino_bridge
 make install
@@ -40,11 +40,11 @@ make install
 make dev
 ```
 
-Acceder a:
+Access at:
 - Web dev: http://localhost:5173 (hot reload)
 - Go backend: http://localhost:8082 (API)
 
-### **3. Build completo**:
+### **3. Full build**:
 ```bash
 make build
 ```
@@ -56,38 +56,38 @@ make deploy
 
 ---
 
-## 📦 Comandos Make
+## 📦 Make Commands
 
-| Comando | Descripción |
+| Command | Description |
 |---------|-------------|
 | `make build` | Build web + go |
-| `make build-web` | Solo build web |
-| `make build-go` | Solo build go |
+| `make build-web` | Web build only |
+| `make build-go` | Go build only |
 | `make deploy` | Build + deploy |
 | `make dev` | Development mode |
-| `make install` | Instalar dependencias |
-| `make clean` | Limpiar todo |
+| `make install` | Install dependencies |
+| `make clean` | Clean everything |
 | `make test` | Run tests |
-| `make help` | Mostrar ayuda |
+| `make help` | Show help |
 
 ---
 
-## 🎯 Componentes Svelte
+## 🎯 Svelte Components
 
-### **Actuales**:
-- ✅ `App.svelte` - Dashboard principal
+### **Current**:
+- ✅ `App.svelte` - Main dashboard
 
-### **Próximos**:
-- ⏳ `Settings.svelte` - Configuración
+### **Upcoming**:
+- ⏳ `Settings.svelte` - Configuration
 - ⏳ `DeviceTab.svelte` - Device (NTP, Language)
 - ⏳ `ConfigTab.svelte` - Config tabs
-- ⏳ `Messages.svelte` - Mensajes
-- ⏳ `Controls.svelte` - Controles
+- ⏳ `Messages.svelte` - Messages
+- ⏳ `Controls.svelte` - Controls
 - ⏳ `Logs.svelte` - Logs viewer
 
 ---
 
-## 🔧 Configuración
+## 🔧 Configuration
 
 ### **vite.config.js**:
 ```javascript
@@ -107,27 +107,27 @@ make deploy
 
 ### **proxy**:
 - `/api/*` → http://localhost:8082/api/*
-- Permite desarrollar con backend real
+- Allows developing with a real backend
 
 ---
 
 ## 📊 Bundle Size
 
-| Build | Tamaño |
+| Build | Size |
 |-------|--------|
 | **Svelte** | ~10-15KB (gzipped) |
 | **Vendor** | ~50KB (Svelte runtime) |
 | **Total** | ~65KB |
 
-**Comparación**:
-- HTML embebido: 14MB (todo en binario Go)
-- Svelte: 13MB + 65KB (separado)
+**Comparison**:
+- Embedded HTML: 14MB (all in the Go binary)
+- Svelte: 13MB + 65KB (separate)
 
 ---
 
-## 🎨 Estilos
+## 🎨 Styles
 
-**Enfoque**: CSS scoped por componente
+**Approach**: scoped CSS per component
 
 ```svelte
 <style>
@@ -138,16 +138,16 @@ make deploy
 </style>
 ```
 
-**Ventajas**:
-- ✅ Sin conflictos de nombres
-- ✅ CSS crítico por componente
-- ✅ Fácil mantenimiento
+**Advantages**:
+- ✅ No naming conflicts
+- ✅ Critical CSS per component
+- ✅ Easy maintenance
 
 ---
 
 ## 🔌 API Integration
 
-### **Ejemplo**:
+### **Example**:
 ```svelte
 <script>
   import { onMount } from 'svelte'
@@ -165,30 +165,30 @@ make deploy
 {/if}
 ```
 
-### **Endpoints disponibles**:
-- `GET /api/status` - Estado del sistema
-- `GET /api/config` - Configuración
+### **Available endpoints**:
+- `GET /api/status` - System status
+- `GET /api/config` - Configuration
 - `GET /api/device/ntp` - NTP config
-- `GET /api/device/language` - Idioma
-- `POST /api/config/save` - Guardar config
+- `GET /api/device/language` - Language
+- `POST /api/config/save` - Save config
 
 ---
 
 ## 🚀 Deploy
 
-### **Automático**:
+### **Automatic**:
 ```bash
 make deploy
 ```
 
-**Qué hace**:
-1. ✅ Build Svelte (`web/dist/`)
-2. ✅ Build Go (`bticino_bridge`)
-3. ✅ SSH al dispositivo
+**What it does**:
+1. ✅ Svelte build (`web/dist/`)
+2. ✅ Go build (`bticino_bridge`)
+3. ✅ SSH to the device
 4. ✅ Backup
-5. ✅ Transferencia
-6. ✅ Restart servicio
-7. ✅ Verificación
+5. ✅ Transfer
+6. ✅ Service restart
+7. ✅ Verification
 
 ### **Manual**:
 ```bash
@@ -206,7 +206,7 @@ cd .. && GOOS=linux GOARCH=arm go build
 
 ### **Error: "npm not found"**:
 ```bash
-# Instalar Node.js
+# Install Node.js
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt-get install -y nodejs
 ```
@@ -219,29 +219,29 @@ cd web && npm install && npm run build
 
 ### **Error: "SSH connection failed"**:
 ```bash
-# Verificar SSH keys
+# Verify SSH keys
 ssh-copy-id bticino
 ssh bticino "echo OK"
 ```
 
 ---
 
-## 📝 Próximos Pasos
+## 📝 Next Steps
 
-### **Inmediatos**:
-1. ✅ Setup Svelte (COMPLETADO)
-2. ✅ Dashboard component (COMPLETADO)
+### **Immediate**:
+1. ✅ Svelte setup (COMPLETE)
+2. ✅ Dashboard component (COMPLETE)
 3. ⏳ Settings page
 4. ⏳ Device tab
 5. ⏳ Config tabs
 
-### **Corto plazo**:
+### **Short term**:
 - Messages page
 - Controls page
 - Logs viewer
 - Dark mode
 
-### **Largo plazo**:
+### **Long term**:
 - TypeScript migration
 - Unit tests (Vitest)
 - E2E tests (Playwright)
@@ -249,20 +249,19 @@ ssh bticino "echo OK"
 
 ---
 
-## 📚 Recursos
+## 📚 Resources
 
-### **Documentación**:
+### **Documentation**:
 - [Svelte Docs](https://svelte.dev/docs)
 - [Svelte Tutorial](https://svelte.dev/tutorial)
 - [Vite Docs](https://vitejs.dev/guide/)
 
-### **Componentes**:
+### **Components**:
 - [Svelte Material UI](https://sveltematerialui.com/)
 - [Svelte Kit](https://kit.svelte.dev/)
 
 ---
 
-**Estado**: ✅ **SETUP COMPLETADO**  
-**Próximo**: Crear Settings page  
-**Dificultad**: 🟢 Baja (Svelte es simple)
-
+**Status**: ✅ **SETUP COMPLETE**  
+**Next**: Create Settings page  
+**Difficulty**: 🟢 Low (Svelte is simple)

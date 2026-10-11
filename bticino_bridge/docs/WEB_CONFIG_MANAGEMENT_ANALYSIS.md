@@ -1,76 +1,76 @@
-# Gestión de Configuración vía Web Dashboard - Análisis de Viabilidad
+# Configuration Management via Web Dashboard - Feasibility Analysis
 
-**Fecha**: 2026-03-24  
-**Versión**: bticino_bridge v0.12.0  
-**Tipo**: Análisis de evolución arquitectónica
-
----
-
-## 📊 Resumen Ejecutivo
-
-**¿Es una evolución coherente?** → ✅ **SÍ, ABSOLUTAMENTE**
-
-La gestión de configuración vía web dashboard es una **evolución natural y coherente** para el proyecto bticino_bridge, especialmente considerando:
-
-1. ✅ **Ya existe la infraestructura** (web server, API REST, settings page)
-2. ✅ **Resuelve problemas reales** (deploy SSH, edición manual de YAML)
-3. ✅ **Alineado con la arquitectura** (todo se gestiona vía web menos config)
-4. ✅ **Mejora la experiencia de usuario** significativamente
-5. ✅ **Bajo riesgo técnico** (config ya está en memoria, solo falta persistencia)
+**Date**: 2026-03-24  
+**Version**: bticino_bridge v0.12.0  
+**Type**: architectural evolution analysis
 
 ---
 
-## 🎯 Estado Actual vs Estado Deseado
+## 📊 Executive Summary
 
-### **Estado Actual (v0.12.0)**
+**Is it a coherent evolution?** → ✅ **YES, ABSOLUTELY**
+
+Managing configuration via the web dashboard is a **natural and coherent evolution** for the bticino_bridge project, especially considering:
+
+1. ✅ **The infrastructure already exists** (web server, REST API, settings page)
+2. ✅ **Solves real problems** (SSH deploy, manual YAML editing)
+3. ✅ **Aligned with the architecture** (everything is managed via web except config)
+4. ✅ **Significantly improves user experience**
+5. ✅ **Low technical risk** (config is already in memory, only persistence is missing)
+
+---
+
+## 🎯 Current State vs Desired State
+
+### **Current State (v0.12.0)**
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Web Dashboard (:8082)                                  │
-│  ✅ Dashboard - Estado del sistema                      │
-│  ✅ Messages - Gestión de mensajes                      │
-│  ✅ Controls - Control de dispositivos                  │
-│  ✅ Settings - SOLO LECTURA (HTML estático)             │
-│  ✅ Logs - Visor de logs                                │
+│  ✅ Dashboard - System status                        │
+│  ✅ Messages - Message management                     │
+│  ✅ Controls - Device control                         │
+│  ✅ Settings - READ ONLY (static HTML)                │
+│  ✅ Logs - Log viewer                                 │
 └─────────────────────────────────────────────────────────┘
                             │
                             ▼
               ┌─────────────────────────┐
               │  API REST               │
               │  ✅ 24 endpoints        │
-              │  ❌ Sin endpoints POST  │
-              │     para configuración  │
+              │  ❌ No POST endpoints   │
+              │     for configuration   │
               └─────────────────────────┘
                             │
                             ▼
               ┌─────────────────────────┐
               │  config.yaml            │
-              │  Edición manual vía SSH │
-              │  Requiere restart       │
+              │  Manual editing via SSH │
+              │  Requires restart       │
               └─────────────────────────┘
 ```
 
-**Problemas**:
-- ❌ Editar config requiere SSH + editor de texto
-- ❌ Requiere restart manual del servicio
-- ❌ Sin validación de sintaxis YAML
-- ❌ Sin backup automático
-- ❌ Sin rollback fácil
-- ❌ Error-prone para usuarios no técnicos
+**Problems**:
+- ❌ Editing config requires SSH + text editor
+- ❌ Requires manual service restart
+- ❌ No YAML syntax validation
+- ❌ No automatic backup
+- ❌ No easy rollback
+- ❌ Error-prone for non-technical users
 
 ---
 
-### **Estado Deseado (v0.13.0)**
+### **Desired State (v0.13.0)**
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Web Dashboard (:8082)                                  │
-│  ✅ Dashboard - Estado del sistema                      │
-│  ✅ Messages - Gestión de mensajes                      │
-│  ✅ Controls - Control de dispositivos                  │
-│  ✅ Settings - EDITABLE (formularios + validación)      │
-│  ✅ Logs - Visor de logs                                │
-│  ✅ Config - Gestión completa (CRUD)                    │
+│  ✅ Dashboard - System status                      │
+│  ✅ Messages - Message management                    │
+│  ✅ Controls - Device control                        │
+│  ✅ Settings - EDITABLE (forms + validation)         │
+│  ✅ Logs - Log viewer                                │
+│  ✅ Config - Full management (CRUD)                  │
 └─────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -86,8 +86,8 @@ La gestión de configuración vía web dashboard es una **evolución natural y c
                             ▼
               ┌─────────────────────────┐
               │  Config Manager         │
-              │  ✅ Validación YAML     │
-              │  ✅ Backup automático   │
+              │  ✅ YAML validation   │
+              │  ✅ Automatic backup    │
               │  ✅ Hot reload          │
               │  ✅ Rollback            │
               └─────────────────────────┘
@@ -95,41 +95,41 @@ La gestión de configuración vía web dashboard es una **evolución natural y c
                             ▼
               ┌─────────────────────────┐
               │  config.yaml            │
-              │  Actualización automática │
+              │  Automatic update     │
               │  Backup: config.yaml.bak │
               └─────────────────────────┘
 ```
 
-**Beneficios**:
-- ✅ Edición desde navegador (sin SSH)
-- ✅ Validación en tiempo real
-- ✅ Backup automático antes de cambios
-- ✅ Hot reload (restart automático)
-- ✅ Rollback con 1 click
-- ✅ Accesible para usuarios no técnicos
+**Benefits**:
+- ✅ Editing from the browser (no SSH)
+- ✅ Real-time validation
+- ✅ Automatic backup before changes
+- ✅ Hot reload (automatic restart)
+- ✅ 1-click rollback
+- ✅ Accessible to non-technical users
 
 ---
 
-## 🔍 Análisis Técnico
+## 🔍 Technical Analysis
 
-### 1. **Infraestructura Existente** ✅
+### 1. **Existing Infrastructure** ✅
 
-| Componente | Estado | Reutilización |
+| Component | Status | Reuse |
 |------------|--------|---------------|
-| Web Server | ✅ Implementado | 100% reutilizable |
-| API REST | ✅ 24 endpoints | Patrón existente |
-| Settings Page | ✅ HTML existe | Extender con forms |
-| Config en Memoria | ✅ `ws.config` | Ya disponible |
-| YAML Parser | ✅ `gopkg.in/yaml.v2` | Ya importado |
+| Web Server | ✅ Implemented | 100% reusable |
+| API REST | ✅ 24 endpoints | Existing pattern |
+| Settings Page | ✅ HTML exists | Extend with forms |
+| Config in Memory | ✅ `ws.config` | Already available |
+| YAML Parser | ✅ `gopkg.in/yaml.v2` | Already imported |
 
-**Código a escribir**: ~500-800 líneas (estimado)
+**Code to write**: ~500-800 lines (estimated)
 
 ---
 
-### 2. **Endpoints Necesarios**
+### 2. **Required Endpoints**
 
 ```go
-// GET /api/config - Obtener configuración actual
+// GET /api/config - Get current configuration
 GET /api/config
 Response: {
   "config": { ... },
@@ -137,7 +137,7 @@ Response: {
   "timestamp": "2026-03-24T10:00:00Z"
 }
 
-// POST /api/config - Guardar configuración
+// POST /api/config - Save configuration
 POST /api/config
 Body: { "config": { ... } }
 Response: {
@@ -147,7 +147,7 @@ Response: {
   "restart_required": true
 }
 
-// POST /api/config/validate - Validar configuración
+// POST /api/config/validate - Validate configuration
 POST /api/config/validate
 Body: { "config": { ... } }
 Response: {
@@ -156,7 +156,7 @@ Response: {
   "warnings": ["SIP server not reachable"]
 }
 
-// POST /api/config/backup - Crear backup
+// POST /api/config/backup - Create backup
 POST /api/config/backup
 Response: {
   "success": true,
@@ -171,7 +171,7 @@ Response: {
   "message": "Config restored"
 }
 
-// POST /api/config/restart - Reiniciar servicio
+// POST /api/config/restart - Restart service
 POST /api/config/restart
 Response: {
   "success": true,
@@ -191,7 +191,7 @@ Response: {
 
 ### 3. **UI/UX - Settings Page**
 
-**Secciones editables**:
+**Editable sections**:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -221,7 +221,7 @@ Response: {
 
 ---
 
-### 4. **Arquitectura Propuesta**
+### 4. **Proposed Architecture**
 
 ```go
 // pkg/webserver/config_manager.go
@@ -256,206 +256,206 @@ type ConfigChange struct {
 
 ---
 
-## 📈 Análisis de Riesgos
+## 📈 Risk Analysis
 
-### **Riesgos Técnicos**
+### **Technical Risks**
 
-| Riesgo | Probabilidad | Impacto | Mitigación |
+| Risk | Probability | Impact | Mitigation |
 |--------|--------------|---------|------------|
-| Config inválida rompe servicio | Media | Alto | Validación + backup automático |
-| Hot reload falla | Media | Medio | Restart manual como fallback |
-| Pérdida de configuración | Baja | Alto | Múltiples backups + history |
-| Race conditions | Media | Medio | Mutex + transacciones |
-| Security (auth) | Alta | Alto | Login obligatorio + HTTPS |
+| Invalid config breaks service | Medium | High | Validation + automatic backup |
+| Hot reload fails | Medium | Medium | Manual restart as fallback |
+| Configuration loss | Low | High | Multiple backups + history |
+| Race conditions | Medium | Medium | Mutex + transactions |
+| Security (auth) | High | High | Mandatory login + HTTPS |
 
 ---
 
-### **Riesgos de Seguridad**
+### **Security Risks**
 
 ```yaml
-# CRÍTICO: La configuración contiene credenciales
+# CRITICAL: The configuration contains credentials
 sip:
   password: "sensitive"
 mqtt:
   password: "sensitive"
   
 # Requiere:
-1. Autenticación obligatoria para /api/config
-2. HTTPS en producción
-3. Encriptación de passwords en UI
+1. Mandatory authentication for /api/config
+2. HTTPS in production
+3. Password encryption in UI
 4. Audit log de cambios
 5. Rate limiting en endpoints
 ```
 
 ---
 
-## 🎯 Implementación Propuesta
+## 🎯 Proposed Implementation
 
-### **Fase 1: API Básica (v0.13.0-alpha)**
+### **Phase 1: Basic API (v0.13.0-alpha)**
 - [ ] GET /api/config
-- [ ] POST /api/config (sin validación)
-- [ ] Backup manual antes de guardar
-- [ ] Settings page con forms básicos
+- [ ] POST /api/config (no validation)
+- [ ] Manual backup before saving
+- [ ] Settings page with basic forms
 
-**Líneas de código**: ~300  
-**Tiempo estimado**: 4-6 horas  
-**Riesgo**: Bajo
+**Lines of code**: ~300  
+**Estimated time**: 4-6 hours  
+**Risk**: Low
 
 ---
 
-### **Fase 2: Validación (v0.13.0-beta)**
+### **Phase 2: Validation (v0.13.0-beta)**
 - [ ] POST /api/config/validate
-- [ ] Validación de sintaxis YAML
-- [ ] Validación semántica (puertos, IPs)
-- [ ] Warnings para configs riesgosas
+- [ ] YAML syntax validation
+- [ ] Semantic validation (ports, IPs)
+- [ ] Warnings for risky configs
 
-**Líneas de código**: ~200  
-**Tiempo estimado**: 3-4 horas  
-**Riesgo**: Bajo
+**Lines of code**: ~200  
+**Estimated time**: 3-4 hours  
+**Risk**: Low
 
 ---
 
-### **Fase 3: Hot Reload (v0.13.0-rc)**
+### **Phase 3: Hot Reload (v0.13.0-rc)**
 - [ ] POST /api/config/restart
 - [ ] Graceful shutdown
-- [ ] Auto-restart después de guardar
+- [ ] Auto-restart after saving
 - [ ] Health check post-restart
 
-**Líneas de código**: ~150  
-**Tiempo estimado**: 4-5 horas  
-**Riesgo**: Medio
+**Lines of code**: ~150  
+**Estimated time**: 4-5 hours  
+**Risk**: Medium
 
 ---
 
-### **Fase 4: Seguridad (v0.13.0)**
-- [ ] Autenticación para endpoints config
-- [ ] HTTPS opcional
-- [ ] Audit log de cambios
+### **Phase 4: Security (v0.13.0)**
+- [ ] Authentication for config endpoints
+- [ ] Optional HTTPS
+- [ ] Change audit log
 - [ ] Rate limiting
 
-**Líneas de código**: ~250  
-**Tiempo estimado**: 6-8 horas  
-**Riesgo**: Medio
+**Lines of code**: ~250  
+**Estimated time**: 6-8 hours  
+**Risk**: Medium
 
 ---
 
-### **Fase 5: UX Avanzado (v0.14.0)**
-- [ ] Historial de cambios
-- [ ] Diff entre versiones
-- [ ] Rollback con 1 click
-- [ ] Import/export de config
-- [ ] Templates de configuración
+### **Phase 5: Advanced UX (v0.14.0)**
+- [ ] Change history
+- [ ] Diff between versions
+- [ ] 1-click rollback
+- [ ] Config import/export
+- [ ] Configuration templates
 
-**Líneas de código**: ~400  
-**Tiempo estimado**: 8-10 horas  
-**Riesgo**: Bajo
+**Lines of code**: ~400  
+**Estimated time**: 8-10 hours  
+**Risk**: Low
 
 ---
 
-## 📊 Comparación con Alternativas
+## 📊 Comparison with Alternatives
 
-### **Alternativa 1: Mantener edición manual (Status Quo)**
+### **Alternative 1: Keep manual editing (Status Quo)**
 
-| Pros | Contras |
+| Pros | Cons |
 |------|---------|
-| ✅ Sin desarrollo | ❌ Requiere SSH |
-| ✅ Sin bugs nuevos | ❌ Error-prone |
-| | ❌ No accesible para usuarios |
-| | ❌ Sin validación |
-| | ❌ Sin backup automático |
+| ✅ No development | ❌ Requires SSH |
+| ✅ No new bugs | ❌ Error-prone |
+| | ❌ Not accessible to users |
+| | ❌ No validation |
+| | ❌ No automatic backup |
 
-**Veredicto**: ❌ No recomendado - limita adopción
+**Verdict**: ❌ Not recommended - limits adoption
 
 ---
 
-### **Alternativa 2: Web Dashboard (Propuesta)**
+### **Alternative 2: Web Dashboard (Proposed)**
 
-| Pros | Contras |
+| Pros | Cons |
 |------|---------|
-| ✅ Accesible desde navegador | ⚠️ Requiere desarrollo (~1000 LOC) |
-| ✅ Validación automática | ⚠️ Riesgo de seguridad (mitigable) |
-| ✅ Backup automático | ⚠️ Complejidad adicional |
+| ✅ Accessible from browser | ⚠️ Requires development (~1000 LOC) |
+| ✅ Automatic validation | ⚠️ Security risk (mitigable) |
+| ✅ Automatic backup | ⚠️ Additional complexity |
 | ✅ Hot reload | |
-| ✅ Rollback fácil | |
+| ✅ Easy rollback | |
 | ✅ Audit log | |
 
-**Veredicto**: ✅ **RECOMENDADO** - mejora significativa UX
+**Verdict**: ✅ **RECOMMENDED** - significant UX improvement
 
 ---
 
-### **Alternativa 3: CLI Tool + Web**
+### **Alternative 3: CLI Tool + Web**
 
-| Pros | Contras |
+| Pros | Cons |
 |------|---------|
-| ✅ Reutilizable en scripts | ⚠️ Más desarrollo (CLI + Web) |
-| ✅ SSH aún funciona | ⚠️ Duplicación de lógica |
-| ✅ Power users felices | ⚠️ Mantenimiento adicional |
+| ✅ Reusable in scripts | ⚠️ More development (CLI + Web) |
+| ✅ SSH still works | ⚠️ Duplicated logic |
+| ✅ Power users happy | ⚠️ Additional maintenance |
 
-**Veredicto**: ⚠️ **OPCIONAL** - nice to have, no crítico
-
----
-
-## 🎯 Recomendación Final
-
-### **¿Es una evolución coherente?**
-
-**✅ SÍ** - Por las siguientes razones:
-
-1. **Alineado con la arquitectura existente**
-   - Web dashboard ya existe
-   - API REST ya existe
-   - Config ya está en memoria
-   - Solo falta persistencia + UI
-
-2. **Resuelve problemas reales**
-   - SSH no siempre disponible
-   - Edición manual es error-prone
-   - Usuarios no técnicos necesitan acceso
-
-3. **Bajo riesgo técnico**
-   - Infraestructura 90% lista
-   - Validación YAML ya existe
-   - Hot reload es simple (signal + exec)
-
-4. **Alto valor para usuarios**
-   - Reduce tiempo de configuración
-   - Reduce errores
-   - Mejora experiencia general
-
-5. **Evolución natural del proyecto**
-   - v0.10.0: Web dashboard (lectura)
-   - v0.11.0: Streaming RTSP
-   - **v0.12.0: Web dashboard (escritura)** ← Next logical step
-   - v0.13.0: Advanced features (HKSV, etc.)
+**Verdict**: ⚠️ **OPTIONAL** - nice to have, not critical
 
 ---
 
-## 📝 Plan de Implementación Sugerido
+## 🎯 Final Recommendation
 
-### **Sprint 1: API Básica (v0.13.0-alpha)**
+### **Is it a coherent evolution?**
+
+**✅ YES** - For the following reasons:
+
+1. **Aligned with the existing architecture**
+    - Web dashboard already exists
+    - REST API already exists
+    - Config is already in memory
+    - Only persistence + UI missing
+
+2. **Solves real problems**
+    - SSH not always available
+    - Manual editing is error-prone
+    - Non-technical users need access
+
+3. **Low technical risk**
+    - Infrastructure 90% ready
+    - YAML validation already exists
+    - Hot reload is simple (signal + exec)
+
+4. **High value for users**
+    - Reduces configuration time
+    - Reduces errors
+    - Improves overall experience
+
+5. **Natural project evolution**
+    - v0.10.0: Web dashboard (read)
+    - v0.11.0: RTSP streaming
+    - **v0.12.0: Web dashboard (write)** ← Next logical step
+    - v0.13.0: Advanced features (HKSV, etc.)
+
+---
+
+## 📝 Suggested Implementation Plan
+
+### **Sprint 1: Basic API (v0.13.0-alpha)**
 ```bash
 # Semana 1
 - [ ] Crear pkg/webserver/config_manager.go
 - [ ] Implementar GET /api/config
 - [ ] Implementar POST /api/config
-- [ ] Backup automático antes de guardar
-- [ ] Settings page con forms básicos
+- [ ] Automatic backup before saving
+- [ ] Settings page with basic forms
 ```
 
-### **Sprint 2: Validación + Hot Reload (v0.13.0-beta)**
+### **Sprint 2: Validation + Hot Reload (v0.13.0-beta)**
 ```bash
 # Semana 2
-- [ ] Implementar validación YAML
-- [ ] Validación semántica (puertos, IPs)
+- [ ] Implement YAML validation
+- [ ] Semantic validation (ports, IPs)
 - [ ] POST /api/config/restart
 - [ ] Graceful shutdown
 - [ ] Health check post-restart
 ```
 
-### **Sprint 3: Seguridad (v0.13.0-rc)**
+### **Sprint 3: Security (v0.13.0-rc)**
 ```bash
 # Semana 3
-- [ ] Autenticación para endpoints
+- [ ] Authentication for endpoints
 - [ ] HTTPS opcional
 - [ ] Audit log
 - [ ] Testing exhaustivo
@@ -464,7 +464,7 @@ mqtt:
 ### **Release: v0.13.0**
 ```bash
 # Semana 4
-- [ ] Documentación
+- [ ] Documentation
 - [ ] Testing en dispositivo real
 - [ ] Release candidate
 - [ ] Release final
@@ -472,22 +472,22 @@ mqtt:
 
 ---
 
-## 🏆 Conclusión
+## 🏆 Conclusion
 
-**La gestión de configuración vía web dashboard es:**
+**Managing configuration via the web dashboard is:**
 
-1. ✅ **Técnicamente viable** (90% infraestructura existe)
-2. ✅ **Arquitectónicamente coherente** (sigue patrones existentes)
-3. ✅ **Comercialmente valiosa** (mejora UX significativamente)
-4. ✅ **Estratégicamente correcta** (alineado con roadmap)
-5. ✅ **Bajo riesgo** (mitigaciones disponibles)
+1. ✅ **Technically viable** (90% of the infrastructure exists)
+2. ✅ **Architecturally coherent** (follows existing patterns)
+3. ✅ **Valuable** (significantly improves UX)
+4. ✅ **Strategically right** (aligned with roadmap)
+5. ✅ **Low risk** (mitigations available)
 
-**Recomendación**: **IMPLEMENTAR en v0.13.0**
+**Recommendation**: **IMPLEMENT in v0.13.0**
 
 ---
 
-**Próximos pasos**:
-1. Crear issue en GitHub: "Web-based configuration management"
-2. Priorizar en roadmap v0.13.0
-3. Asignar desarrollador (estimado: 3 sprints)
-4. Comenzar Sprint 1 (API Básica)
+**Next steps**:
+1. Create GitHub issue: "Web-based configuration management"
+2. Prioritize in v0.13.0 roadmap
+3. Assign developer (estimated: 3 sprints)
+4. Start Sprint 1 (Basic API)

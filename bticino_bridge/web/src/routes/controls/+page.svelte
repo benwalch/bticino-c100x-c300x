@@ -56,7 +56,7 @@
   }
   
   async function restartBridge() {
-    // Doble confirmación: el bridge queda ~2s fuera de servicio.
+    // Double confirmation: the bridge is out of service for ~2s.
     if (!confirm('Restart the bridge service?\n\nWeb, MQTT and HomeKit will drop for a few seconds.')) return
     if (!confirm('Are you sure? This restarts the bridge NOW.')) return
     try {
@@ -77,7 +77,7 @@
   }
 
   async function rebootDevice() {
-    // Doble confirmación: reinicia TODO el videoportero (nativos incluidos).
+    // Double confirmation: reboots the WHOLE intercom (native functions included).
     if (!confirm('⚠️ REBOOT THE WHOLE INTERCOM?\n\nThe device (including the native doorbell functions) will be offline for 1-2 minutes.')) return
     if (!confirm('Last chance: really reboot the device NOW?')) return
     try {
@@ -265,7 +265,7 @@
           </button>
         </div>
 
-        <!-- Mute eliminado - integrado en doorbell_sound -->
+        <!-- Mute removed - integrated into doorbell_sound -->
         <!--
         <div class="control-card">
           <div class="control-icon">🔇</div>

@@ -1,5 +1,57 @@
 # Changelog - BTicino Classe 300X Enhanced Bridge
 
+## [Unreleased]
+
+### Home Assistant entities renamed from Spanish to English (breaking)
+
+All HA `object_id`s (which drive HA `entity_id`s) are now English and match
+their discovery IDs. Friendly `name`s were already English. After upgrading,
+HA will create new entities (e.g. `sensor.bticino_temperature` instead of
+`sensor.bticino_temperatura`) — update automations/dashboards and delete the
+stale Spanish entities:
+
+- `bticino_puerta` → `bticino_door`, `bticino_contestador` → `bticino_voicemail`,
+  `bticino_sonido_timbre` → `bticino_doorbell_sound`,
+  `bticino_pantalla` → `bticino_display`,
+  `bticino_luz_escalera` → `bticino_staircase_light`,
+  `bticino_abrir_puerta` → `bticino_door_open`,
+  `bticino_temperatura` → `bticino_temperature`,
+  `bticino_mensajes_nuevos` → `bticino_new_messages`,
+  `bticino_total_mensajes` → `bticino_total_messages`,
+  `bticino_almacenamiento` → `bticino_storage`,
+  `bticino_teclado` → `bticino_keypad`, `bticino_timbre` → `bticino_doorbell`,
+  `bticino_evento_bus` → `bticino_bus_event`,
+  `bticino_estado_sip` → `bticino_sip_status`,
+  `bticino_diagnostico` → `bticino_system_diag`,
+  `bticino_actividad` → `bticino_activity_log`,
+  `bticino_info_sistema` → `bticino_system_info`,
+  `bticino_idioma` → `bticino_language`,
+  `bticino_answering` → `bticino_answering_status`,
+  `bticino_camera_20` → `bticino_camera_20_brightness`,
+  `bticino_estado_llamada` → `bticino_call_state`,
+  `bticino_quien_llama` → `bticino_call_caller`,
+  `bticino_timbre_rellano` → `bticino_doorbell_floor`,
+  `bticino_evento_timbre` → `bticino_event_doorbell`,
+  `bticino_evento_timbre_rellano` → `bticino_event_doorbell_floor`,
+  `bticino_evento_llamada` → `bticino_event_call`,
+  `bticino_evento_bus_own` → `bticino_event_bus_own`,
+  `bticino_ip` → `bticino_ip_address`, `bticino_mac` → `bticino_mac_address`,
+  `bticino_wifi` → `bticino_wifi_signal`,
+  `bticino_marcar_todos_leidos` → `bticino_mark_all_read`,
+  `bticino_reiniciar_bridge` → `bticino_restart_bridge`,
+  `bticino_reiniciar_dispositivo` → `bticino_reboot_device`,
+  `bticino_camara_timbre` → `bticino_doorbell_camera`
+  (so `camera.camara_timbre` → `camera.doorbell_camera`).
+- LED names now English (`LED Message`, `LED Answering Machine`, `LED Lock`,
+  `LED Missed Call`, `LED Green Call`, `LED Red Call`); default extra-lock name
+  `Cerradura N` → `Lock N`.
+- MQTT payloads now English: keypad values (`key`/`star`/`eye`/`phone`),
+  `activity_log` descriptions, `system_diag` startup value (`starting`),
+  `system_info` fallback (`unknown`), IP/MAC `value_template` defaults
+  (`unknown`). MQTT topics are unchanged.
+- Docs (`docs/HOME_ASSISTANT.md`, `docs/ha_config/README.md`) updated to the
+  English entity IDs.
+
 ## [0.18.0] - 2026-08-18
 
 ### Live door video in HA during an incoming call (passive mirror)

@@ -25,50 +25,50 @@ func baseValidConfig() *config.Config {
 	return cfg
 }
 
-// --- FromJSON: merge sobre la config actual (evita poner a cero lo no enviado) ---
+// --- FromJSON: merge over the current config (avoids zeroing fields not sent) ---
 
 func TestFromJSONPartialPreservesCurrentValues(t *testing.T) {
 	cm := newTestCM(t)
 	current := baseValidConfig()
-	current.MQTT.Password = "secreto"
+	current.MQTT.Password = "secret"
 	current.Streaming.LiveOnCall = true
 	cm.config = current
 
-	cfg, err := cm.FromJSON([]byte(`{"Bridge":{"Name":"nuevo-nombre"}}`))
+	cfg, err := cm.FromJSON([]byte(`{"Bridge":{"Name":"new-name"}}`))
 	if err != nil {
 		t.Fatalf("FromJSON: %v", err)
 	}
-	if cfg.Bridge.Name != "nuevo-nombre" {
-		t.Fatalf("esperaba nombre actualizado, got %q", cfg.Bridge.Name)
+	if cfg.Bridge.Name != "new-name" {
+		t.Fatalf("expected updated name, got %q", cfg.Bridge.Name)
 	}
-	if cfg.MQTT.Password != "secreto" {
-		t.Fatal("un JSON parcial no debe borrar la contraseña MQTT actual")
+	if cfg.MQTT.Password != "secret" {
+		t.Fatal("a partial JSON must not erase the current MQTT password")
 	}
 	if !cfg.Streaming.LiveOnCall {
-		t.Fatal("un JSON parcial no debe apagar streaming.live_on_call")
+		t.Fatal("a partial JSON must not turn off streaming.live_on_call")
 	}
 }
 
 func TestFromJSONDoesNotMutateCurrent(t *testing.T) {
 	cm := newTestCM(t)
 	cm.config = baseValidConfig()
-	if _, err := cm.FromJSON([]byte(`{"Bridge":{"Name":"otro"}}`)); err != nil {
+	if _, err := cm.FromJSON([]byte(`{"Bridge":{"Name":"other"}}`)); err != nil {
 		t.Fatalf("FromJSON: %v", err)
 	}
 	if cm.config.Bridge.Name != "test-bridge" {
-		t.Fatal("FromJSON no debe mutar la config en memoria (solo devuelve la candidata)")
+		t.Fatal("FromJSON must not mutate the in-memory config (it only returns the candidate)")
 	}
 }
 
 func TestFromJSONWithoutCurrentConfig(t *testing.T) {
 	cm := newTestCM(t) // cm.config == nil
-	cfg, err := cm.FromJSON([]byte(`{"Bridge":{"Name":"solo"}}`))
-	if err != nil || cfg.Bridge.Name != "solo" {
-		t.Fatalf("FromJSON sin config previa debe funcionar: cfg=%v err=%v", cfg, err)
+	cfg, err := cm.FromJSON([]byte(`{"Bridge":{"Name":"single"}}`))
+	if err != nil || cfg.Bridge.Name != "single" {
+		t.Fatalf("FromJSON without prior config must work: cfg=%v err=%v", cfg, err)
 	}
 }
 
-// --- ValidateConfig: reglas nuevas ---
+// --- ValidateConfig: new rules ---
 
 func hasErrorContaining(r ConfigValidationResult, sub string) bool {
 	for _, e := range r.Errors {
@@ -92,7 +92,7 @@ func TestValidateBaseConfigIsValid(t *testing.T) {
 	cm := newTestCM(t)
 	r := cm.ValidateConfig(baseValidConfig())
 	if !r.Valid {
-		t.Fatalf("config base debería ser válida, errores: %v", r.Errors)
+		t.Fatalf("base config should be valid, errors: %v", r.Errors)
 	}
 }
 
@@ -101,11 +101,11 @@ func TestValidateLogLevelEnum(t *testing.T) {
 	cfg := baseValidConfig()
 	cfg.Bridge.LogLevel = "verbose"
 	if r := cm.ValidateConfig(cfg); r.Valid || !hasErrorContaining(r, "log level") {
-		t.Fatalf("esperaba error de log level, got %+v", r)
+		t.Fatalf("expected log level error, got %+v", r)
 	}
 	cfg.Bridge.LogLevel = "debug"
 	if r := cm.ValidateConfig(cfg); !r.Valid {
-		t.Fatalf("'debug' debe ser válido: %v", r.Errors)
+		t.Fatalf("'debug' must be valid: %v", r.Errors)
 	}
 }
 
@@ -119,12 +119,12 @@ func TestValidateSIPTransportAndPort(t *testing.T) {
 	cfg.SIP.ServerPort = 0
 	r := cm.ValidateConfig(cfg)
 	if r.Valid || !hasErrorContaining(r, "transport") || !hasErrorContaining(r, "SIP server port") {
-		t.Fatalf("esperaba errores de transporte y puerto SIP, got %+v", r)
+		t.Fatalf("expected transport and SIP port errors, got %+v", r)
 	}
 	cfg.SIP.Transport = "tcp"
 	cfg.SIP.ServerPort = 5060
 	if r := cm.ValidateConfig(cfg); !r.Valid {
-		t.Fatalf("SIP tcp:5060 debe ser válido: %v", r.Errors)
+		t.Fatalf("SIP tcp:5060 must be valid: %v", r.Errors)
 	}
 }
 
@@ -135,7 +135,7 @@ func TestValidateMQTTPortRange(t *testing.T) {
 	cfg.MQTT.Host = "192.168.1.3"
 	cfg.MQTT.Port = 0
 	if r := cm.ValidateConfig(cfg); r.Valid || !hasErrorContaining(r, "MQTT port") {
-		t.Fatalf("esperaba error de puerto MQTT, got %+v", r)
+		t.Fatalf("expected MQTT port error, got %+v", r)
 	}
 }
 
@@ -145,7 +145,7 @@ func TestValidateRTSPPortZeroWhenStreamingEnabled(t *testing.T) {
 	cfg.Streaming.Enabled = true
 	cfg.Streaming.RTSPPort = 0
 	if r := cm.ValidateConfig(cfg); r.Valid || !hasErrorContaining(r, "RTSP port") {
-		t.Fatalf("RTSPPort=0 con streaming activo debe ser error, got %+v", r)
+		t.Fatalf("RTSPPort=0 with streaming enabled must be an error, got %+v", r)
 	}
 }
 
@@ -154,11 +154,11 @@ func TestValidateVideoBackendEnum(t *testing.T) {
 	cfg := baseValidConfig()
 	cfg.Streaming.VideoBackend = "vlc"
 	if r := cm.ValidateConfig(cfg); r.Valid || !hasErrorContaining(r, "video backend") {
-		t.Fatalf("esperaba error de backend de vídeo, got %+v", r)
+		t.Fatalf("expected video backend error, got %+v", r)
 	}
 	cfg.Streaming.VideoBackend = config.VideoBackendAVMedia
 	if r := cm.ValidateConfig(cfg); !r.Valid {
-		t.Fatalf("'avmedia' debe ser válido: %v", r.Errors)
+		t.Fatalf("'avmedia' must be valid: %v", r.Errors)
 	}
 }
 
@@ -167,7 +167,7 @@ func TestValidateDNSServersMustBeIPs(t *testing.T) {
 	cfg := baseValidConfig()
 	cfg.Network.DNS.Servers = []string{"1.1.1.1", "not-an-ip"}
 	if r := cm.ValidateConfig(cfg); r.Valid || !hasErrorContaining(r, "DNS") {
-		t.Fatalf("esperaba error de DNS, got %+v", r)
+		t.Fatalf("expected DNS error, got %+v", r)
 	}
 }
 
@@ -176,13 +176,13 @@ func TestValidateHomeKitPortNumericString(t *testing.T) {
 	cfg := baseValidConfig()
 	cfg.HomeKit.Enabled = true
 	cfg.HomeKit.Pin = "12345678"
-	cfg.HomeKit.Port = "ochenta"
+	cfg.HomeKit.Port = "eighty"
 	if r := cm.ValidateConfig(cfg); r.Valid || !hasErrorContaining(r, "HomeKit port") {
-		t.Fatalf("esperaba error de puerto HomeKit, got %+v", r)
+		t.Fatalf("expected HomeKit port error, got %+v", r)
 	}
 	cfg.HomeKit.Port = "8081"
 	if r := cm.ValidateConfig(cfg); !r.Valid {
-		t.Fatalf("'8081' debe ser válido: %v", r.Errors)
+		t.Fatalf("'8081' must be valid: %v", r.Errors)
 	}
 }
 
@@ -193,7 +193,7 @@ func TestValidateHomeKitPinDigits(t *testing.T) {
 	cfg.HomeKit.Port = "8081"
 	cfg.HomeKit.Pin = "abcdefgh"
 	if r := cm.ValidateConfig(cfg); r.Valid || !hasErrorContaining(r, "PIN") {
-		t.Fatalf("PIN no numérico debe ser error, got %+v", r)
+		t.Fatalf("non-numeric PIN must be an error, got %+v", r)
 	}
 }
 
@@ -203,10 +203,10 @@ func TestValidateVideoOnDemandWarning(t *testing.T) {
 	cfg.Streaming.VideoOnDemand = true
 	r := cm.ValidateConfig(cfg)
 	if !r.Valid {
-		t.Fatalf("video_on_demand es válido (con aviso): %v", r.Errors)
+		t.Fatalf("video_on_demand is valid (with warning): %v", r.Errors)
 	}
 	if !hasWarningContaining(r, "video_on_demand") {
-		t.Fatalf("esperaba warning de video_on_demand, got %+v", r.Warnings)
+		t.Fatalf("expected video_on_demand warning, got %+v", r.Warnings)
 	}
 }
 
@@ -214,12 +214,12 @@ func TestValidateVideoOnDemandWarning(t *testing.T) {
 
 func TestRestoreBackupRejectsPathOutsideBackupDir(t *testing.T) {
 	cm := newTestCM(t)
-	// Fichero YAML válido pero FUERA del directorio de backups
+	// Valid YAML file but OUTSIDE the backups directory
 	outside := filepath.Join(t.TempDir(), "evil.yaml")
 	if err := os.WriteFile(outside, []byte("bridge:\n  name: evil\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := cm.RestoreBackup(outside); err == nil {
-		t.Fatal("RestoreBackup debe rechazar rutas fuera del directorio de backups")
+		t.Fatal("RestoreBackup must reject paths outside the backups directory")
 	}
 }

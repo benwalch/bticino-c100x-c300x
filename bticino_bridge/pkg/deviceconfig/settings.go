@@ -1,4 +1,4 @@
-// Package deviceconfig proporciona parsers para archivos de configuración del dispositivo BTicino
+// Package deviceconfig provides parsers for BTicino device configuration files
 package deviceconfig
 
 import (
@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// SettingsXML representa la estructura del archivo settings.xml (directorio 0)
+// SettingsXML represents the structure of the settings.xml file (directory 0)
 type SettingsXML struct {
 	Ringtones Ringtones  `json:"ringtones"`
 	Volumes   Volumes    `json:"volumes"`
@@ -17,7 +17,7 @@ type SettingsXML struct {
 	Extra     []ExtraObj `json:"extra"`
 }
 
-// ExtraObj representa objetos adicionales en settings.xml
+// ExtraObj represents additional objects in settings.xml
 type ExtraObj struct {
 	CID        string `json:"cid"`
 	ID         string `json:"id"`
@@ -35,13 +35,13 @@ type ExtraObj struct {
 	Mode       *int   `json:"mode,omitempty"`
 }
 
-// RawSettingsXML estructura original del XML
+// RawSettingsXML original XML structure
 type RawSettingsXML struct {
 	XMLName xml.Name         `xml:"settings"`
 	Objects []RawSettingsObj `xml:"obj"`
 }
 
-// RawSettingsObj representa un objeto en el XML
+// RawSettingsObj represents an object in the XML
 type RawSettingsObj struct {
 	CID                 string         `xml:"cid,attr"`
 	ID                  string         `xml:"id,attr"`
@@ -64,7 +64,7 @@ type RawSettingsObj struct {
 	Ist                 RawSettingsIst `xml:"ist"`
 }
 
-// RawSettingsIst representa el elemento ist dentro de un objeto
+// RawSettingsIst represents the ist element inside an object
 type RawSettingsIst struct {
 	UII                 string `xml:"uii,attr"`
 	IDRingtone          string `xml:"id_ringtone,attr"`
@@ -76,7 +76,7 @@ type RawSettingsIst struct {
 	ConfigurationActive string `xml:"configuration_active,attr"`
 }
 
-// ReadSettingsXML lee y parsea el archivo settings.xml
+// ReadSettingsXML reads and parses the settings.xml file
 func ReadSettingsXML(path string) (*SettingsXML, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -95,12 +95,12 @@ func ReadSettingsXML(path string) (*SettingsXML, error) {
 		Extra:     []ExtraObj{},
 	}
 
-	// Procesar cada objeto
+	// Process each object
 	for _, obj := range raw.Objects {
-		// Determinar tipo basado en atributos
-		// Para ringtones, el id_ringtone está en <ist>, no en <obj>
+		// Determine type based on attributes
+		// For ringtones, id_ringtone is in <ist>, not in <obj>
 		if obj.Ist.IDRingtone != "" {
-			// Es un ringtone
+			// It is a ringtone
 			ringtoneID, _ := strconv.Atoi(obj.Ist.IDRingtone)
 			if obj.Ist.UII != "" {
 				uii, _ := strconv.Atoi(obj.Ist.UII)
@@ -109,7 +109,7 @@ func ReadSettingsXML(path string) (*SettingsXML, error) {
 			}
 		} else if obj.CID == "14121" || obj.CID == "14122" || obj.CID == "14123" ||
 			obj.CID == "14124" || obj.CID == "14125" || obj.CID == "14127" || obj.CID == "14129" {
-			// Es un volumen
+			// It is a volume
 			volume := 50
 			if obj.Ist.Volume != "" {
 				volume, _ = strconv.Atoi(obj.Ist.Volume)
@@ -118,7 +118,7 @@ func ReadSettingsXML(path string) (*SettingsXML, error) {
 			}
 			assignVolume(&settings.Volumes, obj.CID, volume)
 		} else if obj.CID == "14151" {
-			// Brillo display
+			// Display brightness
 			brightness := 100
 			if obj.Ist.Brightness != "" {
 				brightness, _ = strconv.Atoi(obj.Ist.Brightness)
@@ -134,7 +134,7 @@ func ReadSettingsXML(path string) (*SettingsXML, error) {
 			}
 			settings.Display.CleanTime = cleanTime
 		} else {
-			// Objeto adicional
+			// Additional object
 			extra := ExtraObj{CID: obj.CID, ID: obj.ID}
 			if obj.Enable != "" {
 				v, _ := strconv.Atoi(obj.Enable)
@@ -167,7 +167,7 @@ func ReadSettingsXML(path string) (*SettingsXML, error) {
 	return settings, nil
 }
 
-// assignRingtone asigna el ringtone según el UII
+// assignRingtone assigns the ringtone by UII
 func assignRingtone(r *Ringtones, uii, ringtoneID int) {
 	switch uii {
 	case 52: // Ringtone S0
@@ -191,7 +191,7 @@ func assignRingtone(r *Ringtones, uii, ringtoneID int) {
 	}
 }
 
-// assignVolume asigna el volumen según el CID
+// assignVolume assigns the volume by CID
 func assignVolume(v *Volumes, cid string, volume int) {
 	switch cid {
 	case "14121":
@@ -209,7 +209,7 @@ func assignVolume(v *Volumes, cid string, volume int) {
 	}
 }
 
-// ReadSettingsXMLSimple hace un parsing simple usando strings
+// ReadSettingsXMLSimple does a simple parsing using strings
 func ReadSettingsXMLSimple(path string) (*SettingsXML, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -223,7 +223,7 @@ func ReadSettingsXMLSimple(path string) (*SettingsXML, error) {
 		Display:   Display{},
 	}
 
-	// Buscar todos los elementos obj con id_ringtone
+	// Find all obj elements with id_ringtone
 	lines := strings.Split(content, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -231,7 +231,7 @@ func ReadSettingsXMLSimple(path string) (*SettingsXML, error) {
 			continue
 		}
 
-		// Extraer cid
+		// Extract cid
 		cidStart := strings.Index(line, "cid=\"")
 		if cidStart == -1 {
 			continue
@@ -242,7 +242,7 @@ func ReadSettingsXMLSimple(path string) (*SettingsXML, error) {
 		}
 		cid := line[cidStart+5 : cidStart+cidEnd]
 
-		// Extraer id_ringtone
+		// Extract id_ringtone
 		ringStart := strings.Index(line, "id_ringtone=\"")
 		var ringtoneID int
 		if ringStart != -1 {
@@ -252,7 +252,7 @@ func ReadSettingsXMLSimple(path string) (*SettingsXML, error) {
 			}
 		}
 
-		// Extraer uii del elemento ist
+		// Extract uii from the ist element
 		uiiStart := strings.Index(line, "uii=\"")
 		var uii int
 		if uiiStart != -1 {
@@ -262,12 +262,12 @@ func ReadSettingsXMLSimple(path string) (*SettingsXML, error) {
 			}
 		}
 
-		// Asignar según UII
+		// Assign by UII
 		if uii > 0 && ringtoneID > 0 {
 			assignRingtone(&settings.Ringtones, uii, ringtoneID)
 		}
 
-		// Buscar volume
+		// Find volume
 		volStart := strings.Index(line, "volume=\"")
 		if volStart != -1 {
 			volEnd := strings.Index(line[volStart:], "\"")
@@ -277,7 +277,7 @@ func ReadSettingsXMLSimple(path string) (*SettingsXML, error) {
 			}
 		}
 
-		// Buscar brightness
+		// Find brightness
 		if cid == "14151" {
 			brightStart := strings.Index(line, "brightness=\"")
 			if brightStart != -1 {
@@ -292,7 +292,7 @@ func ReadSettingsXMLSimple(path string) (*SettingsXML, error) {
 	return settings, nil
 }
 
-// GetRingtone retorna el ringtone para un UII específico
+// GetRingtone returns the ringtone for a specific UII
 func GetRingtone(path string, uii int) (int, error) {
 	settings, err := ReadSettingsXML(path)
 	if err != nil {
@@ -323,7 +323,7 @@ func GetRingtone(path string, uii int) (int, error) {
 	return 0, fmt.Errorf("unknown uii: %d", uii)
 }
 
-// GetVolume retorna el volumen para un CID específico
+// GetVolume returns the volume for a specific CID
 func GetVolume(path string, cid string) (int, error) {
 	settings, err := ReadSettingsXML(path)
 	if err != nil {
@@ -348,7 +348,7 @@ func GetVolume(path string, cid string) (int, error) {
 	return 0, fmt.Errorf("unknown cid: %s", cid)
 }
 
-// GetDisplayBrightness retorna el brillo del display
+// GetDisplayBrightness returns the display brightness
 func GetDisplayBrightness(path string) (int, error) {
 	settings, err := ReadSettingsXML(path)
 	if err != nil {
@@ -357,7 +357,7 @@ func GetDisplayBrightness(path string) (int, error) {
 	return settings.Display.Brightness, nil
 }
 
-// GetDisplayCleanTime retorna el tiempo de limpieza del display
+// GetDisplayCleanTime returns the display clean time
 func GetDisplayCleanTime(path string) (int, error) {
 	settings, err := ReadSettingsXML(path)
 	if err != nil {

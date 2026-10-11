@@ -1,33 +1,33 @@
 # BTicino Bridge - Svelte Migration Complete! 🎉
 
-**Fecha**: 2026-03-30  
-**Versión**: 0.14.3  
-**Estado**: ✅ **MIGRACIÓN COMPLETADA**
+**Date**: 2026-03-30  
+**Version**: 0.14.3  
+**Status**: ✅ **MIGRATION COMPLETE**
 
 ---
 
-## 🎉 **¡SVELTE EN PRODUCCIÓN!**
+## 🎉 **SVELTE IN PRODUCTION!**
 
-La migración de HTML embebido a Svelte ha sido **COMPLETADA EXITOSAMENTE**.
+The migration from embedded HTML to Svelte has been **COMPLETED SUCCESSFULLY**.
 
 ---
 
-## 📊 **Métricas de la Migración**
+## 📊 **Migration Metrics**
 
-| Métrica | Antes | Ahora | Mejora |
+| Metric | Before | Now | Improvement |
 |---------|-------|-------|--------|
-| **server.go líneas** | 4800 | ~3500 | **-27%** |
-| **HTML embebido** | ✅ Sí | ❌ No | ✅ Eliminado |
-| **CSS embebido** | ✅ Sí | ❌ No | ✅ Eliminado |
-| **JS embebido** | ✅ Sí | ❌ No | ✅ Eliminado |
-| **Bundle Size** | 14MB (todo junto) | 14MB + 56KB | ✅ Separado |
-| **Hot Reload** | ❌ No | ✅ Sí (Vite) | ✅ 30x más rápido |
-| **Componentes** | 0 | 4 | ✅ Reutilizables |
-| **File Server** | ❌ No | ✅ Sí | ✅ Estándar |
+| **server.go lines** | 4800 | ~3500 | **-27%** |
+| **Embedded HTML** | ✅ Yes | ❌ No | ✅ Removed |
+| **Embedded CSS** | ✅ Yes | ❌ No | ✅ Removed |
+| **Embedded JS** | ✅ Yes | ❌ No | ✅ Removed |
+| **Bundle Size** | 14MB (all together) | 14MB + 56KB | ✅ Separate |
+| **Hot Reload** | ❌ No | ✅ Yes (Vite) | ✅ 30x faster |
+| **Components** | 0 | 4 | ✅ Reusable |
+| **File Server** | ❌ No | ✅ Yes | ✅ Standard |
 
 ---
 
-## 🏗️ **Arquitectura Final**
+## 🏗️ **Final Architecture**
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -63,38 +63,38 @@ La migración de HTML embebido a Svelte ha sido **COMPLETADA EXITOSAMENTE**.
 
 ---
 
-## ✅ **Componentes Svelte en Producción**
+## ✅ **Svelte Components in Production**
 
-| Componente | Archivo | Estado |
+| Component | File | Status |
 |------------|---------|--------|
-| **Dashboard** | `web/src/routes/+page.svelte` | ✅ Producción |
-| **Settings** | `web/src/routes/settings/+page.svelte` | ✅ Producción |
-| **Controls** | `web/src/routes/controls/+page.svelte` | ✅ Producción |
-| **Logs** | `web/src/routes/logs/+page.svelte` | ✅ Producción |
-| **App Shell** | `web/src/App.svelte` | ✅ Producción |
+| **Dashboard** | `web/src/routes/+page.svelte` | ✅ Production |
+| **Settings** | `web/src/routes/settings/+page.svelte` | ✅ Production |
+| **Controls** | `web/src/routes/controls/+page.svelte` | ✅ Production |
+| **Logs** | `web/src/routes/logs/+page.svelte` | ✅ Production |
+| **App Shell** | `web/src/App.svelte` | ✅ Production |
 
 ---
 
-## 🔧 **Cambios Realizados**
+## 🔧 **Changes Made**
 
 ### **1. server.go**
 
-**Antes**:
+**Before**:
 ```go
-// HTML embebido (~3000 líneas)
+// Embedded HTML (~3000 lines)
 func (ws *WebServer) getDashboardHTML() string {
     return `<!DOCTYPE html>...`
 }
 
-// Rutas para HTML embebido
+// Routes for embedded HTML
 mux.HandleFunc("/", ws.handleDashboard)
 mux.HandleFunc("/dashboard", ws.handleDashboard)
 // ...
 ```
 
-**Ahora**:
+**Now**:
 ```go
-// File server para Svelte
+// File server for Svelte
 fs := http.FileServer(http.Dir("web/dist"))
 mux.Handle("/", fs)
 
@@ -105,12 +105,12 @@ mux.HandleFunc("/api/status", ws.handleAPIStatus)
 
 ### **2. deploy.sh**
 
-**Antes**:
+**Before**:
 ```bash
 scp -r web/dist/* user@device:/path/  # ❌ No funciona
 ```
 
-**Ahora**:
+**Now**:
 ```bash
 # Copiar con base64 (confiable)
 base64 web/dist/index.html | ssh user@device "base64 -d > /path/web/dist/index.html"
@@ -119,12 +119,12 @@ for file in web/dist/assets/*; do
 done
 ```
 
-### **3. Estructura de Archivos**
+### **3. File Structure**
 
 ```
 bticino_bridge/
 ├── web/
-│   ├── src/                      # Código fuente Svelte
+│   ├── src/                      # Svelte source code
 │   │   ├── routes/
 │   │   │   ├── +page.svelte      # Dashboard
 │   │   │   ├── settings/
@@ -134,7 +134,7 @@ bticino_bridge/
 │   │   │   └── logs/
 │   │   │       └── +page.svelte  # Logs
 │   │   └── App.svelte            # App shell
-│   ├── dist/                     # ✅ Build para producción
+│   ├── dist/                     # ✅ Production build
 │   │   ├── index.html
 │   │   └── assets/
 │   ├── package.json
@@ -150,9 +150,9 @@ bticino_bridge/
 
 ---
 
-## 🚀 **Comandos de Desarrollo**
+## 🚀 **Development Commands**
 
-### **Producción**:
+### **Production**:
 ```bash
 # Build completo
 make build
@@ -161,7 +161,7 @@ make build
 make deploy
 ```
 
-### **Desarrollo (Futuro)**:
+### **Development (Future)**:
 ```bash
 # Hot reload con Vite (pendiente implementar)
 make dev
@@ -175,33 +175,33 @@ go run ./cmd/main.go -config configs/config.yaml
 
 ---
 
-## 📝 **Features Eliminadas**
+## 📝 **Removed Features**
 
-| Feature | Razón | Reemplazo |
+| Feature | Reason | Replacement |
 |---------|-------|-----------|
-| **Quick Actions** | Poco usado, redundante | Auto-refresh cada 30s |
-| **Enhanced Features** | Sección vacía | N/A |
-| **HTML embebido** | Difícil mantenimiento | Svelte components |
-| **CSS embebido** | Sin syntax highlighting | Svelte `<style>` |
-| **JS embebido** | Sin module system | Svelte `<script>` |
+| **Quick Actions** | Rarely used, redundant | Auto-refresh every 30s |
+| **Enhanced Features** | Empty section | N/A |
+| **Embedded HTML** | Hard to maintain | Svelte components |
+| **Embedded CSS** | No syntax highlighting | Svelte `<style>` |
+| **Embedded JS** | No module system | Svelte `<script>` |
 
 ---
 
-## 🎯 **Próximas Mejoras**
+## 🎯 **Next Improvements**
 
-### **Corto Plazo**:
-- [ ] Agregar Messages page en Svelte
-- [ ] Hot reload en desarrollo
+### **Short Term**:
+- [ ] Add Messages page in Svelte
+- [ ] Hot reload in development
 - [ ] TypeScript migration
-- [ ] Unit tests para componentes
+- [ ] Unit tests for components
 
-### **Mediano Plazo**:
+### **Medium Term**:
 - [ ] Dark mode
-- [ ] WebSocket para logs en tiempo real
+- [ ] WebSocket for real-time logs
 - [ ] PWA support (offline mode)
 - [ ] Performance optimization
 
-### **Largo Plazo**:
+### **Long Term**:
 - [ ] E2E tests (Playwright)
 - [ ] CI/CD pipeline
 - [ ] Internationalization (i18n)
@@ -209,62 +209,62 @@ go run ./cmd/main.go -config configs/config.yaml
 
 ---
 
-## 📊 **Estado del Proyecto**
+## 📊 **Project Status**
 
-| Área | Estado | Progreso |
+| Area | Status | Progress |
 |------|--------|----------|
-| **Svelte Setup** | ✅ Completo | 100% |
-| **Componentes** | ✅ Completos | 100% |
-| **File Server** | ✅ Implementado | 100% |
-| **HTML Embebido** | ✅ Eliminado | 100% |
-| **CSS Embebido** | ✅ Eliminado | 100% |
-| **JS Embebido** | ✅ Eliminado | 100% |
-| **Deploy Script** | ✅ Actualizado | 100% |
-| **Documentación** | ✅ Completa | 100% |
+| **Svelte Setup** | ✅ Complete | 100% |
+| **Components** | ✅ Complete | 100% |
+| **File Server** | ✅ Implemented | 100% |
+| **Embedded HTML** | ✅ Removed | 100% |
+| **Embedded CSS** | ✅ Removed | 100% |
+| **Embedded JS** | ✅ Removed | 100% |
+| **Deploy Script** | ✅ Updated | 100% |
+| **Documentation** | ✅ Complete | 100% |
 
-**Migración**: ✅ **100% COMPLETADA**
+**Migration**: ✅ **100% COMPLETE**
 
 ---
 
-## 🔍 **Verificación en Producción**
+## 🔍 **Production Verification**
 
 ```bash
-# Verificar que Svelte está sirviendo
+# Check that Svelte is serving
 curl http://192.168.1.38:8082/ | grep -o 'Svelte\|/assets/index'
 
-# Debería mostrar:
+# Should show:
 # /assets/index
 
-# Verificar API
+# Check API
 curl http://192.168.1.38:8082/api/status
 
-# Debería mostrar:
+# Should show:
 # {"version": "0.14.3", ...}
 ```
 
 ---
 
-## 📚 **Recursos**
+## 📚 **Resources**
 
-### **Documentación**:
-- `docs/WEB_ARCHITECTURE.md` - Arquitectura completa
-- `docs/VERSIONING.md` - Guía de versionado
-- `docs/SVELTE_SETUP.md` - Setup de Svelte
-- `docs/PROGRESS_REPORT.md` - Reporte de progreso
+### **Documentation**:
+- `docs/WEB_ARCHITECTURE.md` - Full architecture
+- `docs/VERSIONING.md` - Versioning guide
+- `docs/SVELTE_SETUP.md` - Svelte setup
+- `docs/PROGRESS_REPORT.md` - Progress report
 
-### **Código**:
+### **Code**:
 - `web/src/routes/+page.svelte` - Dashboard
 - `web/src/App.svelte` - App shell
 - `pkg/webserver/server.go` - File server + API
-- `scripts/deploy.sh` - Deploy automático
+- `scripts/deploy.sh` - Automatic deploy
 
 ---
 
-## 🎉 **¡MIGRACIÓN COMPLETADA!**
+## 🎉 **MIGRATION COMPLETE!**
 
-**Estado**: ✅ **PRODUCCIÓN**  
-**Versión**: 0.14.3  
-**Dispositivo**: 192.168.1.38:8082  
+**Status**: ✅ **PRODUCTION**  
+**Version**: 0.14.3  
+**Device**: 192.168.1.38:8082  
 **URL**: http://192.168.1.38:8082/
 
-**¡Svelte está funcionando en producción!** 🚀
+**Svelte is running in production!** 🚀

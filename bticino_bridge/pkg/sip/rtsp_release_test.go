@@ -18,7 +18,7 @@ func newTestRTSP(t *testing.T) (*EnhancedRTSPServer, *int32) {
 	bus.Subscribe("sip.call.ended", func(_ *events.Event) {
 		atomic.AddInt32(&ended, 1)
 	})
-	// sipClient nil a propósito: en producción el SIP local puede no registrar.
+	// nil sipClient on purpose: in production the local SIP may fail to register.
 	r := NewEnhancedRTSPServer(0, nil, bus, logrus.New())
 	return r, &ended
 }
@@ -35,28 +35,28 @@ func waitEnded(c *int32, want int32) bool {
 }
 
 func TestReleaseSelfCallIgnoresNativeCall(t *testing.T) {
-	// Una llamada NATIVA (marcada por LiveVideoOnCall vía SetCallActive) no es
-	// nuestra: cuando el último cliente RTSP se va, NO se cuelga ni se limpia.
+	// A NATIVE call (marked by LiveVideoOnCall via SetCallActive) is not
+	// ours: when the last RTSP client leaves, it is NOT hung up nor cleaned up.
 	r, ended := newTestRTSP(t)
 	r.SetCallActive(true)
 
-	r.releaseSelfCallIfIdle("test") // no debe entrar en pánico (sipClient nil)
+	r.releaseSelfCallIfIdle("test") // must not panic (nil sipClient)
 
 	r.mutex.RLock()
 	active := r.callActive
 	r.mutex.RUnlock()
 	if !active {
-		t.Fatal("la llamada nativa no debe limpiarse al irse los clientes RTSP")
+		t.Fatal("native call must not be cleaned up when RTSP clients leave")
 	}
 	time.Sleep(50 * time.Millisecond)
 	if atomic.LoadInt32(ended) != 0 {
-		t.Fatal("no debe publicarse sip.call.ended para una llamada nativa")
+		t.Fatal("sip.call.ended must not be published for a native call")
 	}
 }
 
 func TestReleaseSelfCallHangsUpOwnCallWithNilClient(t *testing.T) {
-	// Llamada self-INVITE (estado interno) con sipClient nil: debe limpiar el
-	// estado y publicar sip.call.ended SIN entrar en pánico.
+	// Self-INVITE call (internal state) with nil sipClient: must clean up the
+	// state and publish sip.call.ended WITHOUT panicking.
 	r, ended := newTestRTSP(t)
 	r.mutex.Lock()
 	r.callActive = true // interna: no marcada por SetCallActive
@@ -68,10 +68,10 @@ func TestReleaseSelfCallHangsUpOwnCallWithNilClient(t *testing.T) {
 	active := r.callActive
 	r.mutex.RUnlock()
 	if active {
-		t.Fatal("esperaba callActive=false tras liberar la llamada propia")
+		t.Fatal("expected callActive=false after releasing own call")
 	}
 	if !waitEnded(ended, 1) {
-		t.Fatalf("esperaba 1 sip.call.ended, got %d", atomic.LoadInt32(ended))
+		t.Fatalf("expected 1 sip.call.ended, got %d", atomic.LoadInt32(ended))
 	}
 }
 
@@ -88,17 +88,17 @@ func TestReleaseSelfCallSkipsWhenClientsRemain(t *testing.T) {
 	active := r.callActive
 	r.mutex.RUnlock()
 	if !active {
-		t.Fatal("con clientes activos no debe liberarse la llamada")
+		t.Fatal("call must not be released with active clients")
 	}
 	time.Sleep(50 * time.Millisecond)
 	if atomic.LoadInt32(ended) != 0 {
-		t.Fatal("no debe publicarse sip.call.ended con clientes activos")
+		t.Fatal("sip.call.ended must not be published with active clients")
 	}
 }
 
 func TestSetupUDPWithNilSIPClientDoesNotPanic(t *testing.T) {
-	// SETUP con transporte UDP consulta la config del sipClient para el
-	// server_port; con sipClient nil debe responder igualmente (fallback).
+	// SETUP with UDP transport queries the sipClient config for the
+	// server_port; with a nil sipClient it must still answer (fallback).
 	r, _ := newTestRTSP(t)
 	resp := r.handleSetup(&RTSPRequest{
 		Method:    "SETUP",
@@ -107,13 +107,13 @@ func TestSetupUDPWithNilSIPClientDoesNotPanic(t *testing.T) {
 		Transport: "RTP/AVP;unicast;client_port=5000-5001",
 	}, "127.0.0.1:34567", nil)
 	if !strings.Contains(resp, "200 OK") {
-		t.Fatalf("esperaba 200 OK en SETUP UDP con sipClient nil, got: %q", resp)
+		t.Fatalf("expected 200 OK in UDP SETUP with nil sipClient, got: %q", resp)
 	}
 }
 
 func TestSetCallActiveFalseClearsExternalMark(t *testing.T) {
-	// Tras desmarcar la llamada nativa, una futura llamada self-INVITE debe
-	// poder liberarse con normalidad (el flag externo no debe quedar pegado).
+	// After unmarking the native call, a future self-INVITE call must
+	// be releasable normally (the external flag must not stay stuck).
 	r, ended := newTestRTSP(t)
 	r.SetCallActive(true)
 	r.SetCallActive(false)
@@ -124,6 +124,6 @@ func TestSetCallActiveFalseClearsExternalMark(t *testing.T) {
 	r.releaseSelfCallIfIdle("test")
 
 	if !waitEnded(ended, 1) {
-		t.Fatalf("esperaba 1 sip.call.ended tras llamada propia, got %d", atomic.LoadInt32(ended))
+		t.Fatalf("expected 1 sip.call.ended after own call, got %d", atomic.LoadInt32(ended))
 	}
 }

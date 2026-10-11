@@ -1,23 +1,23 @@
-// Autenticacion HMAC-SHA256 para OpenWebNet (protocolo BTicino Classe 300X).
+// HMAC-SHA256 authentication for OpenWebNet (BTicino Classe 300X protocol).
 //
-// Implementado a partir del analisis de slyoldfox/c300x-controller (lib/openwebnet.js).
+// Implemented from the analysis of slyoldfox/c300x-controller (lib/openwebnet.js).
 //
-// Protocolo de autenticacion:
-//  1. Cliente envia *99*0## (solicitud de sesion COMMAND)
-//  2. Servidor responde *98*2## (indica que requiere auth HMAC-SHA256)
-//     - En localhost, puede responder *#*1## directamente (sin auth)
-//  3. Cliente responde *#*1## (acepta HMAC)
-//  4. Servidor envia *#NONCE## (nonce Ra codificado en digitos OWN)
-//  5. Cliente calcula:
-//     - Ra = digitToHex(nonce del servidor)
-//     - Rb = SHA256("time" + timestamp) (nonce generado por cliente)
+// Authentication protocol:
+//  1. Client sends *99*0## (COMMAND session request)
+//  2. Server replies *98*2## (indicates HMAC-SHA256 auth is required)
+//     - On localhost, it may reply *#*1## directly (no auth)
+//  3. Client replies *#*1## (accepts HMAC)
+//  4. Server sends *#NONCE## (nonce Ra encoded in OWN digits)
+//  5. Client computes:
+//     - Ra = digitToHex(server nonce)
+//     - Rb = SHA256("time" + timestamp) (client-generated nonce)
 //     - Kab = SHA256(password)
 //     - HMAC = SHA256(Ra + Rb + A + B + Kab)
-//     donde A="736F70653E", B="636F70653E"
-//  6. Cliente envia: *#<hexToDigit(Rb)>*<hexToDigit(HMAC)>##
-//  7. Servidor envia su propio HMAC (validacion del servidor)
-//  8. Cliente responde *#*1## (acepta)
-//  9. Servidor confirma con *#*1## -> autenticado
+//     where A="736F70653E", B="636F70653E"
+//  6. Client sends: *#<hexToDigit(Rb)>*<hexToDigit(HMAC)>##
+//  7. Server sends its own HMAC (server-side validation)
+//  8. Client replies *#*1## (accepts)
+//  9. Server confirms with *#*1## -> authenticated
 package openwebnet
 
 import (
@@ -30,29 +30,29 @@ import (
 	"time"
 )
 
-// Constantes fijas del protocolo HMAC-SHA256 BTicino
+// Fixed constants of the BTicino HMAC-SHA256 protocol
 const (
-	// Valores fijos A y B para el calculo HMAC.
-	// Decodificados: A = "sope>", B = "cope>"
+	// Fixed A and B values for the HMAC computation.
+	// Decoded: A = "sope>", B = "cope>"
 	HMAC_A = "736F70653E"
 	HMAC_B = "636F70653E"
 
-	// Comandos de autenticacion OpenWebNet
-	CMD_SESSION_COMMAND = "*99*0##" // Solicitar sesion de comando
-	CMD_SESSION_EVENT   = "*99*1##" // Solicitar sesion de eventos
-	CMD_AUTH_HMAC       = "*98*2##" // Servidor requiere auth HMAC-SHA256
+	// OpenWebNet authentication commands
+	CMD_SESSION_COMMAND = "*99*0##" // Request command session
+	CMD_SESSION_EVENT   = "*99*1##" // Request event session
+	CMD_AUTH_HMAC       = "*98*2##" // Server requires HMAC-SHA256 auth
 	CMD_ACK             = "*#*1##"  // Acknowledgment
 	CMD_NACK            = "*#*0##"  // Negative acknowledgment
 )
 
-// digitToHex convierte una cadena de digitos OWN a hexadecimal.
-// Cada grupo de 4 digitos decimales codifica 2 caracteres hex.
-// Ejemplo: "0709" -> hex: (07=07, 09=09) -> "0709"
-// Mas claro: digitos[0]*10 + digitos[1] -> primer nibble hex,
+// digitToHex converts an OWN digit string to hexadecimal.
+// Each group of 4 decimal digits encodes 2 hex characters.
+// Example: "0709" -> hex: (07=07, 09=09) -> "0709"
+// Clearer: digits[0]*10 + digits[1] -> first hex nibble,
 //
-//	digitos[2]*10 + digitos[3] -> segundo nibble hex.
+//	digits[2]*10 + digits[3] -> second hex nibble.
 //
-// Ej: "0100" -> (0*10+1=1 -> "1") + (0*10+0=0 -> "0") -> "10"
+// Ex: "0100" -> (0*10+1=1 -> "1") + (0*10+0=0 -> "0") -> "10"
 func digitToHex(digits string) string {
 	var out strings.Builder
 	chars := []rune(digits)
@@ -63,7 +63,7 @@ func digitToHex(digits string) string {
 		d2, _ := strconv.Atoi(string(chars[i+2]))
 		d3, _ := strconv.Atoi(string(chars[i+3]))
 
-		// Cada par de digitos codifica un valor 0-15 (un nibble hex)
+		// Each digit pair encodes a 0-15 value (one hex nibble)
 		val1 := d0*10 + d1
 		val2 := d2*10 + d3
 
@@ -73,9 +73,9 @@ func digitToHex(digits string) string {
 	return out.String()
 }
 
-// hexToDigit convierte una cadena hexadecimal a digitos OWN.
-// Cada caracter hex (0-f, valor 0-15) se codifica como 2 digitos decimales.
-// Ej: "a" (valor 10) -> "10", "f" (valor 15) -> "15", "0" -> "00"
+// hexToDigit converts a hexadecimal string to OWN digits.
+// Each hex char (0-f, value 0-15) is encoded as 2 decimal digits.
+// Ex: "a" (value 10) -> "10", "f" (value 15) -> "15", "0" -> "00"
 func hexToDigit(hexString string) string {
 	var out strings.Builder
 
@@ -94,87 +94,87 @@ func hexToDigit(hexString string) string {
 	return out.String()
 }
 
-// sha256Hex calcula SHA-256 de un string y devuelve el hash en hex.
+// sha256Hex computes SHA-256 of a string and returns the hash in hex.
 func sha256Hex(input string) string {
 	hash := sha256.Sum256([]byte(input))
 	return hex.EncodeToString(hash[:])
 }
 
-// HMACAuth realiza la autenticacion HMAC-SHA256 completa en una conexion OWN.
+// HMACAuth performs the full HMAC-SHA256 authentication on an OWN connection.
 //
-// Precondicion: la conexion ya ha recibido el ACK inicial (*#*1##) y se ha enviado
-// *99*0## y recibido *98*2## como respuesta (indicando que se requiere HMAC).
+// Precondition: the connection has already received the initial ACK (*#*1##) and has sent
+// *99*0## and received *98*2## as response (indicating HMAC is required).
 //
-// Parametros:
-//   - reader: lector buferizado de la conexion TCP
-//   - writer: funcion para escribir bytes en la conexion
-//   - password: contrasena del dispositivo
-//   - timeout: timeout para lecturas
+// Parameters:
+//   - reader: buffered reader of the TCP connection
+//   - writer: function to write bytes to the connection
+//   - password: device password
+//   - timeout: timeout for reads
 //
-// Retorna error si la autenticacion falla.
+// Returns an error if authentication fails.
 func HMACAuth(reader *bufio.Reader, writer func([]byte) error, password string, timeout time.Duration) error {
-	// Paso 1: Enviar ACK para aceptar challenge HMAC
+	// Step 1: Send ACK to accept HMAC challenge
 	if err := writer([]byte(CMD_ACK)); err != nil {
-		return fmt.Errorf("error enviando ACK para HMAC: %w", err)
+		return fmt.Errorf("error sending ACK for HMAC: %w", err)
 	}
 
-	// Paso 2: Leer nonce (Ra) del servidor: *#DIGITS##
+	// Step 2: Read server nonce (Ra): *#DIGITS##
 	nonceMsg, err := readOWNMessage(reader)
 	if err != nil {
-		return fmt.Errorf("error leyendo nonce del servidor: %w", err)
+		return fmt.Errorf("error reading server nonce: %w", err)
 	}
 	nonceMsg = strings.TrimSpace(nonceMsg)
 
-	// Extraer digitos del nonce: quitar "*#" del inicio y "##" del final
+	// Extract nonce digits: strip "*#" prefix and "##" suffix
 	if !strings.HasPrefix(nonceMsg, "*#") || !strings.HasSuffix(nonceMsg, "##") {
-		return fmt.Errorf("formato de nonce inesperado: %s", nonceMsg)
+		return fmt.Errorf("unexpected nonce format: %s", nonceMsg)
 	}
 	nonceDigits := strings.TrimPrefix(nonceMsg, "*#")
 	nonceDigits = strings.TrimSuffix(nonceDigits, "##")
 
-	// Paso 3: Calcular valores de autenticacion
+	// Step 3: Compute authentication values
 	ra := digitToHex(nonceDigits)
 	rb := sha256Hex(fmt.Sprintf("time%d", time.Now().UnixMilli()))
 	kab := sha256Hex(password)
 
 	hmac := sha256Hex(ra + rb + HMAC_A + HMAC_B + kab)
 
-	// Paso 4: Enviar respuesta: *#<Rb_digits>*<HMAC_digits>##
+	// Step 4: Send response: *#<Rb_digits>*<HMAC_digits>##
 	rbDigits := hexToDigit(rb)
 	hmacDigits := hexToDigit(hmac)
 
 	authResponse := fmt.Sprintf("*#%s*%s##", rbDigits, hmacDigits)
 	if err := writer([]byte(authResponse)); err != nil {
-		return fmt.Errorf("error enviando respuesta HMAC: %w", err)
+		return fmt.Errorf("error sending HMAC response: %w", err)
 	}
 
-	// Paso 5: Leer HMAC del servidor (validacion del servidor hacia nosotros)
+	// Step 5: Read server HMAC (server-to-us validation)
 	serverHMAC, err := readOWNMessage(reader)
 	if err != nil {
-		return fmt.Errorf("error leyendo HMAC del servidor: %w", err)
+		return fmt.Errorf("error reading server HMAC: %w", err)
 	}
 	serverHMAC = strings.TrimSpace(serverHMAC)
 
-	// Paso 6: Enviar ACK para aceptar el HMAC del servidor
+	// Step 6: Send ACK to accept the server HMAC
 	if err := writer([]byte(CMD_ACK)); err != nil {
-		return fmt.Errorf("error enviando ACK final: %w", err)
+		return fmt.Errorf("error sending final ACK: %w", err)
 	}
 
-	// Paso 7: Leer resultado final: *#*1## = exito, *#*0## = fallo
+	// Step 7: Read final result: *#*1## = success, *#*0## = failure
 	result, err := readOWNMessage(reader)
 	if err != nil {
-		return fmt.Errorf("error leyendo resultado de autenticacion: %w", err)
+		return fmt.Errorf("error reading authentication result: %w", err)
 	}
 	result = strings.TrimSpace(result)
 
 	if result != CMD_ACK {
-		return fmt.Errorf("autenticacion HMAC fallida: servidor respondio %s", result)
+		return fmt.Errorf("HMAC authentication failed: server responded %s", result)
 	}
 
 	return nil
 }
 
-// IsLocalhost determina si el host es localhost (no requiere auth HMAC).
+// IsLocalhost determines whether the host is localhost (no HMAC auth required).
 func IsLocalhost(host string) bool {
 	return host == "127.0.0.1" || host == "localhost" || host == "::1" || host == "0" || host == "0.0.0.0"
 }

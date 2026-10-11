@@ -62,7 +62,7 @@ architecture and capabilities.
 | [SVELTE_MIGRATION_COMPLETE.md](SVELTE_MIGRATION_COMPLETE.md) | Migration from embedded HTML to Svelte |
 | [SIP_DEBUG_PLAN.md](SIP_DEBUG_PLAN.md) | SIP debugging plan and methodology |
 | [AUDIT_REPORT.md](AUDIT_REPORT.md) | Security audit report |
-| [MEJORAS_FUTURAS.md](MEJORAS_FUTURAS.md) | Future improvements roadmap |
+| [FUTURE_IMPROVEMENTS.md](FUTURE_IMPROVEMENTS.md) | Future improvements roadmap |
 | [ROADMAP_VIDEO_AUDIO.md](ROADMAP_VIDEO_AUDIO.md) | Video/audio roadmap (talk-back, native WebRTC) |
 | [BACKLOG.md](BACKLOG.md) | Backlog of pending ideas |
 | [plans/](plans/) | Implementation plans (e.g. live video on call) |

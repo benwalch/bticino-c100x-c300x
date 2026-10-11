@@ -1,4 +1,4 @@
-// Package deviceconfig proporciona parsers para archivos de configuración del dispositivo BTicino
+// Package deviceconfig provides parsers for BTicino device configuration files
 package deviceconfig
 
 import (
@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// ConfXML representa la estructura del archivo /var/tmp/conf.xml
+// ConfXML represents the structure of the /var/tmp/conf.xml file
 type ConfXML struct {
 	Language   string `json:"language"`
 	Town       string `json:"town"`
@@ -18,19 +18,19 @@ type ConfXML struct {
 	Fuso       string `json:"fuso"`
 }
 
-// RawConfXML estructura original del XML para parsing
+// RawConfXML original XML structure for parsing
 type RawConfXML struct {
 	XMLName  xml.Name     `xml:"configuratore"`
 	Setup    ConfSetup    `xml:"setup"`
 	Generale ConfGenerale `xml:"generale"`
 }
 
-// ConfSetup estructura del elemento setup
+// ConfSetup structure of the setup element
 type ConfSetup struct {
 	Generale ConfGenerale `xml:"generale"`
 }
 
-// ConfGenerale estructura del elemento generale
+// ConfGenerale structure of the generale element
 type ConfGenerale struct {
 	XMLName     xml.Name     `xml:"generale"`
 	Language    string       `xml:"language"`
@@ -39,7 +39,7 @@ type ConfGenerale struct {
 	Password    ConfPassword `xml:"password"`
 }
 
-// ConfClock estructura del elemento clock
+// ConfClock structure of the clock element
 type ConfClock struct {
 	XMLName    xml.Name `xml:"clock"`
 	Master     string   `xml:"master"`
@@ -50,28 +50,28 @@ type ConfClock struct {
 	NTPAalgo   string   `xml:"ntp_algo"`
 }
 
-// ConfTemp estructura del elemento temperature
+// ConfTemp structure of the temperature element
 type ConfTemp struct {
 	XMLName xml.Name `xml:"temperature"`
 	Format  string   `xml:"format"`
 }
 
-// ConfPassword estructura del elemento password
+// ConfPassword structure of the password element
 type ConfPassword struct {
 	XMLName xml.Name `xml:"password"`
 	Enabled string   `xml:"enabled"`
 	Pwd     string   `xml:"pwd"`
 }
 
-// ReadConfXML lee y parsea el archivo /var/tmp/conf.xml
-// Usa string parsing porque la estructura XML no se mapea correctamente con encoding/xml estándar
+// ReadConfXML reads and parses the /var/tmp/conf.xml file
+// Uses string parsing because the XML structure does not map correctly with standard encoding/xml
 func ReadConfXML(path string) (*ConfXML, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
-	// Usar string parsing para este XML específico
+	// Use string parsing for this specific XML
 	return parseConfXMLSimple(string(data)), nil
 }
 
@@ -104,7 +104,7 @@ func parseConfXMLSimple(content string) *ConfXML {
 	return conf
 }
 
-// GetLanguage retorna el idioma actual del sistema
+// GetLanguage returns the current system language
 func GetLanguage(path string) (string, error) {
 	conf, err := ReadConfXML(path)
 	if err != nil {
@@ -113,7 +113,7 @@ func GetLanguage(path string) (string, error) {
 	return conf.Language, nil
 }
 
-// GetTimezone retorna la zona horaria configurada
+// GetTimezone returns the configured time zone
 func GetTimezone(path string) (string, error) {
 	conf, err := ReadConfXML(path)
 	if err != nil {
@@ -122,7 +122,7 @@ func GetTimezone(path string) (string, error) {
 	return conf.Town, nil
 }
 
-// GetNTPServer retorna el servidor NTP configurado
+// GetNTPServer returns the configured NTP server
 func GetNTPServer(path string) (string, error) {
 	conf, err := ReadConfXML(path)
 	if err != nil {
@@ -131,7 +131,7 @@ func GetNTPServer(path string) (string, error) {
 	return conf.NTPServer, nil
 }
 
-// GetNTPConfig retorna la configuración NTP completa
+// GetNTPConfig returns the full NTP configuration
 func GetNTPConfig(path string) (server, algo string, err error) {
 	conf, err := ReadConfXML(path)
 	if err != nil {
@@ -140,7 +140,7 @@ func GetNTPConfig(path string) (server, algo string, err error) {
 	return conf.NTPServer, conf.NTPalgo, nil
 }
 
-// ParseConfXMLSimple hace un parsing simple del conf.xml usando strings
+// ParseConfXMLSimple does a simple parsing of conf.xml using strings
 func ParseConfXMLSimple(path string) (map[string]string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -150,7 +150,7 @@ func ParseConfXMLSimple(path string) (map[string]string, error) {
 	content := string(data)
 	result := make(map[string]string)
 
-	// Extraer language
+	// Extract language
 	if idx := strings.Index(content, "<language>"); idx != -1 {
 		end := strings.Index(content[idx:], "</language>")
 		if end > 0 {
@@ -158,7 +158,7 @@ func ParseConfXMLSimple(path string) (map[string]string, error) {
 		}
 	}
 
-	// Extraer town
+	// Extract town
 	if idx := strings.Index(content, "<town>"); idx != -1 {
 		end := strings.Index(content[idx:], "</town>")
 		if end > 0 {
@@ -166,7 +166,7 @@ func ParseConfXMLSimple(path string) (map[string]string, error) {
 		}
 	}
 
-	// Extraer ntp_server
+	// Extract ntp_server
 	if idx := strings.Index(content, "<ntp_server>"); idx != -1 {
 		end := strings.Index(content[idx:], "</ntp_server>")
 		if end > 0 {
@@ -174,7 +174,7 @@ func ParseConfXMLSimple(path string) (map[string]string, error) {
 		}
 	}
 
-	// Extraer ntp_algo
+	// Extract ntp_algo
 	if idx := strings.Index(content, "<ntp_algo>"); idx != -1 {
 		end := strings.Index(content[idx:], "</ntp_algo>")
 		if end > 0 {
@@ -182,7 +182,7 @@ func ParseConfXMLSimple(path string) (map[string]string, error) {
 		}
 	}
 
-	// Extraer dateformat
+	// Extract dateformat
 	if idx := strings.Index(content, "<dateformat>"); idx != -1 {
 		end := strings.Index(content[idx:], "</dateformat>")
 		if end > 0 {
@@ -190,7 +190,7 @@ func ParseConfXMLSimple(path string) (map[string]string, error) {
 		}
 	}
 
-	// Extraer fuso
+	// Extract fuso
 	if idx := strings.Index(content, "<fuso>"); idx != -1 {
 		end := strings.Index(content[idx:], "</fuso>")
 		if end > 0 {
@@ -198,7 +198,7 @@ func ParseConfXMLSimple(path string) (map[string]string, error) {
 		}
 	}
 
-	// Extraer language desde general
+	// Extract language from general
 	if result["language"] == "" {
 		if idx := strings.Index(content, "<language>"); idx != -1 {
 			result["language"] = extractValue(content, idx, "<language>", "</language>")
@@ -208,7 +208,7 @@ func ParseConfXMLSimple(path string) (map[string]string, error) {
 	return result, nil
 }
 
-// Helper para extraer valores simples
+// Helper to extract simple values
 func extractValue(content string, startIdx int, openTag, closeTag string) string {
 	end := strings.Index(content[startIdx:], closeTag)
 	if end > 0 {
@@ -217,7 +217,7 @@ func extractValue(content string, startIdx int, openTag, closeTag string) string
 	return ""
 }
 
-// GetDeviceInfoFromConfXML extrae información del dispositivo del conf.xml
+// GetDeviceInfoFromConfXML extracts device information from conf.xml
 func GetDeviceInfoFromConfXML(path string) (map[string]string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -227,12 +227,12 @@ func GetDeviceInfoFromConfXML(path string) (map[string]string, error) {
 	content := string(data)
 	result := make(map[string]string)
 
-	// Modelo
+	// Model
 	if idx := strings.Index(content, "<modello>"); idx != -1 {
 		result["model"] = extractValue(content, idx, "<modello>", "</modello>")
 	}
 
-	// Nombre
+	// Name
 	if idx := strings.Index(content, "<nome>"); idx != -1 {
 		result["name"] = extractValue(content, idx, "<nome>", "</nome>")
 	}

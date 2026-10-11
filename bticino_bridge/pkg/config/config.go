@@ -71,9 +71,9 @@ type MQTTConfig struct {
 	Password    string     `yaml:"password"`
 	TopicPrefix string     `yaml:"topic_prefix"`
 	Topics      MQTTTopics `yaml:"topics"`
-	// EnableSystemButtons expone en HA (sección Configuration) botones de
-	// reinicio: reiniciar el bridge y reiniciar el dispositivo. DESACTIVADO por
-	// defecto porque son acciones potentes (el reboot reinicia todo el equipo).
+	// EnableSystemButtons exposes restart buttons in HA (Configuration section):
+	// restarting the bridge and rebooting the device. DISABLED by
+	// default because they are powerful actions (reboot restarts the whole unit).
 	EnableSystemButtons bool `yaml:"enable_system_buttons"`
 }
 
@@ -133,30 +133,30 @@ type LoggingConfig struct {
 	MaxFiles int    `yaml:"max_files"`
 }
 
-// AdditionalLock representa una cerradura adicional configurable.
-// Cada cerradura tiene un WHERE address unico en el bus OpenWebNet.
-// Ejemplo config YAML:
+// AdditionalLock represents an extra configurable lock.
+// Each lock has a unique WHERE address on the OpenWebNet bus.
+// Example YAML config:
 //
 //	additional_locks:
-//	  - name: "Puerta Trasera"
+//	  - name: "Back Door"
 //	    where: 21
-//	  - name: "Puerta Lateral"
+//	  - name: "Side Door"
 //	    where: 22
 type AdditionalLock struct {
-	Name  string `yaml:"name"`  // Nombre legible (ej. "Puerta Trasera")
-	Where int    `yaml:"where"` // Direccion WHERE en bus OWN (ej. 21, 22)
+	Name  string `yaml:"name"`  // Human-readable name (e.g. "Back Door")
+	Where int    `yaml:"where"` // WHERE address on OWN bus (e.g. 21, 22)
 }
 
-// UDPProxyConfig configura el proxy UDP que reenvía paquetes del puerto 40004 al 4000.
-// Esto permite que clientes externos (como la app movil BTicino) se comuniquen
-// con el dispositivo a traves del bridge.
+// UDPProxyConfig configures the UDP proxy that forwards packets from port 40004 to 4000.
+// This lets external clients (like the BTicino mobile app) talk
+// to the device through the bridge.
 type UDPProxyConfig struct {
 	Enabled    bool `yaml:"enabled"`
-	ListenPort int  `yaml:"listen_port"` // Puerto de escucha (default: 40004)
-	TargetPort int  `yaml:"target_port"` // Puerto destino (default: 4000)
+	ListenPort int  `yaml:"listen_port"` // Listen port (default: 40004)
+	TargetPort int  `yaml:"target_port"` // Target port (default: 4000)
 }
 
-// StreamingConfig configura el streaming RTSP/WebRTC
+// StreamingConfig configures RTSP/WebRTC streaming
 type StreamingConfig struct {
 	Enabled              bool   `yaml:"enabled"`
 	RTSPPort             int    `yaml:"rtsp_port"`
@@ -206,7 +206,7 @@ func GetStreamingConfig() StreamingConfig {
 	}
 }
 
-// NetworkConfig configura la red y servidores externos
+// NetworkConfig configures networking and external servers
 type NetworkConfig struct {
 	NTP      NTPConfig      `yaml:"ntp"`
 	DNS      DNSConfig      `yaml:"dns"`
@@ -229,7 +229,7 @@ type FirewallConfig struct {
 	AllowUpdates   bool `yaml:"allow_updates"`
 }
 
-// ServersConfig configura los servidores externos oficiales
+// ServersConfig configures the official external servers
 type ServersConfig struct {
 	Cloud       CloudServerConfig       `yaml:"cloud"`
 	Logging     LogServerConfig         `yaml:"logging"`
@@ -273,7 +273,7 @@ type SIPOfficialServerConfig struct {
 	Required    bool   `yaml:"required"`
 }
 
-// NotificationsConfig configura las notificaciones
+// NotificationsConfig configures notifications
 type NotificationsConfig struct {
 	MQTT     MQTTNotificationConfig     `yaml:"mqtt"`
 	Email    EmailNotificationConfig    `yaml:"email"`
@@ -308,7 +308,7 @@ type TelegramNotificationConfig struct {
 	ChatID   string `yaml:"chat_id"`
 }
 
-// PrivacyConfig configura la privacidad
+// PrivacyConfig configures privacy
 type PrivacyConfig struct {
 	BlockExternalTelemetry bool `yaml:"block_external_telemetry"`
 	BlockLogServer         bool `yaml:"block_log_server"`
@@ -317,11 +317,11 @@ type PrivacyConfig struct {
 	LocalLogging           bool `yaml:"local_logging"`
 }
 
-// SecurityConfig configura la seguridad
+// SecurityConfig configures security
 type SecurityConfig struct {
-	// WebAuthRequired protege TODO el servidor web (UI + API) con Basic Auth.
-	// Requiere WebPassword no vacía; activado sin contraseña el servidor
-	// responde 503 (fail-closed, nunca abierto en silencio).
+	// WebAuthRequired protects the whole web server (UI + API) with Basic Auth.
+	// Requires a non-empty WebPassword; when enabled without a password the server
+	// replies 503 (fail-closed, never silently open).
 	WebAuthRequired bool   `yaml:"web_auth_required"`
 	WebUsername     string `yaml:"web_username"`
 	WebPassword     string `yaml:"web_password"`

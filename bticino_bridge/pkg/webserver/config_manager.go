@@ -1,4 +1,4 @@
-// Package webserver proporciona gestión de configuración para el web dashboard
+// Package webserver provides configuration management for the web dashboard
 package webserver
 
 import (
@@ -20,10 +20,10 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// homekitPinRe: el PIN de HomeKit son exactamente 8 dígitos.
+// homekitPinRe: the HomeKit PIN is exactly 8 digits.
 var homekitPinRe = regexp.MustCompile(`^\d{8}$`)
 
-// ConfigManager gestiona la configuración del bridge con soporte para backup y hot reload
+// ConfigManager manages the bridge configuration with backup and hot reload support
 type ConfigManager struct {
 	configPath    string
 	backupDir     string
@@ -37,7 +37,7 @@ type ConfigManager struct {
 	reloadChan    chan bool
 }
 
-// ConfigChange representa un cambio en la configuración
+// ConfigChange represents a configuration change
 type ConfigChange struct {
 	Timestamp   time.Time              `json:"timestamp"`
 	User        string                 `json:"user,omitempty"`
@@ -49,14 +49,14 @@ type ConfigChange struct {
 	Error       string                 `json:"error,omitempty"`
 }
 
-// ConfigValidationResult representa el resultado de una validación
+// ConfigValidationResult represents the result of a validation
 type ConfigValidationResult struct {
 	Valid    bool     `json:"valid"`
 	Errors   []string `json:"errors,omitempty"`
 	Warnings []string `json:"warnings,omitempty"`
 }
 
-// NewConfigManager crea un nuevo gestor de configuración
+// NewConfigManager creates a new configuration manager
 func NewConfigManager(configPath string, logger *logrus.Logger) *ConfigManager {
 	backupDir := filepath.Join(filepath.Dir(configPath), "backups")
 	
@@ -74,7 +74,7 @@ func NewConfigManager(configPath string, logger *logrus.Logger) *ConfigManager {
 	}
 }
 
-// LoadConfig carga la configuración desde el archivo YAML
+// LoadConfig loads the configuration from the YAML file
 func (cm *ConfigManager) LoadConfig() (*config.Config, error) {
 	cm.configMutex.Lock()
 	defer cm.configMutex.Unlock()
@@ -94,40 +94,40 @@ func (cm *ConfigManager) LoadConfig() (*config.Config, error) {
 	return cfg, nil
 }
 
-// GetConfig devuelve la configuración actual
+// GetConfig returns the current configuration
 func (cm *ConfigManager) GetConfig() *config.Config {
 	cm.configMutex.RLock()
 	defer cm.configMutex.RUnlock()
 	return cm.config
 }
 
-// SaveConfig guarda la configuración en el archivo YAML
+// SaveConfig saves the configuration to the YAML file
 func (cm *ConfigManager) SaveConfig(cfg *config.Config, user string) error {
 	cm.configMutex.Lock()
 	defer cm.configMutex.Unlock()
 
-	// Crear backup antes de guardar
+	// Create backup before saving
 	backupFile, err := cm.createBackup()
 	if err != nil {
 		cm.logger.WithError(err).Warn("Failed to create backup, proceeding anyway")
 	}
 
-	// Serializar a YAML
+	// Serialize to YAML
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	// Escribir archivo
+	// Write file
 	if err := ioutil.WriteFile(cm.configPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
-	// Actualizar configuración en memoria
+	// Update in-memory configuration
 	oldConfig := cm.config
 	cm.config = cfg
 
-	// Registrar cambio
+	// Record change
 	sections := cm.detectChanges(oldConfig, cfg)
 	cm.addHistoryEntry(ConfigChange{
 		Timestamp:  time.Now(),
@@ -142,7 +142,7 @@ func (cm *ConfigManager) SaveConfig(cfg *config.Config, user string) error {
 	return nil
 }
 
-// ValidateConfig valida la configuración
+// ValidateConfig validates the configuration
 func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResult {
 	result := ConfigValidationResult{
 		Valid:    true,
@@ -150,19 +150,19 @@ func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResu
 		Warnings: make([]string, 0),
 	}
 
-	// Validar configuración básica
+	// Validate basic configuration
 	if cfg.Bridge.Name == "" {
 		result.Errors = append(result.Errors, "Bridge name is required")
 		result.Valid = false
 	}
 
-	// Validar OpenWebNet
+	// Validate OpenWebNet
 	if cfg.OpenWebNet.Port <= 0 || cfg.OpenWebNet.Port > 65535 {
 		result.Errors = append(result.Errors, "OpenWebNet port must be between 1-65535")
 		result.Valid = false
 	}
 
-	// Validar Web
+	// Validate Web
 	if cfg.Web.Port <= 0 || cfg.Web.Port > 65535 {
 		result.Errors = append(result.Errors, "Web port must be between 1-65535")
 		result.Valid = false
@@ -173,7 +173,7 @@ func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResu
 		result.Valid = false
 	}
 
-	// Validar log level (enum; vacío = usar default)
+	// Validate log level (enum; empty = use default)
 	if cfg.Bridge.LogLevel != "" {
 		switch cfg.Bridge.LogLevel {
 		case "debug", "info", "warn", "error":
@@ -183,7 +183,7 @@ func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResu
 		}
 	}
 
-	// Validar SIP
+	// Validate SIP
 	if cfg.SIP.Enabled {
 		if cfg.SIP.ServerHost == "" {
 			result.Warnings = append(result.Warnings, "SIP enabled but no server host configured")
@@ -205,7 +205,7 @@ func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResu
 		}
 	}
 
-	// Validar MQTT
+	// Validate MQTT
 	if cfg.MQTT.Enabled {
 		if cfg.MQTT.Host == "" {
 			result.Errors = append(result.Errors, "MQTT enabled but no host configured")
@@ -217,8 +217,8 @@ func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResu
 		}
 	}
 
-	// Validar Streaming: con streaming activo el puerto RTSP es obligatorio
-	// (0 ya no esquiva la comprobación); desactivado, solo se valida el rango.
+	// Validate Streaming: with streaming enabled the RTSP port is required
+	// (0 no longer skips the check); when disabled, only the range is validated.
 	if cfg.Streaming.Enabled || cfg.Streaming.RTSPPort != 0 {
 		if cfg.Streaming.RTSPPort <= 0 || cfg.Streaming.RTSPPort > 65535 {
 			result.Errors = append(result.Errors, "RTSP port must be between 1-65535")
@@ -237,7 +237,7 @@ func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResu
 		result.Warnings = append(result.Warnings, "video_on_demand competes with the native firmware and may reboot the device — enable only on a validated setup")
 	}
 
-	// Validar DNS (deben ser IPs)
+	// Validate DNS (must be IPs)
 	for _, s := range cfg.Network.DNS.Servers {
 		if net.ParseIP(strings.TrimSpace(s)) == nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("Invalid DNS server %q (must be an IP address)", s))
@@ -245,7 +245,7 @@ func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResu
 		}
 	}
 
-	// Validar HomeKit
+	// Validate HomeKit
 	if cfg.HomeKit.Enabled {
 		if p, err := strconv.Atoi(cfg.HomeKit.Port); err != nil || p < 1 || p > 65535 {
 			result.Errors = append(result.Errors, "HomeKit port must be a number between 1-65535")
@@ -257,8 +257,8 @@ func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResu
 		}
 	}
 
-	// Validar auth web: activarla sin contraseña dejaría el servidor en 503
-	// (fail-closed) — mejor impedir guardar ese estado desde el dashboard.
+	// Validate web auth: enabling it without a password would leave the server in 503
+	// (fail-closed) — better to reject saving that state from the dashboard.
 	if cfg.Security.WebAuthRequired && cfg.Security.WebPassword == "" {
 		result.Errors = append(result.Errors, "web_auth_required needs a non-empty web_password")
 		result.Valid = false
@@ -267,7 +267,7 @@ func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResu
 		result.Warnings = append(result.Warnings, "Web/API served without authentication (security.web_auth_required=false)")
 	}
 
-	// Validar servidores externos (privacy warnings)
+	// Validate external servers (privacy warnings)
 	if cfg.Servers.Cloud.Enabled {
 		result.Warnings = append(result.Warnings, "Cloud connection enabled - data will be sent to Netatmo servers")
 	}
@@ -279,7 +279,7 @@ func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResu
 	return result
 }
 
-// CreateBackup crea un backup de la configuración actual
+// CreateBackup creates a backup of the current configuration
 func (cm *ConfigManager) CreateBackup() (string, error) {
 	cm.configMutex.RLock()
 	defer cm.configMutex.RUnlock()
@@ -287,41 +287,41 @@ func (cm *ConfigManager) CreateBackup() (string, error) {
 }
 
 func (cm *ConfigManager) createBackup() (string, error) {
-	// Crear directorio de backups si no existe
+	// Create backup directory if it does not exist
 	if err := os.MkdirAll(cm.backupDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
-	// Leer archivo actual
+	// Read current file
 	data, err := ioutil.ReadFile(cm.configPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	// Generar nombre de archivo con timestamp
+	// Generate timestamped file name
 	timestamp := time.Now().Format("20060102_150405")
 	backupFile := filepath.Join(cm.backupDir, fmt.Sprintf("config_%s.yaml", timestamp))
 
-	// Escribir backup
+	// Write backup
 	if err := ioutil.WriteFile(backupFile, data, 0644); err != nil {
 		return "", fmt.Errorf("failed to write backup file: %w", err)
 	}
 
-	// Limpiar backups antiguos
+	// Clean up old backups
 	cm.cleanupOldBackups()
 
 	cm.logger.Infof("Backup created: %s", backupFile)
 	return backupFile, nil
 }
 
-// RestoreBackup restaura un backup
+// RestoreBackup restores a backup
 func (cm *ConfigManager) RestoreBackup(backupFile string) error {
 	cm.configMutex.Lock()
 	defer cm.configMutex.Unlock()
 
-	// El backup DEBE estar dentro del directorio de backups: la ruta llega de
-	// la API sin autenticar y sin esta comprobación permitiría restaurar
-	// cualquier YAML del sistema (path traversal).
+	// The backup MUST be inside the backups directory: the path arrives from
+	// the unauthenticated API and without this check it would allow restoring
+	// any YAML on the system (path traversal).
 	absDir, err := filepath.Abs(cm.backupDir)
 	if err != nil {
 		return fmt.Errorf("failed to resolve backup dir: %w", err)
@@ -334,29 +334,29 @@ func (cm *ConfigManager) RestoreBackup(backupFile string) error {
 		return fmt.Errorf("backup file must be inside the backups directory")
 	}
 
-	// Verificar que el backup existe
+	// Verify that the backup exists
 	if _, err := os.Stat(backupFile); os.IsNotExist(err) {
 		return fmt.Errorf("backup file does not exist: %s", backupFile)
 	}
 
-	// Leer backup
+	// Read backup
 	data, err := ioutil.ReadFile(backupFile)
 	if err != nil {
 		return fmt.Errorf("failed to read backup file: %w", err)
 	}
 
-	// Crear backup de la configuración actual antes de restaurar
+	// Back up the current configuration before restoring
 	_, err = cm.createBackup()
 	if err != nil {
 		cm.logger.WithError(err).Warn("Failed to create pre-restore backup")
 	}
 
-	// Escribir backup sobre config actual
+	// Write backup over current config
 	if err := ioutil.WriteFile(cm.configPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to restore config file: %w", err)
 	}
 
-	// Recargar configuración
+	// Reload configuration
 	cfg := &config.Config{}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return fmt.Errorf("failed to parse restored config: %w", err)
@@ -376,18 +376,18 @@ func (cm *ConfigManager) RestoreBackup(backupFile string) error {
 	return nil
 }
 
-// GetHistory devuelve el historial de cambios
+// GetHistory returns the change history
 func (cm *ConfigManager) GetHistory() []ConfigChange {
 	cm.historyMutex.RLock()
 	defer cm.historyMutex.RUnlock()
 
-	// Devolver copia para evitar race conditions
+	// Return a copy to avoid race conditions
 	history := make([]ConfigChange, len(cm.history))
 	copy(history, cm.history)
 	return history
 }
 
-// GetBackups devuelve la lista de backups disponibles
+// GetBackups returns the list of available backups
 func (cm *ConfigManager) GetBackups() ([]string, error) {
 	files, err := ioutil.ReadDir(cm.backupDir)
 	if err != nil {
@@ -397,7 +397,7 @@ func (cm *ConfigManager) GetBackups() ([]string, error) {
 		return nil, fmt.Errorf("failed to read backup directory: %w", err)
 	}
 
-	// Filtrar y ordenar archivos YAML
+	// Filter and sort YAML files
 	var backups []string
 	for _, file := range files {
 		if !file.IsDir() && strings.HasSuffix(file.Name(), ".yaml") {
@@ -405,13 +405,13 @@ func (cm *ConfigManager) GetBackups() ([]string, error) {
 		}
 	}
 
-	// Ordenar por nombre (timestamp)
+	// Sort by name (timestamp)
 	sort.Strings(backups)
 
 	return backups, nil
 }
 
-// RequestReload solicita un hot reload de la configuración
+// RequestReload requests a hot reload of the configuration
 func (cm *ConfigManager) RequestReload() {
 	if cm.autoReload {
 		select {
@@ -423,17 +423,17 @@ func (cm *ConfigManager) RequestReload() {
 	}
 }
 
-// GetReloadChannel devuelve el canal de reload
+// GetReloadChannel returns the reload channel
 func (cm *ConfigManager) GetReloadChannel() <-chan bool {
 	return cm.reloadChan
 }
 
-// EnableAutoReload habilita el hot reload automático
+// EnableAutoReload enables automatic hot reload
 func (cm *ConfigManager) EnableAutoReload() {
 	cm.autoReload = true
 }
 
-// CleanupOldBackups elimina backups antiguos manteniendo solo los últimos maxBackups
+// CleanupOldBackups removes old backups keeping only the last maxBackups
 func (cm *ConfigManager) cleanupOldBackups() {
 	backups, err := cm.GetBackups()
 	if err != nil {
@@ -441,7 +441,7 @@ func (cm *ConfigManager) cleanupOldBackups() {
 		return
 	}
 
-	// Eliminar backups si exceden el máximo
+	// Delete backups if they exceed the maximum
 	for len(backups) > cm.maxBackups {
 		oldFile := backups[0]
 		if err := os.Remove(oldFile); err != nil {
@@ -453,12 +453,12 @@ func (cm *ConfigManager) cleanupOldBackups() {
 	}
 }
 
-// addHistoryEntry agrega una entrada al historial
+// addHistoryEntry adds an entry to the history
 func (cm *ConfigManager) addHistoryEntry(entry ConfigChange) {
 	cm.historyMutex.Lock()
 	defer cm.historyMutex.Unlock()
 
-	// Limitar historial a 100 entradas
+	// Limit history to 100 entries
 	if len(cm.history) >= 100 {
 		cm.history = cm.history[1:]
 	}
@@ -466,7 +466,7 @@ func (cm *ConfigManager) addHistoryEntry(entry ConfigChange) {
 	cm.history = append(cm.history, entry)
 }
 
-// detectChanges detecta qué secciones cambiaron
+// detectChanges detects which sections changed
 func (cm *ConfigManager) detectChanges(old, new *config.Config) []string {
 	var sections []string
 
@@ -474,7 +474,7 @@ func (cm *ConfigManager) detectChanges(old, new *config.Config) []string {
 		return []string{"unknown"}
 	}
 
-	// Comparar secciones principales
+	// Compare main sections
 	if old.Bridge.Name != new.Bridge.Name {
 		sections = append(sections, "bridge")
 	}
@@ -514,7 +514,7 @@ func (cm *ConfigManager) detectChanges(old, new *config.Config) []string {
 	return sections
 }
 
-// ToJSON serializa la configuración a JSON
+// ToJSON serializes the configuration to JSON
 func (cm *ConfigManager) ToJSON() ([]byte, error) {
 	cm.configMutex.RLock()
 	defer cm.configMutex.RUnlock()
@@ -522,9 +522,9 @@ func (cm *ConfigManager) ToJSON() ([]byte, error) {
 	return json.MarshalIndent(cm.config, "", "  ")
 }
 
-// FromJSON deserializa la configuración desde JSON. La candidata parte de una
-// COPIA de la config actual y el JSON se aplica encima: un JSON parcial (p.ej.
-// el del UI legacy) no pone a cero los campos que no envía. No muta cm.config.
+// FromJSON deserializes the configuration from JSON. The candidate starts from a
+// COPY of the current config and the JSON is applied on top: a partial JSON (e.g.
+// the legacy UI one) does not zero out fields it does not send. Does not mutate cm.config.
 func (cm *ConfigManager) FromJSON(data []byte) (*config.Config, error) {
 	cm.configMutex.RLock()
 	current := cm.config

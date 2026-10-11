@@ -22,10 +22,10 @@ func TestSystemRestartBridgeRejectsGET(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ws.handleAPISystemRestartBridge(rec, httptest.NewRequest(http.MethodGet, "/api/system/restart-bridge", nil))
 	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("esperaba 405 en GET, got %d", rec.Code)
+		t.Fatalf("expected 405 on GET, got %d", rec.Code)
 	}
 	if *restarts != 0 {
-		t.Fatal("GET no debe disparar el reinicio")
+		t.Fatal("GET must not trigger the restart")
 	}
 }
 
@@ -34,14 +34,14 @@ func TestSystemRestartBridgePOST(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ws.handleAPISystemRestartBridge(rec, httptest.NewRequest(http.MethodPost, "/api/system/restart-bridge", nil))
 	if rec.Code != http.StatusOK {
-		t.Fatalf("esperaba 200, got %d", rec.Code)
+		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 	var body map[string]interface{}
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil || body["success"] != true {
-		t.Fatalf("esperaba success=true, got %v (err=%v)", body, err)
+		t.Fatalf("expected success=true, got %v (err=%v)", body, err)
 	}
 	if *restarts != 1 {
-		t.Fatalf("esperaba 1 reinicio disparado, got %d", *restarts)
+		t.Fatalf("expected 1 restart triggered, got %d", *restarts)
 	}
 }
 
@@ -50,10 +50,10 @@ func TestSystemRebootRejectsGET(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ws.handleAPISystemReboot(rec, httptest.NewRequest(http.MethodGet, "/api/system/reboot", nil))
 	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("esperaba 405 en GET, got %d", rec.Code)
+		t.Fatalf("expected 405 on GET, got %d", rec.Code)
 	}
 	if *reboots != 0 {
-		t.Fatal("GET no debe disparar el reboot")
+		t.Fatal("GET must not trigger the reboot")
 	}
 }
 
@@ -62,9 +62,9 @@ func TestSystemRebootPOST(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ws.handleAPISystemReboot(rec, httptest.NewRequest(http.MethodPost, "/api/system/reboot", nil))
 	if rec.Code != http.StatusOK {
-		t.Fatalf("esperaba 200, got %d", rec.Code)
+		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 	if *reboots != 1 {
-		t.Fatalf("esperaba 1 reboot disparado, got %d", *reboots)
+		t.Fatalf("expected 1 reboot triggered, got %d", *reboots)
 	}
 }

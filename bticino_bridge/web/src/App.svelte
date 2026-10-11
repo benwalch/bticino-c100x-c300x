@@ -47,7 +47,7 @@
       <a href="#settings" class={currentRoute === 'settings' ? 'active' : ''}>Settings</a>
       <a href="#controls" class={currentRoute === 'controls' ? 'active' : ''}>Controls</a>
       <a href="#messages" class={currentRoute === 'messages' ? 'active' : ''}>Messages</a>
-      <a href="#memos" class={currentRoute === 'memos' ? 'active' : ''}>Notas</a>
+      <a href="#memos" class={currentRoute === 'memos' ? 'active' : ''}>Notes</a>
       <a href="#logs" class={currentRoute === 'logs' ? 'active' : ''}>Logs</a>
       <a href="/api/docs/" target="_blank" class="external-link">API Docs ↗</a>
     </div>

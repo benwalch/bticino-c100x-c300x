@@ -1,6 +1,6 @@
-// Package system agrupa las acciones de sistema (reiniciar el bridge, reiniciar
-// el dispositivo) compartidas por los frontales MQTT y web. La lógica proviene
-// de los handlers MQTT de la v0.17.0 (probados en device).
+// Package system groups system actions (restarting the bridge, rebooting
+// the device) shared by the MQTT and web frontends. The logic comes
+// from the MQTT handlers in v0.17.0 (tested on device).
 package system
 
 import (
@@ -39,14 +39,14 @@ func RestartBridgeAsync(logger *logrus.Logger) {
 	}()
 }
 
-// RebootDeviceAsync reinicia TODO el videoportero (/sbin/reboot) tras una
-// breve pausa (da tiempo a responder al cliente que lo pidió).
+// RebootDeviceAsync reboots the whole video door phone (/sbin/reboot) after a
+// brief pause (gives time to reply to the requesting client).
 func RebootDeviceAsync(logger *logrus.Logger) {
-	logger.Warn("system: REINICIO DEL DISPOSITIVO solicitado (/sbin/reboot)")
+	logger.Warn("system: DEVICE REBOOT requested (/sbin/reboot)")
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 		if err := exec.Command("/sbin/reboot").Run(); err != nil {
-			logger.WithError(err).Error("reboot: /sbin/reboot falló")
+			logger.WithError(err).Error("reboot: /sbin/reboot failed")
 		}
 	}()
 }

@@ -34,7 +34,7 @@ func doAuthRequest(ws *WebServer, user, pass string) *httptest.ResponseRecorder 
 func TestAuthDisabledPassesThrough(t *testing.T) {
 	ws := newAuthTestWS(false, "", "")
 	if rec := doAuthRequest(ws, "", ""); rec.Code != http.StatusOK {
-		t.Fatalf("con auth desactivada esperaba 200, got %d", rec.Code)
+		t.Fatalf("with auth disabled expected 200, got %d", rec.Code)
 	}
 }
 
@@ -42,33 +42,33 @@ func TestAuthEnabledRejectsMissingCredentials(t *testing.T) {
 	ws := newAuthTestWS(true, "admin", "s3cret")
 	rec := doAuthRequest(ws, "", "")
 	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("sin credenciales esperaba 401, got %d", rec.Code)
+		t.Fatalf("without credentials expected 401, got %d", rec.Code)
 	}
 	if rec.Header().Get("WWW-Authenticate") == "" {
-		t.Fatal("el 401 debe llevar WWW-Authenticate para que el navegador pida login")
+		t.Fatal("401 must include WWW-Authenticate so the browser prompts for login")
 	}
 }
 
 func TestAuthEnabledRejectsWrongPassword(t *testing.T) {
 	ws := newAuthTestWS(true, "admin", "s3cret")
-	if rec := doAuthRequest(ws, "admin", "mala"); rec.Code != http.StatusUnauthorized {
-		t.Fatalf("con contraseña incorrecta esperaba 401, got %d", rec.Code)
+	if rec := doAuthRequest(ws, "admin", "wrong"); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("with wrong password expected 401, got %d", rec.Code)
 	}
 }
 
 func TestAuthEnabledAcceptsCorrectCredentials(t *testing.T) {
 	ws := newAuthTestWS(true, "admin", "s3cret")
 	if rec := doAuthRequest(ws, "admin", "s3cret"); rec.Code != http.StatusOK {
-		t.Fatalf("con credenciales correctas esperaba 200, got %d", rec.Code)
+		t.Fatalf("with correct credentials expected 200, got %d", rec.Code)
 	}
 }
 
 func TestAuthEnabledWithoutPasswordFailsClosed(t *testing.T) {
-	// Activado pero sin contraseña: NUNCA abrir en silencio (falsa seguridad);
-	// se responde 503 hasta que la config sea coherente.
+	// Enabled but without password: NEVER leave silently open (false security);
+	// respond 503 until the config is consistent.
 	ws := newAuthTestWS(true, "admin", "")
 	if rec := doAuthRequest(ws, "admin", ""); rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("auth activada sin contraseña debe dar 503, got %d", rec.Code)
+		t.Fatalf("auth enabled without password must return 503, got %d", rec.Code)
 	}
 }
 
@@ -78,11 +78,11 @@ func TestValidateWebAuthRequiresPassword(t *testing.T) {
 	cfg.Security.WebAuthRequired = true
 	cfg.Security.WebPassword = ""
 	if r := cm.ValidateConfig(cfg); r.Valid || !hasErrorContaining(r, "web_password") {
-		t.Fatalf("web_auth_required sin contraseña debe ser error de validación, got %+v", r)
+		t.Fatalf("web_auth_required without password must be a validation error, got %+v", r)
 	}
 	cfg.Security.WebUsername = "admin"
 	cfg.Security.WebPassword = "s3cret"
 	if r := cm.ValidateConfig(cfg); !r.Valid {
-		t.Fatalf("auth bien configurada debe ser válida: %v", r.Errors)
+		t.Fatalf("correctly configured auth must be valid: %v", r.Errors)
 	}
 }

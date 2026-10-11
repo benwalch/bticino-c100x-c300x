@@ -178,7 +178,7 @@ func (ws *WebServer) handleAPIStreamingConfig(w http.ResponseWriter, r *http.Req
 			{
 				"path":        "/doorbell-video",
 				"name":        "Video Only",
-				"description": "Video stream sin audio",
+				"description": "Video stream without audio",
 				"video":       true,
 				"audio":       false,
 				"recordable":  false,
@@ -186,7 +186,7 @@ func (ws *WebServer) handleAPIStreamingConfig(w http.ResponseWriter, r *http.Req
 			{
 				"path":        "/doorbell-recorder",
 				"name":        "HKSV Recorder",
-				"description": "Stream para grabación HKSV",
+				"description": "Stream for HKSV recording",
 				"video":       true,
 				"audio":       true,
 				"recordable":  true,

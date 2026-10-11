@@ -1,55 +1,55 @@
 # SIP Local Testing Report
 
-**Fecha**: 2026-03-24  
-**Estado**: ⚠️ **PARCIALMENTE FUNCIONAL**  
-**Problema**: Registro SIP falla con `i/o timeout`
+**Date**: 2026-03-24  
+**Status**: ⚠️ **PARTIALLY WORKING**  
+**Problem**: SIP registration fails with `i/o timeout`
 
 ---
 
-## 📊 Estado Actual
+## 📊 Current Status
 
-### ✅ **Lo Que Funciona**
+### ✅ **What Works**
 
-| Componente | Estado | Detalles |
+| Component | Status | Details |
 |------------|--------|----------|
-| **Flexisip** | ✅ Corriendo | PID 18942, 18943 |
-| **Puerto 5060** | ✅ Escuchando | 127.0.0.1:5060, 192.168.1.38:5060 |
-| **Puerto 5061** | ✅ Escuchando | 192.168.1.38:5061 (TLS) |
-| **Usuario bticino_bridge** | ✅ Creado | users.db.txt |
-| **Ruta configurada** | ✅ Creada | route.conf → 127.0.0.1 |
-| **Timbre configurado** | ✅ Creado | route_int.conf |
+| **Flexisip** | ✅ Running | PID 18942, 18943 |
+| **Port 5060** | ✅ Listening | 127.0.0.1:5060, 192.168.1.38:5060 |
+| **Port 5061** | ✅ Listening | 192.168.1.38:5061 (TLS) |
+| **bticino_bridge user** | ✅ Created | users.db.txt |
+| **Configured route** | ✅ Created | route.conf → 127.0.0.1 |
+| **Configured doorbell** | ✅ Created | route_int.conf |
 
 ---
 
-### ❌ **Lo Que No Funciona**
+### ❌ **What Doesn't Work**
 
-| Componente | Problema | Error |
+| Component | Problem | Error |
 |------------|----------|-------|
-| **Registro SIP** | ❌ Timeout | `i/o timeout` en 127.0.0.1:5060 |
-| **bticino_bridge** | ⚠️ Sin SIP | Continúa sin features de video |
+| **SIP registration** | ❌ Timeout | `i/o timeout` on 127.0.0.1:5060 |
+| **bticino_bridge** | ⚠️ No SIP | Continues without video features |
 
 ---
 
-## 🔍 Diagnóstico
+## 🔍 Diagnosis
 
-### **Síntomas**:
+### **Symptoms**:
 
-1. ✅ Flexisip está corriendo y escuchando en 127.0.0.1:5060
-2. ✅ Usuario `bticino_bridge` existe en users.db.txt
-3. ✅ Ruta existe en route.conf
-4. ❌ bticino_bridge reporta `i/o timeout` al enviar REGISTER
-5. ❌ No hay logs en flexisip del REGISTER de bticino_bridge
+1. ✅ Flexisip is running and listening on 127.0.0.1:5060
+2. ✅ `bticino_bridge` user exists in users.db.txt
+3. ✅ Route exists in route.conf
+4. ❌ bticino_bridge reports `i/o timeout` when sending REGISTER
+5. ❌ No flexisip logs of bticino_bridge's REGISTER
 
-### **Posibles Causas**:
+### **Possible Causes**:
 
-1. **Cliente SIP del bridge** - Puede no estar enviando REGISTER correctamente
-2. **Firewall interno** - iptables puede estar bloqueando (aunque comando no disponible)
-3. **Formato de username** - Puede necesitar formato diferente
-4. **Autenticación** - Puede requerir configuración adicional
+1. **Bridge SIP client** - May not be sending REGISTER correctly
+2. **Internal firewall** - iptables may be blocking (although command unavailable)
+3. **Username format** - May need a different format
+4. **Authentication** - May require additional configuration
 
 ---
 
-## 📁 Configuración Actual
+## 📁 Current Configuration
 
 ### **Flexisip** (`/etc/flexisip/flexisip.conf`):
 ```ini
@@ -64,12 +64,12 @@ trusted-hosts=127.0.0.1,192.168.1.38
 hashed-passwords=true
 ```
 
-### **Usuarios** (`/etc/flexisip/users/users.db.txt`):
+### **Users** (`/etc/flexisip/users/users.db.txt`):
 ```
 bticino_bridge@YOUR_GATEWAY_ID.bs.iotleg.com md5:REDACTED_MD5 ;
 ```
 
-### **Rutas** (`/etc/flexisip/users/route.conf`):
+### **Routes** (`/etc/flexisip/users/route.conf`):
 ```
 <sip:bticino_bridge@YOUR_GATEWAY_ID.bs.iotleg.com> sip:127.0.0.1
 ```
@@ -88,9 +88,9 @@ sip:
 
 ---
 
-## 🧪 Pruebas Realizadas
+## 🧪 Tests Performed
 
-### **Test 1: Verificar flexisip escuchando**
+### **Test 1: Verify flexisip is listening**
 ```bash
 ps aux | grep flexisip
 # ✅ OK: Flexisip corriendo
@@ -99,28 +99,28 @@ cat /proc/net/tcp | grep 13C4
 # ✅ OK: Escuchando en 127.0.0.1:5060 y 192.168.1.38:5060
 ```
 
-### **Test 2: Verificar usuarios**
+### **Test 2: Verify users**
 ```bash
 cat /etc/flexisip/users/users.db.txt | grep bticino_bridge
 # ✅ OK: Usuario existe
 ```
 
-### **Test 3: Verificar rutas**
+### **Test 3: Verify routes**
 ```bash
 cat /etc/flexisip/users/route.conf | grep bticino_bridge
 # ✅ OK: Ruta configurada
 ```
 
-### **Test 4: Registro SIP**
+### **Test 4: SIP registration**
 ```bash
 # bticino_bridge logs:
 ERRO[2026-03-24T14:20:34+01:00] Failed to start SIP client... 
 error="failed to register: failed to read REGISTER response: 
 read tcp 127.0.0.1:45234->127.0.0.1:5060: i/o timeout"
-# ❌ FAIL: Timeout después de 10 segundos
+# ❌ FAIL: Timeout after 10 seconds
 ```
 
-### **Test 5: Logs de flexisip**
+### **Test 5: flexisip logs**
 ```bash
 tail -100 /var/log/log_rotation.log | grep bticino_bridge
 # ❌ FAIL: No hay logs del REGISTER
@@ -128,35 +128,35 @@ tail -100 /var/log/log_rotation.log | grep bticino_bridge
 
 ---
 
-## 🔧 Próximos Pasos para Debug
+## 🔧 Next Debug Steps
 
-### **1. Verificar que el REGISTER sale del bridge**
+### **1. Verify the REGISTER leaves the bridge**
 ```bash
-# En el dispositivo, capturar tráfico SIP
+# On the device, capture SIP traffic
 tcpdump -i lo -n port 5060 -X
-# Debería mostrar REGISTER saliendo
+# Should show REGISTER going out
 ```
 
-### **2. Probar con usuario existente (baresip)**
+### **2. Try with an existing user (baresip)**
 ```yaml
 sip:
   username: baresip@YOUR_GATEWAY_ID.bs.iotleg.com
   password: REDACTED_MD5
 ```
 
-### **3. Habilitar logs más detallados en flexisip**
+### **3. Enable more detailed flexisip logs**
 ```ini
 [global]
 log-level=debug
 syslog-level=debug
 
 [module::SipAg]
-log-level=9  # Máximo nivel de debug
+log-level=9  # Maximum debug level
 ```
 
-### **4. Probar registro manual con sipsak**
+### **4. Try manual registration with sipsak**
 ```bash
-# Desde otro dispositivo
+# From another device
 sipsak -s sip:bticino_bridge@YOUR_GATEWAY_ID.bs.iotleg.com \
        -u bticino_bridge \
        -p REDACTED_MD5 \
@@ -166,45 +166,45 @@ sipsak -s sip:bticino_bridge@YOUR_GATEWAY_ID.bs.iotleg.com \
 
 ---
 
-## 📝 Lecciones Aprendidas
+## 📝 Lessons Learned
 
-1. ✅ **Flexisip se puede configurar** para escuchar en red local
-2. ✅ **Usuarios se pueden agregar** manualmente
-3. ✅ **Rutas se pueden configurar** para usuarios locales
-4. ⚠️ **El registro SIP requiere debug** más detallado
-5. ⚠️ **El cliente SIP del bridge** puede necesitar ajustes
+1. ✅ **Flexisip can be configured** to listen on the local network
+2. ✅ **Users can be added** manually
+3. ✅ **Routes can be configured** for local users
+4. ⚠️ **SIP registration needs more detailed** debugging
+5. ⚠️ **The bridge SIP client** may need adjustments
 
 ---
 
-## 🎯 Estado del Proyecto
+## 🎯 Project Status
 
-### **Funcionalidades Working**:
-- ✅ Web Dashboard (puerto 8082)
+### **Working Features**:
+- ✅ Web Dashboard (port 8082)
 - ✅ MQTT Bridge (Home Assistant)
-- ✅ OpenWebNet (comandos y monitoreo)
+- ✅ OpenWebNet (commands and monitoring)
 - ✅ Message Parser (answering machine)
-- ✅ Input Monitor (botones físicos)
+- ✅ Input Monitor (physical buttons)
 - ✅ LED/GPIO Monitoring
-- ⚠️ **SIP Client** (fallando registro)
-- ⚠️ **RTSP Streaming** (depende de SIP)
+- ⚠️ **SIP Client** (registration failing)
+- ⚠️ **RTSP Streaming** (depends on SIP)
 
-### **Funcionalidades Pendientes**:
-- ❌ **SIP Registration** - Debug en progreso
-- ❌ **RTSP Streaming** - Depende de SIP
-- ❌ **HKSV Recording** - Depende de RTSP
-
----
-
-## 📚 Documentación Creada
-
-1. `FLEXISIP_LOCAL_CONFIG.md` - Guía completa de configuración
-2. `SIP_LOCAL_TEST_REPORT.md` - Este informe
-3. `BT_DAEMON_REVERSE_ENGINEERING.md` - Análisis de bt_daemon
-4. `FIRMWARE_COMPARISON_1.7.17_vs_1.7.19.md` - Comparativa firmwares
-5. `WEB_CONFIG_IMPLEMENTATION_PROGRESS.md` - Progreso web config
+### **Pending Features**:
+- ❌ **SIP Registration** - Debug in progress
+- ❌ **RTSP Streaming** - Depends on SIP
+- ❌ **HKSV Recording** - Depends on RTSP
 
 ---
 
-**Próxima Revisión**: Después de debug de registro SIP  
-**Prioridad**: Media (bridge funcional sin SIP)  
-**Impacto**: Bajo (otras funcionalidades trabajan)
+## 📚 Created Documentation
+
+1. `FLEXISIP_LOCAL_CONFIG.md` - Full configuration guide
+2. `SIP_LOCAL_TEST_REPORT.md` - This report
+3. `BT_DAEMON_REVERSE_ENGINEERING.md` - bt_daemon analysis
+4. `FIRMWARE_COMPARISON_1.7.17_vs_1.7.19.md` - Firmware comparison
+5. `WEB_CONFIG_IMPLEMENTATION_PROGRESS.md` - Web config progress
+
+---
+
+**Next Review**: after SIP registration debug  
+**Priority**: Medium (bridge works without SIP)  
+**Impact**: Low (other features work)

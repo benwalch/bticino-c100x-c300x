@@ -1,13 +1,13 @@
 #!/bin/bash
 #
-# Deploy automático para BTicino Bridge
-# Asume que SSH ya está configurado y funciona sin password
+# Automatic deploy for BTicino Bridge
+# Assumes SSH is already configured and works without password
 #
 
 set -e
 
 echo "========================================"
-echo "  BTicino Bridge - Deploy Automático"
+echo "  BTicino Bridge - Automatic Deploy"
 echo "========================================"
 echo ""
 
@@ -15,39 +15,39 @@ REMOTE="bticino"
 SSH_OPTS="-o StrictHostKeyChecking=no -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa"
 REMOTE_DIR="/home/bticino/cfg/extra"
 
-echo "⚠️  IMPORTANTE: Este script asume que:"
-echo "   1. Ya aceptaste la host key del dispositivo"
-echo "   2. SSH funciona sin password (key-based)"
+echo "⚠️  IMPORTANT: This script assumes that:"
+echo "   1. You already accepted the device host key"
+echo "   2. SSH works without password (key-based)"
 echo ""
-echo "Si SSH pide password, configurá antes las keys:"
+echo "If SSH asks for a password, set up the keys first:"
 echo "  ssh-copy-id -o HostKeyAlgorithms=+ssh-rsa bticino"
 echo ""
-read -p "Presioná ENTER para continuar o Ctrl+C para cancelar..."
+read -p "Press ENTER to continue or Ctrl+C to cancel..."
 echo ""
 
-# Paso 1: Test SSH
+# Step 1: Test SSH
 echo "[1/8] Testing SSH..."
 if ! ssh ${SSH_OPTS} ${REMOTE} "echo 'OK'" > /dev/null 2>&1; then
-    echo "❌ ERROR: SSH no funciona"
-    echo "Probá: ssh ${SSH_OPTS} ${REMOTE}"
+    echo "❌ ERROR: SSH is not working"
+    echo "Try: ssh ${SSH_OPTS} ${REMOTE}"
     exit 1
 fi
 echo "✅ SSH OK"
 echo ""
 
-# Paso 2: Remount filesystem
+# Step 2: Remount filesystem
 echo "[2/8] Remount filesystem RW..."
 ssh ${SSH_OPTS} ${REMOTE} "mount -o remount,rw /" 2>/dev/null || true
 echo "✅ Filesystem RW"
 echo ""
 
-# Paso 3: Crear directorio recordings
+# Step 3: Create recordings directory
 echo "[3/8] Creating recordings directory..."
 ssh ${SSH_OPTS} ${REMOTE} "mkdir -p ${REMOTE_DIR}/recordings && chmod 755 ${REMOTE_DIR}/recordings"
 echo "✅ Recordings dir created"
 echo ""
 
-# Paso 4: Backup si existe versión anterior
+# Step 4: Backup if a previous version exists
 echo "[4/8] Checking for existing installation..."
 if ssh ${SSH_OPTS} ${REMOTE} "test -f ${REMOTE_DIR}/bticino_bridge && echo 'exists'" 2>/dev/null | grep -q "exists"; then
     echo "⚠️  Existing installation found, creating backup..."
@@ -58,7 +58,7 @@ else
 fi
 echo ""
 
-# Paso 5: Transfer binary via base64 chunks
+# Step 5: Transfer binary via base64 chunks
 echo "[5/8] Transferring binary (base64 method)..."
 echo "    This may take 3-5 minutes..."
 
@@ -82,7 +82,7 @@ done
 echo "✅ All chunks transferred"
 echo ""
 
-# Paso 6: Assemble and decode
+# Step 6: Assemble and decode
 echo "[6/8] Assembling and decoding binary..."
 ssh ${SSH_OPTS} ${REMOTE} "cd ${REMOTE_DIR} && cat bticino_bridge.base64.chunk.* > bticino_bridge.base64 && base64 -d bticino_bridge.base64 > bticino_bridge.new && rm -f bticino_bridge.base64.chunk.* bticino_bridge.base64"
 
@@ -91,14 +91,14 @@ ssh ${SSH_OPTS} ${REMOTE} "ls -lh ${REMOTE_DIR}/bticino_bridge.new"
 echo "✅ Binary decoded"
 echo ""
 
-# Paso 7: Make executable and activate
+# Step 7: Make executable and activate
 echo "[7/8] Activating binary..."
 ssh ${SSH_OPTS} ${REMOTE} "chmod +x ${REMOTE_DIR}/bticino_bridge.new && mv ${REMOTE_DIR}/bticino_bridge.new ${REMOTE_DIR}/bticino_bridge"
 ssh ${SSH_OPTS} ${REMOTE} "ls -lh ${REMOTE_DIR}/bticino_bridge"
 echo "✅ Binary activated"
 echo ""
 
-# Paso 8: Verify binary works
+# Step 8: Verify binary works
 echo "[8/8] Testing binary..."
 if ssh ${SSH_OPTS} ${REMOTE} "cd ${REMOTE_DIR} && ./bticino_bridge -version" 2>&1 | grep -q "v0.12"; then
     echo "✅ Binary version OK (v0.12.0)"
@@ -108,29 +108,29 @@ fi
 echo ""
 
 echo "========================================"
-echo "  ✅ Deploy completado!"
+echo "  ✅ Deploy complete!"
 echo "========================================"
 echo ""
-echo "Próximos pasos MANUALES:"
+echo "Next MANUAL steps:"
 echo ""
-echo "1. Crear configuración:"
+echo "1. Create configuration:"
 echo "   ssh ${SSH_OPTS} ${REMOTE}"
 echo "   cd ${REMOTE_DIR}"
 echo "   cp config-streaming-example.yaml config.yaml"
-echo "   # Editar config.yaml con tus credenciales SIP"
+echo "   # Edit config.yaml with your SIP credentials"
 echo ""
-echo "2. Probar en modo test:"
+echo "2. Test in test mode:"
 echo "   cd ${REMOTE_DIR}"
 echo "   ./bticino_bridge -config config.yaml -test"
 echo ""
-echo "3. Iniciar manualmente:"
+echo "3. Start manually:"
 echo "   ./bticino_bridge -config config.yaml &"
 echo ""
-echo "4. Verificar logs:"
+echo "4. Check logs:"
 echo "   tail -f /var/log/bticino_bridge.log"
 echo ""
-echo "5. Testear RTSP:"
+echo "5. Test RTSP:"
 echo "   ffplay -f rtsp -i rtsp://192.168.1.38:6554/doorbell"
 echo ""
-echo "Para crear servicio init.d, ver docs/DEPLOYMENT_GUIDE.md"
+echo "To create the init.d service, see docs/DEPLOYMENT_GUIDE.md"
 echo ""

@@ -1,5 +1,5 @@
 // Package webserver - Device Tab API Handlers
-// Maneja configuración del dispositivo (NTP, Timezone, Language, Ringtone)
+// Handles device configuration (NTP, Timezone, Language, Ringtone)
 
 package webserver
 
@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// DeviceConfig representa la configuración del dispositivo
+// DeviceConfig represents the device configuration
 type DeviceConfig struct {
 	NTP      NTPConfig      `json:"ntp"`
 	Timezone TimezoneConfig `json:"timezone"`
@@ -166,7 +166,7 @@ func (ws *WebServer) handleAPIDeviceLanguages(w http.ResponseWriter, r *http.Req
 
 	languages := []map[string]string{
 		{"code": "en", "name": "English"},
-		{"code": "es", "name": "Español"},
+		{"code": "es", "name": "Spanish"},
 		{"code": "fr", "name": "Français"},
 		{"code": "de", "name": "Deutsch"},
 		{"code": "it", "name": "Italiano"},

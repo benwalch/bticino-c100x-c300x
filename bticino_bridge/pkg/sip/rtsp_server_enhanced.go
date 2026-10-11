@@ -1,4 +1,4 @@
-// Package sip proporciona funcionalidad RTSP mejorada para streaming de video
+// Package sip provides enhanced RTSP functionality for video streaming
 package sip
 
 import (
@@ -19,7 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// EnhancedRTSPServer es un servidor RTSP mejorado con múltiples streams y grabación
+// EnhancedRTSPServer is an enhanced RTSP server with multiple streams and recording
 type EnhancedRTSPServer struct {
 	port            int
 	listener        *net.TCPListener
@@ -34,17 +34,17 @@ type EnhancedRTSPServer struct {
 	running         bool
 	stopCh          chan struct{}
 	callActive      bool
-	externalCall    bool // callActive marcado por SetCallActive (llamada NATIVA, no nuestra)
+	externalCall    bool // callActive set by SetCallActive (NATIVE call, not ours)
 	activeClients   int
 	recordingPath   string
 	recordingActive bool
 	recorder        *RTSPRecorder
-	streams         map[string]*StreamConfig // Streams configurados
+	streams         map[string]*StreamConfig // Configured streams
 	videoBackend    string                   // "avmedia" | "gstreamer" | "auto"
-	videoActivation bool                     // si false, ensureSIPCallActive NO activa nada (seguridad)
+	videoActivation bool                     // if false, ensureSIPCallActive does NOT activate anything (safety)
 }
 
-// StreamConfig configura un stream RTSP individual
+// StreamConfig configures an individual RTSP stream
 type StreamConfig struct {
 	Name         string // doorbell, doorbell-video, doorbell-recorder
 	Description  string
@@ -53,7 +53,7 @@ type StreamConfig struct {
 	Recordable   bool
 }
 
-// RTSPRecorder maneja la grabación de streams para HKSV
+// RTSPRecorder handles stream recording for HKSV
 type RTSPRecorder struct {
 	server        *EnhancedRTSPServer
 	recordingPath string
@@ -65,7 +65,7 @@ type RTSPRecorder struct {
 	maxDuration   time.Duration
 }
 
-// NewEnhancedRTSPServer crea un servidor RTSP mejorado
+// NewEnhancedRTSPServer creates an enhanced RTSP server
 func NewEnhancedRTSPServer(port int, sipClient *BTicinoSIPClient, eventBus events.EventBus, logger *logrus.Logger) *EnhancedRTSPServer {
 	if logger == nil {
 		logger = logrus.New()
@@ -85,7 +85,7 @@ func NewEnhancedRTSPServer(port int, sipClient *BTicinoSIPClient, eventBus event
 		streams:     make(map[string]*StreamConfig),
 	}
 
-	// Configurar streams por defecto (compatibles con slyoldfox)
+	// Configure default streams (compatible with slyoldfox)
 	server.streams = map[string]*StreamConfig{
 		"/doorbell": {
 			Name:         "doorbell",
@@ -127,7 +127,7 @@ func NewEnhancedRTSPServer(port int, sipClient *BTicinoSIPClient, eventBus event
 	return server
 }
 
-// SetRecordingPath configura el directorio de grabación
+// SetRecordingPath configures the recording directory
 func (r *EnhancedRTSPServer) SetRecordingPath(path string) {
 	r.recordingPath = path
 	if path != "" {
@@ -136,7 +136,7 @@ func (r *EnhancedRTSPServer) SetRecordingPath(path string) {
 	}
 }
 
-// Start inicia el servidor RTSP mejorado
+// Start starts the enhanced RTSP server
 func (r *EnhancedRTSPServer) Start() error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -177,7 +177,7 @@ func (r *EnhancedRTSPServer) Start() error {
 		r.logger.Infof("  - rtsp://<ip>:%d%s (%s)", r.port, path, cfg.Description)
 	}
 
-	// Iniciar recorder si hay path configurado
+	// Start recorder if a path is configured
 	if r.recordingPath != "" {
 		r.recorder = NewRTSPRecorder(r, r.recordingPath)
 	}
@@ -188,7 +188,7 @@ func (r *EnhancedRTSPServer) Start() error {
 	return nil
 }
 
-// Stop detiene el servidor RTSP mejorado
+// Stop stops the enhanced RTSP server
 func (r *EnhancedRTSPServer) Stop() error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -199,7 +199,7 @@ func (r *EnhancedRTSPServer) Stop() error {
 
 	r.logger.Info("Stopping Enhanced RTSP server")
 
-	// Detener grabación activa
+	// Stop active recording
 	if r.recorder != nil && r.recorder.IsActive() {
 		r.recorder.Stop()
 	}
@@ -209,7 +209,7 @@ func (r *EnhancedRTSPServer) Stop() error {
 		r.rtpRelay.Stop()
 	}
 
-	// Terminar llamada SIP si hay clientes activos
+	// End SIP call if there are active clients
 	if r.callActive && r.sipClient != nil {
 		r.logger.Info("Ending active SIP call due to server stop")
 		r.sipClient.Hangup()
@@ -371,7 +371,7 @@ func (r *EnhancedRTSPServer) handleDescribe(request *RTSPRequest) string {
 
 	config, exists := r.streams[streamPath]
 	if !exists {
-		// Si no existe, usar stream por defecto
+		// If it does not exist, use the default stream
 		config = &StreamConfig{
 			Name:         "default",
 			VideoEnabled: true,
@@ -527,8 +527,8 @@ func (r *EnhancedRTSPServer) handleSetup(request *RTSPRequest, clientAddr string
 		"transport":      "udp",
 	}, "rtsp")
 
-	// sipClient puede ser nil (SIP local sin registrar): server_port informativo
-	// con fallback al puerto de vídeo del relay.
+	// sipClient may be nil (local SIP not registered): informational server_port
+	// with fallback to the relay video port.
 	serverPort := DefaultGStreamerConfig().VideoPort
 	if r.sipClient != nil {
 		serverPort = r.sipClient.GetConfig().MediaPorts.VideoRTP
@@ -567,7 +567,7 @@ func (r *EnhancedRTSPServer) handlePlay(request *RTSPRequest, conn net.Conn) str
 		session.State = RTSPPlaying
 		session.LastActivity = time.Now()
 
-		// Iniciar grabación si es stream grabable
+		// Start recording if it is a recordable stream
 		if r.recorder != nil {
 			config, ok := r.streams[session.StreamPath]
 			if ok && config.Recordable && !r.recorder.IsActive() {
@@ -735,7 +735,7 @@ func (r *EnhancedRTSPServer) handleTeardown(request *RTSPRequest) string {
 		"active_clients": r.activeClients,
 	}, "rtsp")
 
-	// Detener grabación si no hay más clientes
+	// Stop recording if there are no more clients
 	if r.activeClients == 0 && r.recorder != nil && r.recorder.IsActive() {
 		r.logger.Info("No more RTSP clients, stopping recorder")
 		go func() {
@@ -750,7 +750,7 @@ func (r *EnhancedRTSPServer) handleTeardown(request *RTSPRequest) string {
 		}()
 	}
 
-	// Terminar llamada SIP y GStreamer pipelines si no hay más clientes
+	// End the SIP call and GStreamer pipelines if there are no more clients
 	if r.activeClients == 0 && r.callActive {
 		r.logger.Info("No more RTSP clients, stopping GStreamer pipelines and ending SIP call")
 		go func() {
@@ -818,7 +818,7 @@ a=maxptime:20
 	return sdp
 }
 
-// parseClientPorts extrae los puertos del cliente del header Transport
+// parseClientPorts extracts the client ports from the Transport header
 func (r *EnhancedRTSPServer) parseClientPorts(transport string) RTSPPortPair {
 	// Handle UDP mode: client_port=xxx-yyy
 	if strings.Contains(transport, "client_port=") {
@@ -924,29 +924,29 @@ func (r *EnhancedRTSPServer) sessionCleanup() {
 	}
 }
 
-// Aserción de compilación: el servidor RTSP satisface CallActiveMarker.
+// Compile-time assertion: the RTSP server satisfies CallActiveMarker.
 var _ CallActiveMarker = (*EnhancedRTSPServer)(nil)
 
-// SetCallActive marca si hay una llamada nativa en curso. Cuando es true,
-// ensureSIPCallActive() OMITE el self-INVITE (la sesión de vídeo ya existe).
-// Lo usa LiveVideoOnCall durante una llamada entrante.
+// SetCallActive marks whether a native call is in progress. When true,
+// ensureSIPCallActive() SKIPS the self-INVITE (the video session already exists).
+// Used by LiveVideoOnCall during an incoming call.
 func (r *EnhancedRTSPServer) SetCallActive(active bool) {
 	r.mutex.Lock()
 	r.callActive = active
 	r.externalCall = active
 	r.mutex.Unlock()
 	if active {
-		r.logger.Info("RTSP: callActive=true (self-INVITE omitido; sesión nativa en curso)")
+		r.logger.Info("RTSP: callActive=true (self-INVITE skipped; native session in progress)")
 	} else {
 		r.logger.Info("RTSP: callActive=false")
 	}
 }
 
-// releaseSelfCallIfIdle cuelga la llamada self-INVITE y limpia callActive si
-// ya no queda ningún cliente RTSP. NUNCA toca una llamada NATIVA marcada por
-// SetCallActive (LiveVideoOnCall): esa no es nuestra y la desarma call.hangup.
-// Tolera sipClient nil (el SIP local puede no haber registrado) — un Hangup
-// sin guard aquí provocó un panic con go2rtc el 2026-08-18.
+// releaseSelfCallIfIdle hangs up the self-INVITE call and clears callActive if
+// no RTSP client remains. It NEVER touches a NATIVE call marked by
+// SetCallActive (LiveVideoOnCall): that one is not ours and call.hangup disarms it.
+// It tolerates a nil sipClient (local SIP may not have registered) — an unguarded
+// Hangup here caused a panic with go2rtc on 2026-08-18.
 func (r *EnhancedRTSPServer) releaseSelfCallIfIdle(reason string) {
 	r.mutex.RLock()
 	idle := r.activeClients == 0 && r.callActive && !r.externalCall
@@ -966,10 +966,10 @@ func (r *EnhancedRTSPServer) releaseSelfCallIfIdle(reason string) {
 }
 
 func (r *EnhancedRTSPServer) ensureSIPCallActive() error {
-	// Si ya hay una llamada nativa en curso (marcada por LiveVideoOnCall), NO
-	// hace falta self-INVITE: la sesión de vídeo ya existe. Se comprueba ANTES
-	// del gate videoActivation para no bloquear el flujo ni ensuciar logs cuando
-	// go2rtc conecta durante una llamada.
+	// If a native call is already in progress (marked by LiveVideoOnCall), NO
+	// self-INVITE is needed: the video session already exists. This is checked BEFORE
+	// the videoActivation gate so as not to block the flow or pollute logs when
+	// go2rtc connects during a call.
 	r.mutex.Lock()
 	if r.callActive {
 		r.mutex.Unlock()
@@ -978,14 +978,14 @@ func (r *EnhancedRTSPServer) ensureSIPCallActive() error {
 	}
 	r.mutex.Unlock()
 
-	// SEGURIDAD: si la activación de vídeo bajo demanda está desactivada,
-	// no disparamos NADA hacia el dispositivo nativo (ni self-INVITE ni *7*300).
+	// SAFETY: if on-demand video activation is disabled,
+	// we fire NOTHING at the native device (neither self-INVITE nor *7*300).
 	if !r.videoActivation {
 		r.logger.Warn("Video on-demand disabled: ignoring RTSP/snapshot activation request")
 		return fmt.Errorf("video on-demand activation is disabled")
 	}
 
-	// Sin cliente SIP (el REGISTER local puede fallar) no hay self-INVITE posible.
+	// Without a SIP client (the local REGISTER may fail) no self-INVITE is possible.
 	if r.sipClient == nil {
 		return fmt.Errorf("SIP client not available (not registered)")
 	}
@@ -1036,9 +1036,9 @@ func (r *EnhancedRTSPServer) SetVideoBackend(backend string) {
 	r.logger.Infof("Video backend set to: %s", backend)
 }
 
-// SetVideoActivation habilita/deshabilita la activación de vídeo bajo demanda.
-// Con false (por defecto), ensureSIPCallActive rechaza cualquier intento, de
-// modo que ni un cliente RTSP ni un snapshot pueden disparar comandos al nativo.
+// SetVideoActivation enables/disables on-demand video activation.
+// With false (the default), ensureSIPCallActive rejects any attempt, so
+// that neither an RTSP client nor a snapshot can fire commands at the native side.
 func (r *EnhancedRTSPServer) SetVideoActivation(enabled bool) {
 	r.videoActivation = enabled
 	if enabled {
@@ -1078,36 +1078,36 @@ func (r *EnhancedRTSPServer) activateMediaStreamsWhenConnected() {
 
 	switch backend {
 	case "gstreamer":
-		// Solo GStreamer directo (compite con la cámara nativa)
+		// Direct GStreamer only (competes with the native camera)
 		if r.startGStreamer(localIP, videoPort, audioPort) {
 			return
 		}
 		r.logger.Warn("=== GStreamer backend failed and no fallback configured (video_backend=gstreamer) ===")
 
 	case "avmedia":
-		// Solo *7*300: pedir a bt_av_media que duplique su RTP (cooperativo)
+		// *7*300 only: ask bt_av_media to duplicate its RTP (cooperative)
 		if r.ownClient != nil {
 			r.activateVia7300(localIP, videoPort, audioPort)
 		} else {
-			r.logger.Error("=== video_backend=avmedia pero no hay cliente OpenWebNet; sin vídeo ===")
+			r.logger.Error("=== video_backend=avmedia but no OpenWebNet client; no video ===")
 		}
 
-	default: // "auto": avmedia primero, GStreamer como respaldo
+	default: // "auto": avmedia first, GStreamer as fallback
 		activated := false
 		if r.ownClient != nil {
-			r.logger.Info("=== auto: intentando backend avmedia (*7*300) primero ===")
+			r.logger.Info("=== auto: trying avmedia backend (*7*300) first ===")
 			r.activateVia7300(localIP, videoPort, audioPort)
-			// Confirmar por flujo RTP real antes de dar por buena la activación
+			// Confirm via real RTP flow before accepting the activation as good
 			activated = r.waitVideoFlow(6 * time.Second)
 		}
 		if !activated {
-			r.logger.Info("=== auto: avmedia sin flujo RTP, cayendo a GStreamer directo ===")
+			r.logger.Info("=== auto: avmedia with no RTP flow, falling back to direct GStreamer ===")
 			r.startGStreamer(localIP, videoPort, audioPort)
 		}
 	}
 }
 
-// startGStreamer lanza el pipeline GStreamer directo. Devuelve true si arrancó.
+// startGStreamer launches the direct GStreamer pipeline. Returns true if it started.
 func (r *EnhancedRTSPServer) startGStreamer(localIP string, videoPort, audioPort int) bool {
 	cfg := DefaultGStreamerConfig()
 	cfg.TargetIP = localIP
@@ -1132,7 +1132,7 @@ func (r *EnhancedRTSPServer) startGStreamer(localIP string, videoPort, audioPort
 	return true
 }
 
-// waitVideoFlow espera hasta timeout a que el relay de vídeo reciba paquetes.
+// waitVideoFlow waits up to timeout for the video relay to receive packets.
 func (r *EnhancedRTSPServer) waitVideoFlow(timeout time.Duration) bool {
 	if r.rtpRelay == nil || r.rtpRelay.Video == nil {
 		return false
@@ -1180,7 +1180,7 @@ func (r *EnhancedRTSPServer) activateVia7300(localIP string, videoPort, audioPor
 	}, "openwebnet")
 }
 
-// GetActiveSessions devuelve las sesiones activas
+// GetActiveSessions returns the active sessions
 func (r *EnhancedRTSPServer) GetActiveSessions() map[string]*RTSPSession {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
@@ -1194,7 +1194,7 @@ func (r *EnhancedRTSPServer) GetActiveSessions() map[string]*RTSPSession {
 	return sessions
 }
 
-// GetStats devuelve estadísticas del servidor
+// GetStats returns server statistics
 func (r *EnhancedRTSPServer) GetStats() map[string]interface{} {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
@@ -1233,16 +1233,16 @@ func (r *EnhancedRTSPServer) GetStats() map[string]interface{} {
 	return stats
 }
 
-// NewRTSPRecorder crea un grabador RTSP
+// NewRTSPRecorder creates an RTSP recorder
 func NewRTSPRecorder(server *EnhancedRTSPServer, recordingPath string) *RTSPRecorder {
 	return &RTSPRecorder{
 		server:        server,
 		recordingPath: recordingPath,
-		maxDuration:   30 * time.Second, // Duración máxima por defecto
+		maxDuration:   30 * time.Second, // Default max duration
 	}
 }
 
-// Start inicia la grabación
+// Start starts recording
 func (r *RTSPRecorder) Start(sessionID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -1255,7 +1255,7 @@ func (r *RTSPRecorder) Start(sessionID string) error {
 		return fmt.Errorf("recording path not configured")
 	}
 
-	// Crear archivo de grabación
+	// Create recording file
 	timestamp := time.Now().Format("20060102_150405")
 	filename := filepath.Join(r.recordingPath, fmt.Sprintf("recording_%s_%s.ts", timestamp, sessionID))
 
@@ -1276,7 +1276,7 @@ func (r *RTSPRecorder) Start(sessionID string) error {
 		"start_time": r.startTime,
 	}, "rtsp")
 
-	// Programar parada automática
+	// Schedule automatic stop
 	go func() {
 		time.Sleep(r.maxDuration)
 		r.Stop()
@@ -1285,7 +1285,7 @@ func (r *RTSPRecorder) Start(sessionID string) error {
 	return nil
 }
 
-// Stop detiene la grabación
+// Stop stops recording
 func (r *RTSPRecorder) Stop() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -1311,14 +1311,14 @@ func (r *RTSPRecorder) Stop() error {
 	return nil
 }
 
-// IsActive devuelve si el grabador está activo
+// IsActive returns whether the recorder is active
 func (r *RTSPRecorder) IsActive() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.active
 }
 
-// GetStats devuelve estadísticas de grabación
+// GetStats returns recording statistics
 func (r *RTSPRecorder) GetStats() map[string]interface{} {
 	r.mu.Lock()
 	defer r.mu.Unlock()

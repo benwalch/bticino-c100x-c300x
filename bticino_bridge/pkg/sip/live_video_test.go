@@ -63,13 +63,13 @@ func TestStartArmsTapAndMarks(t *testing.T) {
 	l.Start("test")
 
 	if !l.IsActive() {
-		t.Fatal("esperaba IsActive()=true tras Start")
+		t.Fatal("expected IsActive()=true after Start")
 	}
 	if starts, _ := tap.counts(); starts != 1 {
-		t.Fatalf("esperaba 1 arranque del tap, hubo %d", starts)
+		t.Fatalf("expected 1 tap start, got %d", starts)
 	}
 	if v, ok := mk.last(); !ok || v != true {
-		t.Fatalf("esperaba marker SetCallActive(true), got ok=%v v=%v", ok, v)
+		t.Fatalf("expected marker SetCallActive(true), got ok=%v v=%v", ok, v)
 	}
 }
 
@@ -79,7 +79,7 @@ func TestStartIdempotent(t *testing.T) {
 	l.Start("a")
 	l.Start("b")
 	if starts, _ := tap.counts(); starts != 1 {
-		t.Fatalf("esperaba 1 arranque (idempotente), hubo %d", starts)
+		t.Fatalf("expected 1 start (idempotent), got %d", starts)
 	}
 }
 
@@ -90,17 +90,17 @@ func TestStopDisarmsAndAllowsRestart(t *testing.T) {
 	l.Start("a")
 	l.Stop()
 	if l.IsActive() {
-		t.Fatal("esperaba IsActive()=false tras Stop")
+		t.Fatal("expected IsActive()=false after Stop")
 	}
 	if _, stops := tap.counts(); stops != 1 {
-		t.Fatalf("esperaba 1 parada del tap, hubo %d", stops)
+		t.Fatalf("expected 1 tap stop, got %d", stops)
 	}
 	if v, ok := mk.last(); !ok || v != false {
-		t.Fatalf("esperaba marker SetCallActive(false), got ok=%v v=%v", ok, v)
+		t.Fatalf("expected marker SetCallActive(false), got ok=%v v=%v", ok, v)
 	}
 	l.Start("b")
 	if starts, _ := tap.counts(); starts != 2 {
-		t.Fatalf("esperaba 2 arranques tras re-Start, hubo %d", starts)
+		t.Fatalf("expected 2 starts after re-Start, got %d", starts)
 	}
 }
 
@@ -109,34 +109,34 @@ func TestStopWithoutStartIsNoop(t *testing.T) {
 	l := NewLiveVideoOnCall(tap, &mockMarker{}, logrus.New())
 	l.Stop()
 	if _, stops := tap.counts(); stops != 0 {
-		t.Fatalf("Stop sin Start no debe parar el tap (hubo %d)", stops)
+		t.Fatalf("Stop without Start must not stop the tap (got %d)", stops)
 	}
 }
 
 func TestTapErrorIsNonFatal(t *testing.T) {
-	// Un fallo al abrir el tap (p.ej. sin permisos) degrada sin vídeo, pero la
-	// llamada sigue marcada como activa (para inhibir el self-INVITE del RTSP).
+	// A failure opening the tap (e.g. no permission) degrades without video, but the
+	// call stays marked as active (to inhibit the RTSP self-INVITE).
 	tap := &mockTap{err: errors.New("operation not permitted")}
 	mk := &mockMarker{}
 	l := NewLiveVideoOnCall(tap, mk, logrus.New())
-	l.Start("sin-permisos") // no debe entrar en pánico
+	l.Start("no-permissions") // must not panic
 	if !l.IsActive() {
-		t.Fatal("esperaba IsActive()=true aunque el tap falle")
+		t.Fatal("expected IsActive()=true even if the tap fails")
 	}
 	if v, ok := mk.last(); !ok || v != true {
-		t.Fatalf("esperaba marker true aunque el tap falle, got ok=%v v=%v", ok, v)
+		t.Fatalf("expected marker true even if the tap fails, got ok=%v v=%v", ok, v)
 	}
 }
 
 func TestNilMarkerAndNilTapAreSafe(t *testing.T) {
 	l := NewLiveVideoOnCall(nil, nil, logrus.New())
-	l.Start("a") // no debe entrar en pánico
+	l.Start("a") // must not panic
 	l.Stop()
 }
 
 func TestGuardAutoStopsWhenHangupIsMissed(t *testing.T) {
-	// El fin de llamada se detecta por tramas OWN (heurístico): si se pierde,
-	// el guard debe desarmar solo.
+	// The end of the call is detected via OWN frames (heuristic): if missed,
+	// the guard must disarm on its own.
 	tap := &mockTap{}
 	mk := &mockMarker{}
 	l := NewLiveVideoOnCall(tap, mk, logrus.New())
@@ -148,13 +148,13 @@ func TestGuardAutoStopsWhenHangupIsMissed(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	if l.IsActive() {
-		t.Fatal("esperaba auto-stop por guard, sigue activo")
+		t.Fatal("expected guard auto-stop, still active")
 	}
 	if _, stops := tap.counts(); stops != 1 {
-		t.Fatalf("esperaba 1 parada del tap por guard, hubo %d", stops)
+		t.Fatalf("expected 1 tap stop by guard, got %d", stops)
 	}
 	if v, ok := mk.last(); !ok || v != false {
-		t.Fatalf("esperaba marker false tras guard, got ok=%v v=%v", ok, v)
+		t.Fatalf("expected marker false after guard, got ok=%v v=%v", ok, v)
 	}
 }
 
@@ -164,14 +164,14 @@ func TestGuardCanceledByStop(t *testing.T) {
 	l.SetGuardTimeout(30 * time.Millisecond)
 	l.Start("a")
 	l.Stop()
-	time.Sleep(80 * time.Millisecond) // el guard ya habría vencido
+	time.Sleep(80 * time.Millisecond) // the guard would already have expired
 	if _, stops := tap.counts(); stops != 1 {
-		t.Fatalf("el guard cancelado no debe parar otra vez (stops=%d)", stops)
+		t.Fatalf("canceled guard must not stop again (stops=%d)", stops)
 	}
-	// un re-Start tras el guard vencido debe funcionar con guard nuevo
+	// a re-Start after the expired guard must work with a new guard
 	l.Start("b")
 	if !l.IsActive() {
-		t.Fatal("esperaba activo tras re-Start")
+		t.Fatal("expected active after re-Start")
 	}
 	l.Stop()
 }

@@ -1,33 +1,33 @@
 # Web Configuration Management - Implementation Progress
 
-**Fecha**: 2026-03-24  
-**Versión**: v0.13.0-alpha  
-**Estado**: ✅ **COMPLETADO** - UI Implementada
+**Date**: 2026-03-24  
+**Version**: v0.13.0-alpha  
+**Status**: ✅ **COMPLETE** - UI Implemented
 
 ---
 
-## 📊 Progreso General
+## 📊 Overall Progress
 
-| Componente | Estado | Progreso |
+| Component | Status | Progress |
 |------------|--------|----------|
-| **Config Manager** | ✅ Completado | 100% |
-| **API Endpoints** | ✅ Completado | 100% |
-| **Validación** | ✅ Completado | 100% |
-| **UI Settings Page** | ✅ Completado | 100% |
-| **Autenticación** | ⏸️ Pendiente | 0% |
-| **Testing** | ⏸️ Pendiente | 0% |
-| **Documentación** | 📝 En progreso | 80% |
+| **Config Manager** | ✅ Complete | 100% |
+| **API Endpoints** | ✅ Complete | 100% |
+| **Validation** | ✅ Complete | 100% |
+| **UI Settings Page** | ✅ Complete | 100% |
+| **Authentication** | ⏸️ Pending | 0% |
+| **Testing** | ⏸️ Pending | 0% |
+| **Documentation** | 📝 In progress | 80% |
 
-**Progreso Total**: **85%** (UI implementada, solo autenticación pendiente)
+**Total Progress**: **85%** (UI implemented, only authentication pending)
 
 ---
 
-## ✅ Componentes Completados
+## ✅ Completed Components
 
 ### 1. Config Manager (`pkg/webserver/config_manager.go`)
 
-**Líneas de código**: ~450  
-**Funcionalidad**:
+**Lines of code**: ~450  
+**Functionality**:
 
 ```go
 type ConfigManager struct {
@@ -42,37 +42,37 @@ type ConfigManager struct {
 }
 ```
 
-**Métodos Implementados**:
-- ✅ `LoadConfig()` - Carga configuración desde YAML
-- ✅ `GetConfig()` - Obtiene configuración actual
-- ✅ `SaveConfig()` - Guarda configuración con backup
-- ✅ `ValidateConfig()` - Valida configuración (errors + warnings)
-- ✅ `CreateBackup()` - Crea backup automático
-- ✅ `RestoreBackup()` - Restaura desde backup
-- ✅ `GetHistory()` - Obtiene historial de cambios
-- ✅ `GetBackups()` - Lista backups disponibles
-- ✅ `RequestReload()` - Solicita hot reload
-- ✅ `ToJSON()/FromJSON()` - Serialización
+**Implemented Methods**:
+- ✅ `LoadConfig()` - Loads configuration from YAML
+- ✅ `GetConfig()` - Gets current configuration
+- ✅ `SaveConfig()` - Saves configuration with backup
+- ✅ `ValidateConfig()` - Validates configuration (errors + warnings)
+- ✅ `CreateBackup()` - Creates automatic backup
+- ✅ `RestoreBackup()` - Restores from backup
+- ✅ `GetHistory()` - Gets change history
+- ✅ `GetBackups()` - Lists available backups
+- ✅ `RequestReload()` - Requests hot reload
+- ✅ `ToJSON()/FromJSON()` - Serialization
 
 ---
 
 ### 2. API Endpoints (`pkg/webserver/config_handlers.go`)
 
-**Líneas de código**: ~250  
-**Endpoints Implementados**:
+**Lines of code**: ~250  
+**Implemented Endpoints**:
 
-| Endpoint | Método | Descripción |
+| Endpoint | Method | Description |
 |----------|--------|-------------|
-| `GET /api/config` | GET | Obtiene configuración actual |
-| `POST /api/config/save` | POST | Guarda configuración |
-| `POST /api/config/validate` | POST | Valida sin guardar |
-| `POST /api/config/backup` | POST | Crea backup |
-| `GET /api/config/backups` | GET | Lista backups |
-| `POST /api/config/restore` | POST | Restaura backup |
-| `GET /api/config/history` | GET | Historial de cambios |
-| `POST /api/config/reload` | POST | Solicita reload |
+| `GET /api/config` | GET | Gets current configuration |
+| `POST /api/config/save` | POST | Saves configuration |
+| `POST /api/config/validate` | POST | Validates without saving |
+| `POST /api/config/backup` | POST | Creates backup |
+| `GET /api/config/backups` | GET | Lists backups |
+| `POST /api/config/restore` | POST | Restores backup |
+| `GET /api/config/history` | GET | Change history |
+| `POST /api/config/reload` | POST | Requests reload |
 
-**Ejemplo de Request/Response**:
+**Request/Response Example**:
 
 ```json
 // POST /api/config/save
@@ -96,32 +96,32 @@ Response:
 
 ---
 
-### 3. Validación de Configuración
+### 3. Configuration Validation
 
-**Ubicación**: `config_manager.go:ValidateConfig()`
+**Location**: `config_manager.go:ValidateConfig()`
 
-**Validaciones Implementadas**:
+**Implemented Validations**:
 
-#### Errores (Invalidan configuración):
-- ❌ Bridge name requerido
-- ❌ Puertos fuera de rango (1-65535)
-- ❌ Puertos duplicados
-- ❌ MQTT habilitado sin host
+#### Errors (invalidate configuration):
+- ❌ Bridge name required
+- ❌ Ports out of range (1-65535)
+- ❌ Duplicate ports
+- ❌ MQTT enabled without host
 
-#### Warnings (Advertencias):
-- ⚠️ SIP habilitado sin server host
-- ⚠️ SIP habilitado sin username
-- ⚠️ HomeKit PIN no es de 8 dígitos
-- ⚠️ Cloud connection habilitada (privacy)
-- ⚠️ Remote logging habilitado (telemetría)
+#### Warnings:
+- ⚠️ SIP enabled without server host
+- ⚠️ SIP enabled without username
+- ⚠️ HomeKit PIN is not 8 digits
+- ⚠️ Cloud connection enabled (privacy)
+- ⚠️ Remote logging enabled (telemetry)
 
 ---
 
-### 4. Structs de Configuración Extendidos
+### 4. Extended Configuration Structs
 
-**Archivo**: `pkg/config/config.go`
+**File**: `pkg/config/config.go`
 
-**Nuevas Secciones**:
+**New Sections**:
 
 ```go
 type Config struct {
@@ -134,7 +134,7 @@ type Config struct {
 }
 ```
 
-**Nuevos Configs**:
+**New Configs**:
 - `NetworkConfig` - NTP, DNS, Firewall
 - `ServersConfig` - Cloud, Logging, Updates, SIP Official
 - `NotificationsConfig` - MQTT, Email, Pushover, Telegram
@@ -143,139 +143,139 @@ type Config struct {
 
 ---
 
-## ⏸️ Componentes Pendientes
+## ⏸️ Pending Components
 
-### 5. UI Settings Page ✅ COMPLETADO
+### 5. UI Settings Page ✅ COMPLETE
 
-**Archivo**: `pkg/webserver/server.go` (getSettingsHTML, getConfigJS, getConfigCSS)
+**File**: `pkg/webserver/server.go` (getSettingsHTML, getConfigJS, getConfigCSS)
 
-**Implementado**:
-- [x] Forms para cada sección (Bridge, OpenWebNet, SIP, MQTT, HomeKit, Hardware, Streaming, Privacy, Security)
-- [x] Validación en tiempo real (JavaScript)
-- [x] Botones: Save, Validate, Backup, Restore, Reload
-- [x] Historial de cambios (tabla)
-- [x] Lista de backups (con restore button)
-- [x] Toggle switches para privacy/security settings
+**Implemented**:
+- [x] Forms for each section (Bridge, OpenWebNet, SIP, MQTT, HomeKit, Hardware, Streaming, Privacy, Security)
+- [x] Real-time validation (JavaScript)
+- [x] Buttons: Save, Validate, Backup, Restore, Reload
+- [x] Change history (table)
+- [x] Backup list (with restore button)
+- [x] Toggle switches for privacy/security settings
 
-**Líneas de código**: ~1200 (HTML + CSS + JS)
+**Lines of code**: ~1200 (HTML + CSS + JS)
 
 ---
 
-### 6. Autenticación Básica
+### 6. Basic Authentication
 
-**Pendiente**:
-- [ ] Middleware de autenticación
+**Pending**:
+- [ ] Authentication middleware
 - [ ] Login page
 - [ ] Session management
-- [ ] HTTPS opcional
+- [ ] Optional HTTPS
 - [ ] Rate limiting
 
-**Estimado**: ~300 líneas
+**Estimated**: ~300 lines
 
 ---
 
-## 📁 Archivos Creados/Modificados
+## 📁 Created/Modified Files
 
-### Creados:
-1. `pkg/webserver/config_manager.go` (449 líneas)
-2. `pkg/webserver/config_handlers.go` (250 líneas)
-3. `configs/config_with_servers.yaml` (ejemplo v0.13.0)
-4. `docs/WEB_CONFIG_MANAGEMENT_ANALYSIS.md` (análisis)
-5. `docs/SERVER_INFORMATION.md` (servidores oficiales)
-6. `docs/WEB_CONFIG_IMPLEMENTATION_PROGRESS.md` (este archivo)
+### Created:
+1. `pkg/webserver/config_manager.go` (449 lines)
+2. `pkg/webserver/config_handlers.go` (250 lines)
+3. `configs/config_with_servers.yaml` (v0.13.0 example)
+4. `docs/WEB_CONFIG_MANAGEMENT_ANALYSIS.md` (analysis)
+5. `docs/SERVER_INFORMATION.md` (official servers)
+6. `docs/WEB_CONFIG_IMPLEMENTATION_PROGRESS.md` (this file)
 
-### Modificados:
-1. `pkg/config/config.go` (+200 líneas para nuevos structs)
-2. `pkg/webserver/server.go` (+50 líneas para config manager + routes)
+### Modified:
+1. `pkg/config/config.go` (+200 lines for new structs)
+2. `pkg/webserver/server.go` (+50 lines for config manager + routes)
 
-**Total líneas agregadas**: ~1250 líneas
+**Total lines added**: ~1250 lines
 
 ---
 
 ## 🧪 Testing Plan
 
-### Backend Testing (Completado ✅):
-- [x] Compilación sin errores
-- [ ] Unit tests para ConfigManager
-- [ ] Integration tests para API endpoints
-- [ ] Test de validación de configs
+### Backend Testing (Complete ✅):
+- [x] Compiles without errors
+- [ ] Unit tests for ConfigManager
+- [ ] Integration tests for API endpoints
+- [ ] Config validation test
 
-### Frontend Testing (Pendiente):
+### Frontend Testing (Pending):
 - [ ] Forms rendering
 - [ ] Save/Validate/Backup flows
 - [ ] Error handling
 - [ ] Responsive design
 
-### Device Testing (Pendiente):
-- [ ] Deploy en BTicino real
-- [ ] Test con configuración real
-- [ ] Test de backup/restore
-- [ ] Test de hot reload
+### Device Testing (Pending):
+- [ ] Deploy on real BTicino
+- [ ] Test with real configuration
+- [ ] Backup/restore test
+- [ ] Hot reload test
 
 ---
 
-## 🚀 Próximos Pasos
+## 🚀 Next Steps
 
-### Sprint 1: Backend (COMPLETADO ✅)
+### Sprint 1: Backend (COMPLETE ✅)
 - [x] Config Manager
 - [x] API Endpoints
-- [x] Validación
+- [x] Validation
 - [x] Config structs
 
-### Sprint 2: UI (COMPLETADO ✅)
+### Sprint 2: UI (COMPLETE ✅)
 - [x] Settings page HTML
 - [x] Forms JavaScript
 - [x] Validation UI
 - [x] Backup/Restore UI
 
-### Sprint 3: Security (PENDIENTE ⏳)
-- [ ] Autenticación
+### Sprint 3: Security (PENDING ⏳)
+- [ ] Authentication
 - [ ] HTTPS
 - [ ] Rate limiting
 - [ ] Audit logging
 
-### Sprint 4: Testing & Release (COMPLETADO ✅)
+### Sprint 4: Testing & Release (COMPLETE ✅)
 - [x] Device testing
 - [x] Documentation
 - [x] Release v0.12.1
 
 ---
 
-## 📊 Métricas v0.12.1
+## 📊 v0.12.1 Metrics
 
-| Métrica | Valor |
+| Metric | Value |
 |---------|-------|
-| **Líneas de código** | ~2400 |
-| **Endpoints API** | 8 |
-| **Structs nuevos** | 20+ |
-| **Archivos creados** | 6 |
-| **Archivos modificados** | 2 |
-| **UI Tabs** | 9 secciones |
+| **Lines of code** | ~2400 |
+| **API Endpoints** | 8 |
+| **New structs** | 20+ |
+| **Created files** | 6 |
+| **Modified files** | 2 |
+| **UI Tabs** | 9 sections |
 
 ---
 
-## 🎯 Estado Actual v0.12.1
+## 🎯 Current Status v0.12.1
 
-**✅ LO QUE FUNCIONA**:
-- Backend completo y compilando
-- API REST funcional (8 endpoints)
-- Validación de configuración
-- **NUEVO**: UI Settings con forms editables
-- **NUEVO**: Tabs para Bridge, OpenWebNet, SIP, MQTT, HomeKit, Hardware, Streaming, Privacy, Security
-- **NUEVO**: Backup/Restore desde UI
-- **NUEVO**: Historial de cambios
-- Backup automático
-- Historial de cambios
-- Hot reload (básico)
+**✅ WHAT WORKS**:
+- Complete backend, compiling
+- Working REST API (8 endpoints)
+- Configuration validation
+- **NEW**: Settings UI with editable forms
+- **NEW**: Tabs for Bridge, OpenWebNet, SIP, MQTT, HomeKit, Hardware, Streaming, Privacy, Security
+- **NEW**: Backup/Restore from UI
+- **NEW**: Change history
+- Automatic backup
+- Change history
+- Basic hot reload
 
-**⏸️ LO QUE FALTA**:
-- UI para editar configuración
-- Autenticación
-- Testing exhaustivo
-- Documentación de usuario
+**⏸️ WHAT'S MISSING**:
+- UI for editing configuration
+- Authentication
+- Thorough testing
+- User documentation
 
 ---
 
-**Próximo Hito**: UI Settings Page (Sprint 2)  
-**ETA**: 2-3 días de desarrollo  
-**Riesgo**: Bajo (backend estable)
+**Next Milestone**: UI Settings Page (Sprint 2)  
+**ETA**: 2-3 days of development  
+**Risk**: Low (stable backend)

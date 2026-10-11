@@ -49,7 +49,7 @@
   
   async function deleteMemo(memo, event) {
     event.stopPropagation()
-    if (!confirm(`¿Eliminar esta nota de ${memo.type}?`)) {
+    if (!confirm(`Delete this ${memo.type} memo?`)) {
       return
     }
     try {
@@ -93,7 +93,7 @@
 
 <div class="memos-page">
   <div class="container">
-    <h2>📝 Notas (Notes)</h2>
+    <h2>📝 Notes</h2>
     
     <div class="filters">
       <button class="filter-btn" class:active={filter === 'all'} on:click={() => filter = 'all'}>
@@ -141,26 +141,26 @@
 <div class="modal" on:click={closeModal}>
   <div class="modal-content" on:click|stopPropagation>
     <div class="modal-header">
-      <h2>{getTypeIcon(selectedMemo.type)} {selectedMemo.type === 'voice' ? 'Nota de voz' : 'Nota de texto'} #{selectedMemo.id}</h2>
+      <h2>{getTypeIcon(selectedMemo.type)} {selectedMemo.type === 'voice' ? 'Voice memo' : 'Text memo'} #{selectedMemo.id}</h2>
       <button class="close-btn" on:click={closeModal}>×</button>
     </div>
     
     <div class="modal-body">
       <div class="detail-row">
-        <strong>Estado:</strong>
-        <span class:unread={!selectedMemo.read}>{selectedMemo.read ? 'Leído' : 'No leído'}</span>
+        <strong>Status:</strong>
+        <span class:unread={!selectedMemo.read}>{selectedMemo.read ? 'Read' : 'Unread'}</span>
         <button class="toggle-read-btn" on:click={(e) => toggleRead(selectedMemo, e)}>
-          {selectedMemo.read ? 'Marcar como no leído' : 'Marcar como leído'}
+          {selectedMemo.read ? 'Mark as unread' : 'Mark as read'}
         </button>
       </div>
       <div class="detail-row">
-        <strong>Fecha:</strong>
+        <strong>Date:</strong>
         <span>{formatDate(selectedMemo.timestamp)}</span>
       </div>
       
       {#if selectedMemo.type === 'text' && selectedMemo.content}
         <div class="text-content">
-          <h3>Contenido:</h3>
+          <h3>Content:</h3>
           <p>{selectedMemo.content}</p>
         </div>
       {/if}
@@ -169,14 +169,14 @@
         <div class="audio-section">
           <h3>Audio:</h3>
           <audio controls src="/api/memos/audio/{selectedMemo.id}">
-            Tu navegador no soporta audio
+            Your browser does not support audio
           </audio>
         </div>
       {/if}
       
       <div class="actions-row">
         <button class="delete-btn" on:click={(e) => deleteMemo(selectedMemo, e)}>
-          🗑️ Eliminar nota
+          🗑️ Delete memo
         </button>
       </div>
     </div>

@@ -1,116 +1,116 @@
 # BTicino Bridge - Deploy Scripts Guide
 
-> ⚠️ **SUPERSEDED (histórico, v0.14.2).** Esta guía recomienda `deploy_auto.sh`,
-> que **ya no es el método vigente**. El despliegue actual es `deploy-standard.sh`
-> (raíz del repo) / `make deploy`, con `start-bridge.sh` gestionando el servicio
-> (y arrancando go2rtc). Referencia autoritativa: **[DEPLOY.md](DEPLOY.md)**.
+> ⚠️ **SUPERSEDED (historical, v0.14.2).** This guide recommends `deploy_auto.sh`,
+> which is **no longer the current method**. The current deployment is
+> `deploy-standard.sh` (repo root) / `make deploy`, with `start-bridge.sh` managing
+> the service (and starting go2rtc). Authoritative reference: **[DEPLOY.md](DEPLOY.md)**.
 
-**Fecha**: 2026-03-27  
-**Versión**: v0.14.2  
-**Estado**: 🗄️ **HISTÓRICO / SUPERSEDED**
+**Date**: 2026-03-27  
+**Version**: v0.14.2  
+**Status**: 🗄️ **HISTORICAL / SUPERSEDED**
 
 ---
 
-## 📁 Scripts de Deploy Disponibles
+## 📁 Available Deploy Scripts
 
-| Script | Propósito | Cuándo Usar |
+| Script | Purpose | When to Use |
 |--------|-----------|-------------|
-| `deploy_auto.sh` | Deploy automático completo | ✅ **USAR ESTE** (recomendado) |
-| `deploy_to_bticino.sh` | Deploy manual paso a paso | Debug o problemas |
-| `deploy_and_test_safe.sh` | Deploy + tests seguros | Producción |
-| `deploy_v0.14.0.sh` | Deploy versión específica | Versiones específicas |
+| `deploy_auto.sh` | Full automatic deploy | ✅ **USE THIS** (recommended) |
+| `deploy_to_bticino.sh` | Step-by-step manual deploy | Debug or issues |
+| `deploy_and_test_safe.sh` | Deploy + safe tests | Production |
+| `deploy_v0.14.0.sh` | Specific-version deploy | Specific versions |
 
 ---
 
-## ✅ **Script Recomendado: `deploy_auto.sh`**
+## ✅ **Recommended Script: `deploy_auto.sh`**
 
-### **Uso**:
+### **Usage**:
 ```bash
 cd bticino_bridge
 ./scripts/deploy_auto.sh
 ```
 
-### **Qué hace**:
-1. ✅ Test SSH
+### **What it does**:
+1. ✅ SSH test
 2. ✅ Remount filesystem RW
-3. ✅ Crear directorios
-4. ✅ Backup de instalación anterior
-5. ✅ Transferir binario (base64 chunks)
-6. ✅ Ensamblar y decodificar
-7. ✅ Activar binario
-8. ✅ Test de versión
+3. ✅ Create directories
+4. ✅ Back up previous installation
+5. ✅ Transfer binary (base64 chunks)
+6. ✅ Assemble and decode
+7. ✅ Activate binary
+8. ✅ Version test
 
-### **Ventajas**:
-- ✅ Automatizado (8 pasos)
-- ✅ Maneja errores
-- ✅ Crea backups
-- ✅ Verifica SSH
-- ✅ Transfiere en chunks (evita timeouts)
+### **Advantages**:
+- ✅ Automated (8 steps)
+- ✅ Handles errors
+- ✅ Creates backups
+- ✅ Verifies SSH
+- ✅ Transfers in chunks (avoids timeouts)
 
 ---
 
-## 🚀 **Flujo de Deploy Correcto**
+## 🚀 **Correct Deploy Flow**
 
-### **1. Compilar**:
+### **1. Compile**:
 ```bash
 cd bticino_bridge
 GOOS=linux GOARCH=arm GOARM=7 go build -o bticino_bridge ./cmd/main.go
 ```
 
-### **2. Deploy (USANDO SCRIPT)**:
+### **2. Deploy (USING THE SCRIPT)**:
 ```bash
 ./scripts/deploy_auto.sh
 ```
 
-### **3. Iniciar Servicio**:
+### **3. Start Service**:
 ```bash
 ssh bticino "cd /home/bticino/cfg/extra && ./bticino_bridge -config config.yaml &"
 ```
 
-### **4. Verificar**:
+### **4. Verify**:
 ```bash
-# Desde tu máquina
+# From your machine
 curl http://192.168.1.38:8082/api/status
 ```
 
 ---
 
-## ⚠️ **Errores Comunes (QUE NO HACER)**
+## ⚠️ **Common Mistakes (DO NOT DO THIS)**
 
-### ❌ **NO hacer deploy manual con comandos sueltos**:
+### ❌ **Do NOT deploy manually with loose commands**:
 ```bash
 # MALO - No hacer esto:
 ssh bticino "base64 -d > bticino_bridge" < binario.base64
 ```
 
-### ✅ **SÍ usar el script**:
+### ✅ **DO use the script**:
 ```bash
-# BUENO - Usar script:
+# GOOD - Use script:
 ./scripts/deploy_auto.sh
 ```
 
 ---
 
-## 📝 **Por qué usé mal el deploy antes**
+## 📝 **Why I deployed wrong before**
 
-**Error cometido**:
-- Hice deploy manual con comandos `ssh` + `base64` sueltos
-- No usé `deploy_auto.sh` que ya existía
-- Transferencia insegura (puede corromper binario)
+**Mistake made**:
+- I deployed manually with loose `ssh` + `base64` commands
+- I didn't use `deploy_auto.sh`, which already existed
+- Unsafe transfer (can corrupt the binary)
 
-**Corrección**:
-- ✅ Ahora uso `./scripts/deploy_auto.sh`
-- ✅ Transferencia en chunks
-- ✅ Backup automático
-- ✅ Verificación de SSH
+**Fix**:
+- ✅ Now I use `./scripts/deploy_auto.sh`
+- ✅ Chunked transfer
+- ✅ Automatic backup
+- ✅ SSH verification
 
 ---
 
-## 🔧 **Scripts Adicionales**
+## 🔧 **Additional Scripts**
 
-### **Control del Servicio**:
+### **Service Control**:
 ```bash
-# Iniciar/detener/ver estado
+# Start/stop/check status
 ./scripts/bticino_bridge_control.sh start
 ./scripts/bticino_bridge_control.sh stop
 ./scripts/bticino_bridge_control.sh status
@@ -127,32 +127,32 @@ ssh bticino "base64 -d > bticino_bridge" < binario.base64
 
 ---
 
-## 📊 **Comparación: Manual vs Script**
+## 📊 **Comparison: Manual vs Script**
 
-| Aspecto | Manual (MAL) | Script (BIEN) |
+| Aspect | Manual (BAD) | Script (GOOD) |
 |---------|--------------|---------------|
-| **Transferencia** | Un solo archivo grande | Chunks de 2MB |
-| **Backup** | ❌ No hace | ✅ Automático |
-| **Verificación** | ❌ Manual | ✅ Automática |
-| **Errores** | ❌ Sin manejo | ✅ Manejo adecuado |
-| **Tiempo** | ~10 min | ~5 min |
-| **Confiable** | ❌ 70% | ✅ 99% |
+| **Transfer** | Single large file | 2MB chunks |
+| **Backup** | ❌ None | ✅ Automatic |
+| **Verification** | ❌ Manual | ✅ Automatic |
+| **Errors** | ❌ Unhandled | ✅ Handled properly |
+| **Time** | ~10 min | ~5 min |
+| **Reliable** | ❌ 70% | ✅ 99% |
 
 ---
 
-## ✅ **Checklist de Deploy Correcto**
+## ✅ **Correct Deploy Checklist**
 
-- [ ] 1. Compilar para ARM: `GOOS=linux GOARCH=arm GOARM=7 go build`
-- [ ] 2. Usar script: `./scripts/deploy_auto.sh`
-- [ ] 3. Esperar confirmación: `✅ Deploy completado!`
-- [ ] 4. Iniciar servicio: `ssh bticino "./bticino_bridge -config config.yaml &"`
-- [ ] 5. Verificar: `curl http://192.168.1.38:8082/api/status`
-
----
-
-**Regla de Oro**: **SIEMPRE USAR `deploy_auto.sh`** a menos que haya una razón específica para no hacerlo.
+- [ ] 1. Compile for ARM: `GOOS=linux GOARCH=arm GOARM=7 go build`
+- [ ] 2. Use the script: `./scripts/deploy_auto.sh`
+- [ ] 3. Wait for confirmation: `✅ Deploy completado!`
+- [ ] 4. Start the service: `ssh bticino "./bticino_bridge -config config.yaml &"`
+- [ ] 5. Verify: `curl http://192.168.1.38:8082/api/status`
 
 ---
 
-**Última actualización**: 2026-03-27  
-**Responsable**: Equipo de desarrollo
+**Golden Rule**: **ALWAYS USE `deploy_auto.sh`** unless there is a specific reason not to.
+
+---
+
+**Last updated**: 2026-03-27  
+**Maintainer**: development team

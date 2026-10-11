@@ -1,29 +1,29 @@
 # BTicino Bridge - Web Architecture Documentation
 
-**Fecha**: 2026-03-29  
-**Versión**: 0.14.3  
-**Estado**: ⚠️ **TRANSICIÓN** (HTML embebido → Svelte)
+**Date**: 2026-03-29  
+**Version**: 0.14.3  
+**Status**: ⚠️ **TRANSITION** (embedded HTML → Svelte)
 
 ---
 
-## 📊 **Arquitectura Actual (v0.14.3)**
+## 📊 **Current Architecture (v0.14.3)**
 
-### **Estado del Frontend**
+### **Frontend Status**
 
-| Componente | Estado | Ubicación |
+| Component | Status | Location |
 |------------|--------|-----------|
-| **Dashboard** | ⚠️ HTML embebido en Go | `pkg/webserver/server.go` |
-| **Settings** | ⚠️ HTML embebido en Go | `pkg/webserver/server.go` |
-| **Controls** | ⚠️ HTML embebido en Go | `pkg/webserver/server.go` |
-| **Logs** | ⚠️ HTML embebido en Go | `pkg/webserver/server.go` |
-| **CSS** | ⚠️ Embebido en Go | `pkg/webserver/server.go` |
-| **JavaScript** | ⚠️ Embebido en Go | `pkg/webserver/server.go` |
-| **Svelte Build** | ✅ Compilado | `web/dist/` |
-| **Svelte Source** | ✅ Listo | `web/src/` |
+| **Dashboard** | ⚠️ HTML embedded in Go | `pkg/webserver/server.go` |
+| **Settings** | ⚠️ HTML embedded in Go | `pkg/webserver/server.go` |
+| **Controls** | ⚠️ HTML embedded in Go | `pkg/webserver/server.go` |
+| **Logs** | ⚠️ HTML embedded in Go | `pkg/webserver/server.go` |
+| **CSS** | ⚠️ Embedded in Go | `pkg/webserver/server.go` |
+| **JavaScript** | ⚠️ Embedded in Go | `pkg/webserver/server.go` |
+| **Svelte Build** | ✅ Built | `web/dist/` |
+| **Svelte Source** | ✅ Ready | `web/src/` |
 
 ---
 
-## 🏗️ **Arquitectura Actual**
+## 🏗️ **Current Architecture**
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -32,7 +32,7 @@
 │  ┌───────────────────────────────────────────────────┐ │
 │  │  Go Web Server (pkg/webserver/server.go)          │ │
 │  │                                                   │ │
-│  │  HTML Templates (embebidos en el código):        │ │
+│  │  HTML Templates (embedded in code):        │ │
 │  │  ├── getDashboardHTML()                          │ │
 │  │  ├── getSettingsHTML()                           │ │
 │  │  ├── getControlsHTML()                           │ │
@@ -64,7 +64,7 @@
 
 ---
 
-## 🔍 **Cómo Funciona Actualmente**
+## 🔍 **How It Currently Works**
 
 ### **1. Server Startup**
 
@@ -85,7 +85,7 @@ func NewWebServer(cfg *config.Config, bridge BTicinoBridge, logger *logrus.Logge
 ### **2. Route Registration**
 
 ```go
-// Routes para HTML embebido
+// Routes for embedded HTML
 mux.HandleFunc("/", ws.handleDashboard)
 mux.HandleFunc("/dashboard", ws.handleDashboard)
 mux.HandleFunc("/messages", ws.handleMessagesPage)
@@ -93,7 +93,7 @@ mux.HandleFunc("/controls", ws.handleControlsPage)
 mux.HandleFunc("/settings", ws.handleSettingsPage)
 mux.HandleFunc("/logs", ws.handleLogsPage)
 
-// Routes para API
+// Routes for API
 mux.HandleFunc("/api/status", ws.handleAPIStatus)
 mux.HandleFunc("/api/config", ws.handleAPIConfig)
 // ...
@@ -102,7 +102,7 @@ mux.HandleFunc("/api/config", ws.handleAPIConfig)
 ### **3. HTML Rendering**
 
 ```go
-// El HTML se genera desde strings embebidos en Go
+// HTML is generated from strings embedded in Go
 func (ws *WebServer) handleDashboard(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "text/html")
     w.Write([]byte(ws.injectVersion(ws.getDashboardHTML())))
@@ -116,14 +116,14 @@ func (ws *WebServer) getDashboardHTML() string {
     ...
 </head>
 <body>
-    <!-- HTML embebido en el código Go -->
+    <!-- HTML embedded in Go code -->
     ...
 </body>
 </html>`
 }
 ```
 
-### **4. CSS y JavaScript**
+### **4. CSS and JavaScript**
 
 ```go
 // CSS embebido
@@ -149,14 +149,14 @@ async function refreshStatus() {
 
 ---
 
-## 📁 **Estructura de Archivos Actual**
+## 📁 **Current File Structure**
 
 ```
 bticino_bridge/
 ├── pkg/
 │   └── webserver/
-│       ├── server.go              # ⚠️ TODO el HTML/CSS/JS embebido (~4800 líneas)
-│       ├── config_manager.go      # ✅ Gestión de configuración
+│       ├── server.go              # ⚠️ ALL embedded HTML/CSS/JS (~4800 lines)
+│       ├── config_manager.go      # ✅ Configuration management
 │       ├── config_handlers.go     # ✅ API handlers
 │       └── device_handlers.go     # ✅ Device API handlers
 ├── web/
@@ -181,37 +181,37 @@ bticino_bridge/
 
 ---
 
-## ⚠️ **Problemas de la Arquitectura Actual**
+## ⚠️ **Problems with the Current Architecture**
 
-### **1. Código Monolítico**
+### **1. Monolithic Code**
 
-**server.go**: ~4800 líneas
-- HTML embebido: ~3000 líneas
-- CSS embebido: ~1000 líneas
-- JavaScript embebido: ~500 líneas
-- Lógica Go: ~300 líneas
+**server.go**: ~4800 lines
+- Embedded HTML: ~3000 lines
+- Embedded CSS: ~1000 lines
+- Embedded JavaScript: ~500 lines
+- Go logic: ~300 lines
 
-**Problema**: Difícil de mantener, sin syntax highlighting para HTML/CSS/JS.
+**Problem**: hard to maintain, no syntax highlighting for HTML/CSS/JS.
 
-### **2. Sin Hot Reload**
+### **2. No Hot Reload**
 
-- Cada cambio requiere: `go build` → `./scripts/deploy.sh`
-- No hay desarrollo ágil
-- Tiempo de feedback: ~30 segundos
+- Every change requires: `go build` → `./scripts/deploy.sh`
+- No agile development
+- Feedback time: ~30 seconds
 
-### **3. Sin Separation of Concerns**
+### **3. No Separation of Concerns**
 
-- HTML, CSS, JS y Go mezclados en un solo archivo
-- No hay componentización
-- No hay reutilización de código
+- HTML, CSS, JS and Go mixed in a single file
+- No componentization
+- No code reuse
 
 ### **4. Build Size**
 
-- Binario Go: 14MB (con HTML embebido)
-- No hay code splitting
-- No hay lazy loading
+- Go binary: 14MB (with embedded HTML)
+- No code splitting
+- No lazy loading
 
-### **5. Svelte Compilado No Usado**
+### **5. Built Svelte Not Used**
 
 ```
 web/dist/ existe pero el servidor no lo usa
@@ -219,23 +219,23 @@ web/dist/ existe pero el servidor no lo usa
 
 ---
 
-## 🎯 **Arquitectura Objetivo (Svelte)**
+## 🎯 **Target Architecture (Svelte)**
 
-### **Estado Deseado**
+### **Desired State**
 
-| Componente | Actual | Objetivo |
+| Component | Current | Target |
 |------------|--------|----------|
-| **Dashboard** | HTML embebido | `web/src/routes/+page.svelte` |
-| **Settings** | HTML embebido | `web/src/routes/settings/+page.svelte` |
-| **Controls** | HTML embebido | `web/src/routes/controls/+page.svelte` |
-| **Logs** | HTML embebido | `web/src/routes/logs/+page.svelte` |
-| **CSS** | Embebido | Svelte `<style>` + componentes |
-| **JavaScript** | Embebido | Svelte `<script>` + módulos |
-| **Server** | HTML embebido | File server estático |
+| **Dashboard** | Embedded HTML | `web/src/routes/+page.svelte` |
+| **Settings** | Embedded HTML | `web/src/routes/settings/+page.svelte` |
+| **Controls** | Embedded HTML | `web/src/routes/controls/+page.svelte` |
+| **Logs** | Embedded HTML | `web/src/routes/logs/+page.svelte` |
+| **CSS** | Embedded | Svelte `<style>` + components |
+| **JavaScript** | Embedded | Svelte `<script>` + modules |
+| **Server** | Embedded HTML | Static file server |
 
 ---
 
-## 🏗️ **Arquitectura Objetivo**
+## 🏗️ **Target Architecture**
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -267,16 +267,16 @@ web/dist/ existe pero el servidor no lo usa
 
 ---
 
-## 🔄 **Migración Pendiente**
+## 🔄 **Pending Migration**
 
-### **Paso 1: Agregar File Server** ⏳ PENDIENTE
+### **Step 1: Add File Server** ⏳ PENDING
 
 ```go
 // pkg/webserver/server.go
 func (ws *WebServer) Start(ctx context.Context) error {
     mux := http.NewServeMux()
     
-    // ✅ AGREGAR: File server para Svelte
+    // ✅ ADD: File server for Svelte
     fs := http.FileServer(http.Dir("web/dist"))
     mux.Handle("/", fs)
     
@@ -285,28 +285,28 @@ func (ws *WebServer) Start(ctx context.Context) error {
     mux.HandleFunc("/api/config", ws.handleAPIConfig)
     // ...
     
-    // ❌ ELIMINAR: Routes para HTML embebido
+    // ❌ REMOVE: Routes for embedded HTML
     // mux.HandleFunc("/", ws.handleDashboard)
     // mux.HandleFunc("/dashboard", ws.handleDashboard)
     // ...
 }
 ```
 
-### **Paso 2: Eliminar HTML Embebido** ⏳ PENDIENTE
+### **Step 2: Remove Embedded HTML** ⏳ PENDING
 
 ```go
 // pkg/webserver/server.go
 
-// ❌ ELIMINAR: ~3000 líneas de HTML
+// ❌ REMOVE: ~3000 lines of HTML
 func (ws *WebServer) getDashboardHTML() string { ... }
 func (ws *WebServer) getSettingsHTML() string { ... }
 func (ws *WebServer) getControlsHTML() string { ... }
 func (ws *WebServer) getLogsHTML() string { ... }
 
-// ❌ ELIMINAR: ~1000 líneas de CSS
+// ❌ REMOVE: ~1000 lines of CSS
 func (ws *WebServer) getCSS() string { ... }
 
-// ❌ ELIMINAR: ~500 líneas de JS
+// ❌ REMOVE: ~500 lines of JS
 func (ws *WebServer) getJS() string { ... }
 
 // ❌ ELIMINAR: Handlers que usan HTML embebido
@@ -315,20 +315,20 @@ func (ws *WebServer) handleMessagesPage(w http.ResponseWriter, r *http.Request) 
 // ...
 ```
 
-### **Paso 3: Actualizar Svelte Components** ⏳ EN PROGRESO
+### **Step 3: Update Svelte Components** ⏳ IN PROGRESS
 
-**Archivos existentes**:
+**Existing files**:
 - ✅ `web/src/routes/+page.svelte` (Dashboard)
 - ✅ `web/src/routes/settings/+page.svelte` (Settings)
 - ✅ `web/src/routes/controls/+page.svelte` (Controls)
 - ✅ `web/src/routes/logs/+page.svelte` (Logs)
 - ✅ `web/src/App.svelte` (App shell)
 
-**Falta**:
+**Missing**:
 - ⏳ Messages page
-- ⏳ Integration con API endpoints
+- ⏳ Integration with API endpoints
 
-### **Paso 4: Configurar Build** ⏳ PENDIENTE
+### **Step 4: Configure Build** ⏳ PENDING
 
 ```javascript
 // web/vite.config.js
@@ -342,13 +342,13 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:8082'  // Para desarrollo
+      '/api': 'http://localhost:8082'  // For development
     }
   }
 })
 ```
 
-### **Paso 5: Actualizar Deploy Script** ⏳ PENDIENTE
+### **Step 5: Update Deploy Script** ⏳ PENDING
 
 ```bash
 # scripts/deploy.sh
@@ -365,80 +365,80 @@ cd .. && GOOS=linux GOARCH=arm GOARM=7 go build
 
 ---
 
-## 📊 **Comparación: Actual vs Objetivo**
+## 📊 **Comparison: Current vs Target**
 
-| Métrica | Actual | Objetivo | Mejora |
+| Metric | Current | Target | Improvement |
 |---------|--------|----------|--------|
-| **Líneas server.go** | 4800 | ~500 | -90% |
-| **Separación concerns** | ❌ No | ✅ Sí | ✅ |
-| **Hot Reload** | ❌ No | ✅ Sí (Vite) | ✅ |
-| **Componentización** | ❌ No | ✅ Sí (Svelte) | ✅ |
-| **Code Splitting** | ❌ No | ✅ Sí | ✅ |
-| **Bundle Size** | 14MB (todo junto) | 14MB + 56KB | ✅ Separado |
-| **Desarrollo** | Lento (30s) | Rápido (<1s) | ✅ 30x más rápido |
-| **Mantenimiento** | Difícil | Fácil | ✅ |
+| **server.go lines** | 4800 | ~500 | -90% |
+| **Separation of concerns** | ❌ No | ✅ Yes | ✅ |
+| **Hot Reload** | ❌ No | ✅ Yes (Vite) | ✅ |
+| **Componentization** | ❌ No | ✅ Yes (Svelte) | ✅ |
+| **Code Splitting** | ❌ No | ✅ Yes | ✅ |
+| **Bundle Size** | 14MB (all together) | 14MB + 56KB | ✅ Separate |
+| **Development** | Slow (30s) | Fast (<1s) | ✅ 30x faster |
+| **Maintenance** | Hard | Easy | ✅ |
 
 ---
 
-## 🎯 **Roadmap de Migración**
+## 🎯 **Migration Roadmap**
 
-### **Fase 1: Setup** ✅ COMPLETADA
-- [x] Crear proyecto Svelte
-- [x] Configurar Vite
-- [x] Crear componentes básicos
-- [x] Build funcional
+### **Phase 1: Setup** ✅ COMPLETE
+- [x] Create Svelte project
+- [x] Configure Vite
+- [x] Create basic components
+- [x] Working build
 
-### **Fase 2: Componentes** ✅ COMPLETADA
+### **Phase 2: Components** ✅ COMPLETE
 - [x] Dashboard component
 - [x] Settings component
 - [x] Controls component
 - [x] Logs component
 
-### **Fase 3: Integración** ⏳ PENDIENTE
-- [ ] Agregar file server en Go
-- [ ] Eliminar HTML embebido
-- [ ] Eliminar CSS embebido
-- [ ] Eliminar JS embebido
-- [ ] Actualizar deploy.sh
+### **Phase 3: Integration** ⏳ PENDING
+- [ ] Add file server in Go
+- [ ] Remove embedded HTML
+- [ ] Remove embedded CSS
+- [ ] Remove embedded JS
+- [ ] Update deploy.sh
 
-### **Fase 4: Testing** ⏳ PENDIENTE
-- [ ] Testear todas las rutas
-- [ ] Testear API integration
-- [ ] Testear en dispositivo real
+### **Phase 4: Testing** ⏳ PENDING
+- [ ] Test all routes
+- [ ] Test API integration
+- [ ] Test on real device
 - [ ] Performance testing
 
-### **Fase 5: Producción** ⏳ PENDIENTE
-- [ ] Deploy a dispositivo
+### **Phase 5: Production** ⏳ PENDING
+- [ ] Deploy to device
 - [ ] User acceptance testing
-- [ ] Documentación final
+- [ ] Final documentation
 
 ---
 
-## 📝 **Estado Actual del Proyecto**
+## 📝 **Current Project Status**
 
-### **Lo que SÍ funciona**:
-- ✅ API REST completa (`/api/*`)
-- ✅ Svelte components compilados
-- ✅ Build de Go funcional
-- ✅ Deploy automático
-- ✅ Versión 0.14.3 estable
+### **What DOES work**:
+- ✅ Complete REST API (`/api/*`)
+- ✅ Compiled Svelte components
+- ✅ Working Go build
+- ✅ Automatic deploy
+- ✅ Stable version 0.14.3
 
-### **Lo que NO funciona**:
-- ❌ Svelte no se usa en producción
-- ❌ HTML sigue embebido en Go
-- ❌ No hay hot reload
-- ❌ server.go tiene ~4800 líneas
+### **What does NOT work**:
+- ❌ Svelte not used in production
+- ❌ HTML still embedded in Go
+- ❌ No hot reload
+- ❌ server.go has ~4800 lines
 
-### **Lo que está EN PROGRESO**:
-- ⏳ Migración a Svelte
-- ⏳ Eliminación de HTML embebido
-- ⏳ Reducción de server.go
+### **What is IN PROGRESS**:
+- ⏳ Migration to Svelte
+- ⏳ Removal of embedded HTML
+- ⏳ server.go reduction
 
 ---
 
-## 🔧 **Comandos de Desarrollo**
+## 🔧 **Development Commands**
 
-### **Actual (HTML embebido)**:
+### **Current (embedded HTML)**:
 ```bash
 # Build completo
 make build
@@ -447,41 +447,41 @@ make build
 make deploy
 
 # Desarrollo: Editar server.go → go build → deploy
-# Tiempo: ~30 segundos
+# Time: ~30 seconds
 ```
 
-### **Objetivo (Svelte)**:
+### **Target (Svelte)**:
 ```bash
 # Desarrollo con hot reload
 make dev
 
-# Build producción
+# Production build
 make build
 
 # Deploy
 make deploy
 
 # Desarrollo: Editar .svelte → auto reload
-# Tiempo: <1 segundo
+# Time: <1 second
 ```
 
 ---
 
-## 📚 **Recursos**
+## 📚 **Resources**
 
-### **Documentación**:
+### **Documentation**:
 - [Svelte Docs](https://svelte.dev/docs)
 - [Vite Docs](https://vitejs.dev/guide/)
 - [Svelte Tutorial](https://svelte.dev/tutorial)
 
-### **Archivos Clave**:
+### **Key Files**:
 - `web/src/routes/+page.svelte` - Dashboard
 - `web/src/App.svelte` - App shell
 - `web/vite.config.js` - Vite config
-- `pkg/webserver/server.go` - Server Go (actual)
+- `pkg/webserver/server.go` - Go server (current)
 
 ---
 
-**Estado**: ⚠️ **EN TRANSICIÓN**  
-**Próximo Paso**: Agregar file server y eliminar HTML embebido  
-**ETA**: 1-2 días de desarrollo
+**Status**: ⚠️ **IN TRANSITION**  
+**Next Step**: Add file server and remove embedded HTML  
+**ETA**: 1-2 days of development

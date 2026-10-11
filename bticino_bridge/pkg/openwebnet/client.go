@@ -171,11 +171,11 @@ func (c *Client) Connect() error {
 							sessResp = strings.TrimSpace(sessResp)
 							c.logger.Infof("Event session response on port %d: %s", port, sessResp)
 
-							// Si el servidor requiere autenticacion HMAC-SHA256
+							// If the server requires HMAC-SHA256 authentication
 							if sessResp == CMD_AUTH_HMAC {
-								c.logger.Info("Servidor requiere autenticacion HMAC-SHA256")
+								c.logger.Info("Server requires HMAC-SHA256 authentication")
 								if c.password == "" {
-									c.logger.Warn("HMAC requerido pero no hay password configurado, continuando sin auth")
+									c.logger.Warn("HMAC required but no password configured, continuing without auth")
 								} else {
 									writer := func(data []byte) error {
 										conn.SetWriteDeadline(time.Now().Add(c.timeout))
@@ -184,9 +184,9 @@ func (c *Client) Connect() error {
 									}
 									conn.SetReadDeadline(time.Now().Add(c.timeout))
 									if authErr := HMACAuth(initReader, writer, c.password, c.timeout); authErr != nil {
-										c.logger.WithError(authErr).Error("Autenticacion HMAC fallida")
+										c.logger.WithError(authErr).Error("HMAC authentication failed")
 									} else {
-										c.logger.Infof("Autenticacion HMAC-SHA256 exitosa en puerto %d", port)
+										c.logger.Infof("HMAC-SHA256 authentication successful on port %d", port)
 									}
 								}
 							}
@@ -563,9 +563,9 @@ func (c *Client) reconnectPort(port int) {
 						sessResp = strings.TrimSpace(sessResp)
 						c.logger.Infof("Event session response on port %d: %s", port, sessResp)
 
-						// Autenticacion HMAC-SHA256 si requerida
+						// HMAC-SHA256 authentication if required
 						if sessResp == CMD_AUTH_HMAC {
-							c.logger.Info("Reconexion: servidor requiere autenticacion HMAC-SHA256")
+							c.logger.Info("Reconnect: server requires HMAC-SHA256 authentication")
 							if c.password != "" {
 								writer := func(data []byte) error {
 									conn.SetWriteDeadline(time.Now().Add(c.timeout))
@@ -574,9 +574,9 @@ func (c *Client) reconnectPort(port int) {
 								}
 								conn.SetReadDeadline(time.Now().Add(c.timeout))
 								if authErr := HMACAuth(initReader, writer, c.password, c.timeout); authErr != nil {
-									c.logger.WithError(authErr).Error("Reconexion: autenticacion HMAC fallida")
+									c.logger.WithError(authErr).Error("Reconnect: HMAC authentication failed")
 								} else {
-									c.logger.Infof("Reconexion: autenticacion HMAC-SHA256 exitosa en puerto %d", port)
+									c.logger.Infof("Reconnect: HMAC-SHA256 authentication successful on port %d", port)
 								}
 							}
 						}
@@ -707,9 +707,9 @@ func (c *Client) ActivateVideoStream(targetIP string, rtpPort int, highRes bool)
 	cmd := fmt.Sprintf("*7*300#%s#%d#%d*##", ipHash, rtpPort, streamType)
 	c.logger.Infof("Activating video stream: %s (target=%s:%d, type=%d)", cmd, targetIP, rtpPort, streamType)
 
-	// SEGURIDAD: envío ÚNICO, sin reintentos. Reintentar *7*300 en bucle contra
-	// el estado nativo provocó una tormenta de comandos que hizo clickar el relé
-	// de conmutación y disparó el watchdog del sistema (reinicio) el 2026-07-07.
+	// SAFETY: SINGLE send, no retries. Retrying *7*300 in a loop against
+	// the native state caused a command storm that clicked the switching
+	// relay and tripped the system watchdog (reboot) on 2026-07-07.
 	return c.sendToVideoPortWithRetry(cmd, 1)
 }
 
@@ -719,7 +719,7 @@ func (c *Client) ActivateAudioStream(targetIP string, rtpPort int) error {
 	cmd := fmt.Sprintf("*7*300#%s#%d#2*##", ipHash, rtpPort)
 	c.logger.Infof("Activating audio stream: %s (target=%s:%d)", cmd, targetIP, rtpPort)
 
-	// SEGURIDAD: envío único, sin reintentos (ver ActivateVideoStream)
+	// SAFETY: single send, no retries (see ActivateVideoStream)
 	return c.sendToVideoPortWithRetry(cmd, 1)
 }
 

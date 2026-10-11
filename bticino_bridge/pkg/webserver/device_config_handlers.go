@@ -1,4 +1,4 @@
-// Package webserver proporciona handlers para la API de configuración del dispositivo
+// Package webserver provides handlers for the device configuration API
 package webserver
 
 import (
@@ -24,7 +24,7 @@ func (ws *WebServer) handleAPIDeviceConfig(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Usar las rutas del dispositivo
+	// Use the device paths
 	paths := struct {
 		ConfXML      string
 		ASWMSettings string

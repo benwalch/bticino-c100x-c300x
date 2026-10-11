@@ -63,14 +63,14 @@ type ScreenEvent struct {
 }
 
 // InputEventData represents raw Linux input event structure
-// CRITICO: En ARM7 32-bit, struct input_event usa struct timeval con
-// dos campos de 32 bits (tv_sec, tv_usec), NO 64 bits.
-// Tamano total: 16 bytes (4+4+2+2+4), no 24 bytes.
+// CRITICAL: On 32-bit ARM7, struct input_event uses struct timeval with
+// two 32-bit fields (tv_sec, tv_usec), NOT 64 bits.
+// Total size: 16 bytes (4+4+2+2+4), not 24 bytes.
 type InputEventData struct {
-	Time  [2]int32 // struct timeval: tv_sec (4 bytes) + tv_usec (4 bytes) en ARM7 32-bit
+	Time  [2]int32 // struct timeval: tv_sec (4 bytes) + tv_usec (4 bytes) on 32-bit ARM7
 	Type  uint16   // EV_KEY, EV_ABS, etc.
 	Code  uint16   // KEY_1, ABS_X, etc.
-	Value int32    // 1=press, 0=release, o valor absoluto
+	Value int32    // 1=press, 0=release, or absolute value
 }
 
 // Key codes for BTicino device buttons
@@ -162,13 +162,13 @@ func (im *InputMonitor) IsRunning() bool {
 }
 
 // monitorEventDevice monitors a specific /dev/input/event* device
-// Incluye logica de auto-reconexion: si falla la lectura, espera y reintenta
+// Includes auto-reconnect logic: if a read fails, wait and retry
 func (im *InputMonitor) monitorEventDevice(device string) {
 	defer im.wg.Done()
 
 	im.Logger.Infof("Monitoring input device: %s", device)
 
-	const maxRetries = 0 // 0 = reintentar indefinidamente
+	const maxRetries = 0 // 0 = retry indefinitely
 	const retryDelay = 3 * time.Second
 
 	retryCount := 0

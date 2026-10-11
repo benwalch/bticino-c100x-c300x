@@ -6,8 +6,8 @@ import (
 	"bticino_bridge/pkg/system"
 )
 
-// Acciones de sistema inyectables (los tests las sustituyen por stubs).
-// Se inicializan en NewWebServer; si están a nil, los handlers usan pkg/system.
+// Injectable system actions (tests replace them with stubs).
+// Initialized in NewWebServer; when nil, handlers use pkg/system.
 func (ws *WebServer) restartBridge() {
 	if ws.restartBridgeFunc != nil {
 		ws.restartBridgeFunc()
@@ -35,7 +35,7 @@ func (ws *WebServer) handleAPISystemRestartBridge(w http.ResponseWriter, r *http
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	ws.logger.Warn("Web: reinicio del bridge solicitado desde Controls")
+	ws.logger.Warn("Web: bridge restart requested from Controls")
 	ws.restartBridge()
 	ws.writeJSON(w, map[string]interface{}{
 		"success": true,
@@ -54,7 +54,7 @@ func (ws *WebServer) handleAPISystemReboot(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	ws.logger.Warn("Web: REINICIO DEL DISPOSITIVO solicitado desde Controls")
+	ws.logger.Warn("Web: DEVICE REBOOT requested from Controls")
 	ws.rebootDevice()
 	ws.writeJSON(w, map[string]interface{}{
 		"success": true,

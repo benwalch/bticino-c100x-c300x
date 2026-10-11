@@ -4,17 +4,17 @@ import (
 	"testing"
 )
 
-// buildDatagram construye un datagrama sintetico con el formato binario del
-// syslog multicast de BTicino: cabecera de 8 bytes, nombre de sistema
-// NUL-terminado, `meta` bytes de metadatos tras el NUL y mensaje NUL-terminado.
-// El parser salta 13 bytes desde el NUL inclusive → meta=12 para lo estandar.
+// buildDatagram builds a synthetic datagram with the binary format of the
+// BTicino multicast syslog: 8-byte header, NUL-terminated system name,
+// `meta` metadata bytes after the NUL and NUL-terminated message.
+// The parser skips 13 bytes from the NUL inclusive → meta=12 for the standard one.
 func buildDatagram(system string, meta int, message string) []byte {
 	d := make([]byte, 0, 8+len(system)+1+meta+len(message)+1)
-	d = append(d, []byte{0x1e, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}...) // cabecera
+	d = append(d, []byte{0x1e, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00}...) // header
 	d = append(d, []byte(system)...)
 	d = append(d, 0)
 	for i := 0; i < meta; i++ {
-		d = append(d, 0x02) // metadatos binarios (no-NUL)
+		d = append(d, 0x02) // binary metadata (non-NUL)
 	}
 	d = append(d, []byte(message)...)
 	d = append(d, 0)
@@ -36,7 +36,7 @@ func TestParseBinaryDatagramOpen(t *testing.T) {
 }
 
 func TestParseBinaryDatagramRegistration(t *testing.T) {
-	// REGISTRATION lleva 4 bytes extra de metadatos
+	// REGISTRATION carries 4 extra metadata bytes
 	system, msg, ok := parseBinaryDatagram(buildDatagram("REGISTRATION", 16, "registered"))
 	if !ok {
 		t.Fatal("expected ok=true for valid REGISTRATION datagram")
@@ -44,8 +44,8 @@ func TestParseBinaryDatagramRegistration(t *testing.T) {
 	if system != "REGISTRATION" {
 		t.Errorf("system = %q, want REGISTRATION", system)
 	}
-	// msgStart es sysEnd+13, asi que los 4 primeros bytes de metadatos extra
-	// forman parte del prefijo: el mensaje util esta al final
+	// msgStart is sysEnd+13, so the first 4 bytes of extra metadata
+	// are part of the prefix: the useful message is at the end
 	if len(msg) == 0 || msg[len(msg)-len("registered"):] != "registered" {
 		t.Errorf("msg = %q, want suffix %q", msg, "registered")
 	}
@@ -76,7 +76,7 @@ func TestParseBinaryDatagramNonPrintableSystem(t *testing.T) {
 
 func TestParseMessageBinaryOpenExtractsFrame(t *testing.T) {
 	ml := NewMulticastListener(nil, nil)
-	// El mensaje contiene texto alrededor del frame OpenWebNet
+	// The message contains text around the OpenWebNet frame
 	msg := ml.parseMessage(buildDatagram("OPEN", 12, "rx frame *7*59#1*10## end"))
 	if !msg.Parsed {
 		t.Fatal("expected Parsed=true")
@@ -91,7 +91,7 @@ func TestParseMessageBinaryOpenExtractsFrame(t *testing.T) {
 
 func TestParseMessageTextFallback(t *testing.T) {
 	ml := NewMulticastListener(nil, nil)
-	// Datagrama de texto plano (sin estructura binaria valida)
+	// Plain-text datagram (without valid binary structure)
 	msg := ml.parseMessage([]byte("ASWM voicemail state changed"))
 	if msg.System != "ASWM" {
 		t.Errorf("System = %q, want ASWM (text fallback)", msg.System)

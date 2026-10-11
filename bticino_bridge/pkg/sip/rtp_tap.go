@@ -35,7 +35,7 @@ type LoopbackRTPTap struct {
 	dstPort int
 	logger  *logrus.Logger
 
-	// newSource es inyectable en tests; por defecto abre AF_PACKET en `lo`.
+	// newSource is injectable in tests; by default it opens AF_PACKET on `lo`.
 	newSource func() (frameSource, error)
 
 	mu      sync.Mutex
@@ -44,7 +44,7 @@ type LoopbackRTPTap struct {
 	running bool
 }
 
-// NewLoopbackRTPTap crea el tap (sin abrir nada todavía).
+// NewLoopbackRTPTap creates the tap (without opening anything yet).
 func NewLoopbackRTPTap(srcPort, dstPort int, logger *logrus.Logger) *LoopbackRTPTap {
 	if logger == nil {
 		logger = logrus.New()
@@ -54,7 +54,7 @@ func NewLoopbackRTPTap(srcPort, dstPort int, logger *logrus.Logger) *LoopbackRTP
 	return t
 }
 
-// Start abre la captura y arranca el bucle de reenvío. Idempotente.
+// Start opens the capture and starts the forwarding loop. Idempotent.
 func (t *LoopbackRTPTap) Start() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -63,24 +63,24 @@ func (t *LoopbackRTPTap) Start() error {
 	}
 	src, err := t.newSource()
 	if err != nil {
-		return fmt.Errorf("tap: abriendo captura en lo: %w", err)
+		return fmt.Errorf("tap: opening capture on lo: %w", err)
 	}
 	conn, err := net.DialUDP("udp", nil, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: t.dstPort})
 	if err != nil {
 		src.Close()
-		return fmt.Errorf("tap: abriendo destino 127.0.0.1:%d: %w", t.dstPort, err)
+		return fmt.Errorf("tap: opening destination 127.0.0.1:%d: %w", t.dstPort, err)
 	}
 	t.source = src
 	t.conn = conn
 	t.running = true
 	go t.forwardLoop(src, conn)
-	t.logger.Infof("rtp-tap: espejo pasivo lo:%d → 127.0.0.1:%d", t.srcPort, t.dstPort)
+	t.logger.Infof("rtp-tap: passive mirror lo:%d → 127.0.0.1:%d", t.srcPort, t.dstPort)
 	return nil
 }
 
-// forwardLoop lee tramas y reenvía el payload UDP de las que van a srcPort.
-// En `lo` cada paquete se entrega dos veces (PACKET_OUTGOING al enviarse y
-// PACKET_HOST al recibirse); se procesa solo la copia PACKET_HOST.
+// forwardLoop reads frames and forwards the UDP payload of those going to srcPort.
+// On `lo` each packet is delivered twice (PACKET_OUTGOING when sent and
+// PACKET_HOST when received); only the PACKET_HOST copy is processed.
 func (t *LoopbackRTPTap) forwardLoop(src frameSource, conn *net.UDPConn) {
 	buf := make([]byte, 65536)
 	var forwarded uint64
@@ -94,9 +94,9 @@ func (t *LoopbackRTPTap) forwardLoop(src frameSource, conn *net.UDPConn) {
 			running := t.running
 			t.mu.Unlock()
 			if running {
-				t.logger.WithError(err).Debug("rtp-tap: captura terminada")
+				t.logger.WithError(err).Debug("rtp-tap: capture finished")
 			}
-			t.logger.Infof("rtp-tap: parado (%d paquetes espejados)", forwarded)
+			t.logger.Infof("rtp-tap: stopped (%d mirrored packets)", forwarded)
 			return
 		}
 		if pkttype == syscall.PACKET_OUTGOING {
@@ -112,7 +112,7 @@ func (t *LoopbackRTPTap) forwardLoop(src frameSource, conn *net.UDPConn) {
 	}
 }
 
-// Stop cierra la captura y el destino. Idempotente.
+// Stop closes the capture and the destination. Idempotent.
 func (t *LoopbackRTPTap) Stop() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -130,9 +130,9 @@ func (t *LoopbackRTPTap) Stop() {
 	}
 }
 
-// extractUDPPayload interpreta una trama Ethernet+IPv4+UDP (formato de `lo`)
-// y devuelve el puerto destino y el payload UDP. ok=false si la trama no es
-// IPv4/UDP o está truncada. No verifica checksums (loopback no los necesita).
+// extractUDPPayload parses an Ethernet+IPv4+UDP frame (`lo` format)
+// and returns the destination port and the UDP payload. ok=false if the frame
+// is not IPv4/UDP or is truncated. It does not verify checksums (loopback needs none).
 func extractUDPPayload(frame []byte) (dstPort int, payload []byte, ok bool) {
 	const ethLen = 14
 	if len(frame) < ethLen+20+8 {
@@ -152,7 +152,7 @@ func extractUDPPayload(frame []byte) (dstPort int, payload []byte, ok bool) {
 	if ip[9] != 17 { // UDP
 		return 0, nil, false
 	}
-	if binary.BigEndian.Uint16(ip[6:8])&0x1fff != 0 { // fragmento no inicial
+	if binary.BigEndian.Uint16(ip[6:8])&0x1fff != 0 { // non-initial fragment
 		return 0, nil, false
 	}
 	udp := ip[ihl:]
@@ -164,8 +164,8 @@ func extractUDPPayload(frame []byte) (dstPort int, payload []byte, ok bool) {
 	return dstPort, udp[8:udpLen], true
 }
 
-// afpacketSource es la fuente real: AF_PACKET (solo lectura) ligado a una
-// interfaz, con timeout de lectura para poder parar limpiamente.
+// afpacketSource is the real source: AF_PACKET (read-only) bound to an
+// interface, with a read timeout so it can stop cleanly.
 type afpacketSource struct {
 	fd int
 }
@@ -184,8 +184,8 @@ func newAFPacketSource(iface string) (*afpacketSource, error) {
 		syscall.Close(fd)
 		return nil, err
 	}
-	// Timeout de lectura: permite que el bucle observe el cierre sin quedarse
-	// bloqueado en Recvfrom para siempre.
+	// Read timeout: lets the loop observe the close without staying
+	// blocked in Recvfrom forever.
 	tv := syscall.Timeval{Sec: 0, Usec: 500000}
 	if err := syscall.SetsockoptTimeval(fd, syscall.SOL_SOCKET, syscall.SO_RCVTIMEO, &tv); err != nil {
 		syscall.Close(fd)
@@ -210,8 +210,8 @@ func (s *afpacketSource) Close() error {
 	return syscall.Close(s.fd)
 }
 
-// isRetryableReadError distingue timeouts/interrupciones (reintentar) de un
-// cierre real de la fuente (terminar el bucle).
+// isRetryableReadError distinguishes timeouts/interruptions (retry) from a
+// real close of the source (exit the loop).
 func isRetryableReadError(err error) bool {
 	return err == syscall.EAGAIN || err == syscall.EWOULDBLOCK || err == syscall.EINTR
 }

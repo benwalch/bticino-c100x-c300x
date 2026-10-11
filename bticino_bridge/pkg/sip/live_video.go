@@ -7,7 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// VideoTap abstrae el espejo pasivo de vídeo (LoopbackRTPTap en producción).
+// VideoTap abstracts the passive video mirror (LoopbackRTPTap in production).
 type VideoTap interface {
 	Start() error
 	Stop()
@@ -45,7 +45,7 @@ func (l *LiveVideoOnCall) SetGuardTimeout(d time.Duration) {
 	l.guard = d
 }
 
-// NewLiveVideoOnCall crea el orquestador.
+// NewLiveVideoOnCall creates the orchestrator.
 func NewLiveVideoOnCall(tap VideoTap, marker CallActiveMarker, logger *logrus.Logger) *LiveVideoOnCall {
 	if logger == nil {
 		logger = logrus.New()
@@ -53,9 +53,9 @@ func NewLiveVideoOnCall(tap VideoTap, marker CallActiveMarker, logger *logrus.Lo
 	return &LiveVideoOnCall{tap: tap, marker: marker, logger: logger}
 }
 
-// Start arma el espejo. Idempotente: si ya está activo, no hace nada.
-// Un fallo del tap (p.ej. sin permisos para AF_PACKET) degrada sin vídeo pero
-// mantiene la llamada marcada como activa (inhibe el self-INVITE del RTSP).
+// Start arms the mirror. Idempotent: if already active, it does nothing.
+// A tap failure (e.g. no permission for AF_PACKET) degrades without video but
+// keeps the call marked as active (inhibits the RTSP self-INVITE).
 func (l *LiveVideoOnCall) Start(reason string) {
 	l.mu.Lock()
 	if l.active {
@@ -65,7 +65,7 @@ func (l *LiveVideoOnCall) Start(reason string) {
 	l.active = true
 	if l.guard > 0 {
 		l.timer = time.AfterFunc(l.guard, func() {
-			l.logger.Warn("live-video: guard vencido sin fin de llamada — desarmando")
+			l.logger.Warn("live-video: guard expired with no call end — disarming")
 			l.Stop()
 		})
 	}
@@ -74,15 +74,15 @@ func (l *LiveVideoOnCall) Start(reason string) {
 	if l.marker != nil {
 		l.marker.SetCallActive(true)
 	}
-	l.logger.Infof("live-video: armando espejo pasivo (motivo=%s)", reason)
+	l.logger.Infof("live-video: arming passive mirror (reason=%s)", reason)
 	if l.tap != nil {
 		if err := l.tap.Start(); err != nil {
-			l.logger.WithError(err).Warn("live-video: tap no disponible — degradando sin vídeo")
+			l.logger.WithError(err).Warn("live-video: tap unavailable — degrading without video")
 		}
 	}
 }
 
-// Stop desarma (para el tap y libera el marcador). Idempotente.
+// Stop disarms (stops the tap and releases the marker). Idempotent.
 func (l *LiveVideoOnCall) Stop() {
 	l.mu.Lock()
 	if !l.active {
@@ -102,10 +102,10 @@ func (l *LiveVideoOnCall) Stop() {
 	if l.marker != nil {
 		l.marker.SetCallActive(false)
 	}
-	l.logger.Info("live-video: desarmado")
+	l.logger.Info("live-video: disarmed")
 }
 
-// IsActive indica si el vídeo en vivo está armado.
+// IsActive reports whether live video is armed.
 func (l *LiveVideoOnCall) IsActive() bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()

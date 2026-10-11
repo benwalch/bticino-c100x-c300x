@@ -1,71 +1,71 @@
-# BTicino Bridge - Configuración Única
+# BTicino Bridge - Single Configuration
 
-**IMPORTANTE**: Solo existe UN archivo de configuración válido:
+**IMPORTANT**: There is only ONE valid configuration file:
 
 ```
-config.yaml  ← ÚNICO archivo de configuración
+config.yaml  ← ONLY configuration file
 ```
 
-## 📁 Estructura
+## 📁 Structure
 
 ```
 configs/
-├── config.yaml              # ← ÚNICO archivo de configuración
-└── homeassistant/           # Configuraciones de Home Assistant (opcional)
+├── config.yaml              # ← ONLY configuration file
+└── homeassistant/           # Home Assistant configurations (optional)
 ```
 
-## 🚀 Uso
+## 🚀 Usage
 
-### **En tu máquina de desarrollo**:
+### **On your development machine**:
 ```bash
-# El archivo configs/config.yaml se usa como template
-# Para deploy, copiar al dispositivo
+# The configs/config.yaml file is used as a template
+# For deploy, copy to the device
 ```
 
-### **En el dispositivo**:
+### **On the device**:
 ```bash
-# Ubicación: /home/bticino/cfg/extra/config.yaml
-# El bridge se inicia con:
+# Location: /home/bticino/cfg/extra/config.yaml
+# The bridge starts with:
 ./bticino_bridge -config config.yaml
 ```
 
-## 📝 Secciones de Configuración
+## 📝 Configuration Sections
 
-1. **Bridge** - Nombre, versión, log level
-2. **OpenWebNet** - Conexión al bus OpenWebNet
-3. **SIP** - Configuración de servidor SIP (flexisip local o externo)
-4. **MQTT** - Conexión a Home Assistant
-5. **Web** - Dashboard web (puerto, directorios)
-6. **HomeKit** - Integración con Apple HomeKit
+1. **Bridge** - Name, version, log level
+2. **OpenWebNet** - OpenWebNet bus connection
+3. **SIP** - SIP server configuration (local or external flexisip)
+4. **MQTT** - Home Assistant connection
+5. **Web** - Web dashboard (port, directories)
+6. **HomeKit** - Apple HomeKit integration
 7. **Hardware** - GPIO, input devices
-8. **Logging** - Configuración de logs
-9. **Streaming** - RTSP/WebRTC para video
+8. **Logging** - Log configuration
+9. **Streaming** - RTSP/WebRTC for video
 10. **Network** - NTP, DNS, firewall
-11. **Servers** - Servidores externos (cloud, updates, SIP)
+11. **Servers** - External servers (cloud, updates, SIP)
 12. **Notifications** - MQTT, email, push
-13. **Privacy** - Privacidad y telemetría
-14. **Security** - Autenticación, HTTPS, rate limiting
+13. **Privacy** - Privacy and telemetry
+14. **Security** - Authentication, HTTPS, rate limiting
 
-## ⚠️ Archivos Históricos (ELIMINADOS)
+## ⚠️ Historical Files (REMOVED)
 
-Estos archivos ya NO existen, fueron consolidados en `config.yaml`:
+These files NO LONGER exist; they were consolidated into `config.yaml`:
 
-- ❌ `config_ha.yaml` - Eliminado
-- ❌ `config_production_homekit.yaml` - Eliminado
-- ❌ `config-streaming-example.yaml` - Eliminado
-- ❌ `config_with_servers.yaml` - Eliminado
-- ❌ `config_streaming.yaml` (dispositivo) - Eliminado
+- ❌ `config_ha.yaml` - Removed
+- ❌ `config_production_homekit.yaml` - Removed
+- ❌ `config-streaming-example.yaml` - Removed
+- ❌ `config_with_servers.yaml` - Removed
+- ❌ `config_streaming.yaml` (device) - Removed
 
 ## 🔄 Backup
 
-Los backups se crean automáticamente en:
+Backups are created automatically in:
 ```
 /home/bticino/cfg/extra/backups/config_YYYYMMDD_HHMMSS.yaml
 ```
 
-## 🛠️ Edición
+## 🛠️ Editing
 
-### **Desde la UI Web** (Recomendado):
+### **From the Web UI** (Recommended):
 ```
 http://192.168.1.38:8082/settings
 ```
@@ -75,12 +75,12 @@ http://192.168.1.38:8082/settings
 ssh bticino
 cd /home/bticino/cfg/extra
 nano config.yaml
-# Reiniciar bridge
+# Restart bridge
 pkill -9 bticino_bridge
 ./bticino_bridge -config config.yaml &
 ```
 
 ---
 
-**Última actualización**: 2026-03-26  
-**Versión**: v0.13.0
+**Last updated**: 2026-03-26  
+**Version**: v0.13.0

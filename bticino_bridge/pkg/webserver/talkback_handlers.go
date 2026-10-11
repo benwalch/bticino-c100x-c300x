@@ -7,14 +7,14 @@ import (
 	"bticino_bridge/pkg/bticino"
 )
 
-// Talk-back (audio ascendente app/bridge → portero). EXPERIMENTAL.
+// Talk-back (upstream audio app/bridge → door station). EXPERIMENTAL.
 //
-// Mecanismo (ver _investigacion/docs/TALKBACK_AUDIO_ASCENDENTE_2026-07-09.md):
-// el media de la llamada es RTP plano (el c300x usa crypto "dummy" en el SDP).
-// El talk-back = (1) armar el audio bidireccional con el comando OWN
-// *8*2#5#4*16## (bticino.CmdAnswerPickup), y (2) enviar RTP Speex/8000 (pt=110)
-// al puerto de recepción de audio del portero (SDP-negociado por sesión → se
-// pasa como parámetro para poder probar el puerto observado en una llamada viva).
+// Mechanism (see _investigacion/docs/TALKBACK_AUDIO_ASCENDENTE_2026-07-09.md):
+// the call media is plain RTP (the c300x uses "dummy" crypto in the SDP).
+// Talk-back = (1) arm bidirectional audio with the OWN command
+// *8*2#5#4*16## (bticino.CmdAnswerPickup), and (2) send Speex/8000 RTP (pt=110)
+// to the door station's audio receive port (SDP-negotiated per session → passed
+// as a parameter so the port observed in a live call can be tested).
 //
 // Endpoints:
 //   POST /api/talkback/start   {host?, port, source, loop?, arm?}
@@ -27,22 +27,22 @@ func (ws *WebServer) handleTalkbackStart(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var body struct {
-		Host   string `json:"host"`   // destino RTP (default 127.0.0.1)
-		Port   int    `json:"port"`   // puerto de recepción de audio del portero (obligatorio)
-		PT     int    `json:"pt"`     // RTP payload type Speex/8000 (default 98, el del c300x)
-		Source string `json:"source"` // ruta a un fichero de audio (WAV, etc.) — obligatorio
-		Loop   bool   `json:"loop"`   // repetir el fichero de forma continua
-		Arm    *bool  `json:"arm"`    // enviar el comando de armado (default true)
+		Host   string `json:"host"`   // RTP destination (default 127.0.0.1)
+		Port   int    `json:"port"`   // door station audio receive port (required)
+		PT     int    `json:"pt"`     // RTP payload type Speex/8000 (default 98, the c300x one)
+		Source string `json:"source"` // path to an audio file (WAV, etc.) — required
+		Loop   bool   `json:"loop"`   // repeat the file continuously
+		Arm    *bool  `json:"arm"`    // send the arm command (default true)
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		ws.writeTalkbackJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"success": false, "error": "cuerpo JSON inválido",
+			"success": false, "error": "invalid JSON body",
 		})
 		return
 	}
 	if body.Port <= 0 || body.Source == "" {
 		ws.writeTalkbackJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"success": false, "error": "se requieren 'port' (>0) y 'source' (ruta a WAV)",
+			"success": false, "error": "'port' (>0) and 'source' (WAV path) are required",
 		})
 		return
 	}
@@ -54,17 +54,17 @@ func (ws *WebServer) handleTalkbackStart(w http.ResponseWriter, r *http.Request)
 
 	result := map[string]interface{}{}
 
-	// (1) Armar el audio bidireccional (OWN *8*2#5#4*16##)
+	// (1) Arm bidirectional audio (OWN *8*2#5#4*16##)
 	if arm {
 		if err := ws.bridge.SendOpenWebNetCommand(bticino.CmdAnswerPickup); err != nil {
-			ws.logger.WithError(err).Warn("talkback: fallo al enviar el comando de armado")
+			ws.logger.WithError(err).Warn("talkback: failed to send the arm command")
 			result["arm_error"] = err.Error()
 		} else {
 			result["armed"] = bticino.CmdAnswerPickup
 		}
 	}
 
-	// (2) Lanzar el pipeline de subida (RTP Speex → puerto del portero)
+	// (2) Launch the uplink pipeline (Speex RTP → door station port)
 	if err := ws.talkback.Start(body.Host, body.Port, body.PT, body.Source, body.Loop); err != nil {
 		ws.writeTalkbackJSON(w, http.StatusInternalServerError, map[string]interface{}{
 			"success": false, "error": err.Error(), "arm": result,
@@ -74,7 +74,7 @@ func (ws *WebServer) handleTalkbackStart(w http.ResponseWriter, r *http.Request)
 
 	result["success"] = true
 	result["target"] = ws.talkback.Target()
-	result["message"] = "talk-back iniciado (experimental)"
+	result["message"] = "talk-back started (experimental)"
 	ws.writeTalkbackJSON(w, http.StatusOK, result)
 }
 
@@ -85,7 +85,7 @@ func (ws *WebServer) handleTalkbackStop(w http.ResponseWriter, r *http.Request) 
 	}
 	ws.talkback.Stop()
 	ws.writeTalkbackJSON(w, http.StatusOK, map[string]interface{}{
-		"success": true, "message": "talk-back detenido",
+		"success": true, "message": "talk-back stopped",
 	})
 }
 

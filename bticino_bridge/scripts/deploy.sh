@@ -1,20 +1,23 @@
 #!/bin/bash
 #
-# BTicino Bridge - Deploy ÚNICO (Build + Deploy)
-# Unifica build de web + go + deploy en un único comando
+# BTicino Bridge - SINGLE Deploy (Build + Deploy)
+# Unifies web + go build + deploy into a single command
 #
-# Uso: ./scripts/deploy.sh [opciones]
+# Usage: ./scripts/deploy.sh [options]
 #
-# Opciones:
-#   --skip-web     No construir web (usar build anterior)
-#   --skip-go      No construir go (usar build anterior)
-#   --dry-run      Solo mostrar qué se haría
-#   --verbose      Output detallado
+# Options:
+#   --skip-web     Don't build web (use previous build)
+#   --skip-go      Don't build Go (use previous build)
+#   --skip-config  Don't deploy config.yaml (keep remote config)
+#   --skip-docs    Don't deploy API docs (Swagger UI)
+#   --config FILE  Config file to deploy (default: configs/config.yaml)
+#   --dry-run      Only show what would be done
+#   --verbose      Detailed output
 #
 
 set -e
 
-# Colores
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -49,7 +52,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         *)
-            echo -e "${RED}Opción desconocida: $1${NC}"
+            echo -e "${RED}Unknown option: $1${NC}"
             exit 1
             ;;
     esac
@@ -75,7 +78,7 @@ log_error() {
 # Main
 echo -e "${BLUE}"
 echo "╔═══════════════════════════════════════════════════════════╗"
-echo "║        BTicino Bridge - Deploy ÚNICO v0.14.2             ║"
+echo "║        BTicino Bridge - SINGLE Deploy v0.14.2            ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
@@ -107,7 +110,7 @@ else
     fi
 fi
 
-# Paso 2: Build Go
+# Step 2: Build Go
 if [ "$SKIP_GO" = false ]; then
     log "[2/3] Building Go binary..."
     GOOS=linux GOARCH=arm GOARM=7 go build -o bticino_bridge ./cmd/main.go 2>&1 | grep -v "^#" || true
@@ -119,17 +122,17 @@ if [ "$SKIP_GO" = false ]; then
     fi
 fi
 
-# Paso 3: Deploy
+# Step 3: Deploy
 log "[3/3] Deploying to device..."
 
-# Verificar SSH
+# Check SSH
 if ! ssh -o BatchMode=yes -o ConnectTimeout=5 "$REMOTE" "echo OK" > /dev/null 2>&1; then
     log_error "SSH connection failed. Check SSH keys."
     exit 1
 fi
 log_success "SSH OK"
 
-# Transferir binario
+# Transfer binary
 log "Transferring binary..."
 # Transfer VERSION file
 echo "Transferring VERSION file..."
@@ -170,7 +173,7 @@ ssh "$REMOTE" "cd $REMOTE_DIR && pkill -9 bticino_bridge || true && sleep 2 && n
 sleep 5
 log_success "Service restarted"
 
-# Verificar
+# Verify
 log "Verifying..."
 if ssh "$REMOTE" "ps aux | grep bticino_bridge | grep -v grep > /dev/null 2>&1"; then
     log_success "Service running"
@@ -181,11 +184,11 @@ fi
 
 echo
 echo -e "${GREEN}╔═══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║              ✅ Deploy completado exitosamente!            ║${NC}"
+echo -e "${GREEN}║              ✅ Deploy completed successfully!             ║${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════════════════════════╝${NC}"
 echo
-echo "Próximos pasos:"
-echo "  1. Verificar: curl http://192.168.1.38:8082/api/status"
+echo "Next steps:"
+echo "  1. Check: curl http://192.168.1.38:8082/api/status"
 echo "  2. Logs: ssh bticino 'tail -f /var/log/bticino_bridge.log'"
 echo "  3. Web UI: http://192.168.1.38:8082/"
 echo

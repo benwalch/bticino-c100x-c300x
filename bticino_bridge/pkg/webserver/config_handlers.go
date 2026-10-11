@@ -1,4 +1,4 @@
-// Package webserver proporciona handlers API para gestión de configuración
+// Package webserver provides API handlers for configuration management
 package webserver
 
 import (
@@ -14,7 +14,7 @@ import (
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Router /api/config [get]
-// handleAPIConfig maneja GET /api/config - devuelve configuración actual
+// handleAPIConfig handles GET /api/config - returns current configuration
 func (ws *WebServer) handleAPIConfig(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -28,7 +28,7 @@ func (ws *WebServer) handleAPIConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleAPIConfigSave maneja POST /api/config - guarda configuración
+// handleAPIConfigSave handles POST /api/config - saves configuration
 func (ws *WebServer) handleAPIConfigSave(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -45,7 +45,7 @@ func (ws *WebServer) handleAPIConfigSave(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Convertir map a config.Config
+	// Convert map to config.Config
 	configJSON, err := json.Marshal(body.Config)
 	if err != nil {
 		ws.writeJSON(w, map[string]interface{}{
@@ -64,7 +64,7 @@ func (ws *WebServer) handleAPIConfigSave(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Validar configuración
+	// Validate configuration
 	validation := ws.configManager.ValidateConfig(cfg)
 	if !validation.Valid {
 		ws.writeJSON(w, map[string]interface{}{
@@ -76,7 +76,7 @@ func (ws *WebServer) handleAPIConfigSave(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Guardar configuración
+	// Save configuration
 	user := body.User
 	if user == "" {
 		user = "anonymous"
@@ -90,7 +90,7 @@ func (ws *WebServer) handleAPIConfigSave(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Solicitar reload si está habilitado
+	// Request reload if enabled
 	ws.configManager.RequestReload()
 
 	ws.writeJSON(w, map[string]interface{}{
@@ -109,7 +109,7 @@ func (ws *WebServer) handleAPIConfigSave(w http.ResponseWriter, r *http.Request)
 // @Param request body object true "Configuration object and user name"
 // @Success 200 {object} map[string]interface{}
 // @Router /api/config/save [post]
-// handleAPIConfigValidate maneja POST /api/config/validate - valida configuración sin guardar
+// handleAPIConfigValidate handles POST /api/config/validate - validates configuration without saving
 func (ws *WebServer) handleAPIConfigValidate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -125,7 +125,7 @@ func (ws *WebServer) handleAPIConfigValidate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Convertir map a config.Config
+	// Convert map to config.Config
 	configJSON, err := json.Marshal(body.Config)
 	if err != nil {
 		ws.writeJSON(w, map[string]interface{}{
@@ -144,7 +144,7 @@ func (ws *WebServer) handleAPIConfigValidate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Validar configuración
+	// Validate configuration
 	validation := ws.configManager.ValidateConfig(cfg)
 
 	ws.writeJSON(w, validation)
@@ -185,7 +185,7 @@ func (ws *WebServer) handleAPIConfigBackup(w http.ResponseWriter, r *http.Reques
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Router /api/config/backups [get]
-// handleAPIConfigRestore maneja POST /api/config/restore - restaura backup
+// handleAPIConfigRestore handles POST /api/config/restore - restores backup
 func (ws *WebServer) handleAPIConfigRestore(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -209,7 +209,7 @@ func (ws *WebServer) handleAPIConfigRestore(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Solicitar reload
+	// Request reload
 	ws.configManager.RequestReload()
 
 	ws.writeJSON(w, map[string]interface{}{
@@ -227,7 +227,7 @@ func (ws *WebServer) handleAPIConfigRestore(w http.ResponseWriter, r *http.Reque
 // @Param request body object true "Backup file name"
 // @Success 200 {object} map[string]interface{}
 // @Router /api/config/restore [post]
-// handleAPIConfigHistory maneja GET /api/config/history - devuelve historial de cambios
+// handleAPIConfigHistory handles GET /api/config/history - returns change history
 func (ws *WebServer) handleAPIConfigHistory(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -249,7 +249,7 @@ func (ws *WebServer) handleAPIConfigHistory(w http.ResponseWriter, r *http.Reque
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Router /api/config/history [get]
-// handleAPIConfigReload maneja POST /api/config/reload - solicita hot reload
+// handleAPIConfigReload handles POST /api/config/reload - requests hot reload
 func (ws *WebServer) handleAPIConfigReload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

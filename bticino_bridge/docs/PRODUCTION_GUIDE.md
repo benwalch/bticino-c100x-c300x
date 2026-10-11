@@ -236,7 +236,7 @@ event-based monitoring (button/door events via the OWN bus), **video streaming**
 (live video on call via passive tap + go2rtc; see `HOME_ASSISTANT.md`), HMAC
 authentication and a safety gate for OpenWebNet commands.
 
-Still on the roadmap (see `ROADMAP_VIDEO_AUDIO.md` and `MEJORAS_FUTURAS.md`):
+Still on the roadmap (see `ROADMAP_VIDEO_AUDIO.md` and `FUTURE_IMPROVEMENTS.md`):
 - [ ] Two-way audio (talk-back) and native WebRTC
 - [ ] Historical data logging and analytics
 - [ ] Voice control (Alexa, Google Home)

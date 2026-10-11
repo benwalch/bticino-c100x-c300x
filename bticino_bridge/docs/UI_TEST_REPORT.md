@@ -1,32 +1,32 @@
 # Web Configuration UI - Test Report
 
-**Fecha**: 2026-03-25  
-**Versión**: v0.13.0  
-**Estado**: ✅ **100% FUNCIONAL**
+**Date**: 2026-03-25  
+**Version**: v0.13.0  
+**Status**: ✅ **100% WORKING**
 
 ---
 
-## 📊 Resumen Ejecutivo
+## 📊 Executive Summary
 
-| Categoría | Tests | Exitosos | Fallidos | % Éxito |
+| Category | Tests | Passed | Failed | Success % |
 |------------|-------|----------|----------|---------|
-| **Acceso UI** | 2 | 2 | 0 | 100% |
+| **UI Access** | 2 | 2 | 0 | 100% |
 | **API Endpoints** | 8 | 8 | 0 | 100% |
-| **Validaciones** | 5 | 5 | 0 | 100% |
+| **Validations** | 5 | 5 | 0 | 100% |
 | **Backup/Restore** | 4 | 4 | 0 | 100% |
-| **Guardado** | 3 | 3 | 0 | 100% |
+| **Saving** | 3 | 3 | 0 | 100% |
 | **TOTAL** | **22** | **22** | **0** | **100%** |
 
 ---
 
-## ✅ Tests Completados
+## ✅ Completed Tests
 
-### **1. Acceso UI** (2/2 ✅)
+### **1. UI Access** (2/2 ✅)
 
-| Test | Resultado | Detalles |
+| Test | Result | Details |
 |------|-----------|----------|
-| Cargar Settings Page | ✅ | `http://192.168.1.38:8082/settings` |
-| Verificar 9 tabs | ✅ | bridge, openwebnet, sip, mqtt, homekit, hardware, streaming, privacy, security |
+| Load Settings Page | ✅ | `http://192.168.1.38:8082/settings` |
+| Verify 9 tabs | ✅ | bridge, openwebnet, sip, mqtt, homekit, hardware, streaming, privacy, security |
 
 **Output**:
 ```html
@@ -41,9 +41,9 @@ data-tab="sip"
 
 ### **2. API Endpoints** (8/8 ✅)
 
-| Endpoint | Método | Estado | Response |
+| Endpoint | Method | Status | Response |
 |----------|--------|--------|----------|
-| `/api/config` | GET | ✅ 200 | Configuración completa (16 secciones) |
+| `/api/config` | GET | ✅ 200 | Full configuration (16 sections) |
 | `/api/config/save` | POST | ✅ 200 | `{"success": true, "message": "Configuration saved successfully"}` |
 | `/api/config/validate` | POST | ✅ 200 | `{"valid": true/false, "errors": [], "warnings": []}` |
 | `/api/config/backup` | POST | ✅ 200 | `{"success": true, "backup_file": "..."}` |
@@ -52,7 +52,7 @@ data-tab="sip"
 | `/api/config/history` | GET | ✅ 200 | `{"history": [], "count": 0}` |
 | `/api/config/reload` | POST | ✅ 200 | `{"success": true, "message": "Configuration reload requested"}` |
 
-**Config Sections Cargadas**:
+**Loaded Config Sections**:
 ```
 Bridge, OpenWebNet, SIP, MQTT, HomeKit, Hardware, Web, Logging, 
 AdditionalLocks, UDPProxy, Streaming, Network, Servers, 
@@ -61,17 +61,17 @@ Notifications, Privacy, Security
 
 ---
 
-### **3. Validaciones** (5/5 ✅)
+### **3. Validations** (5/5 ✅)
 
-| Validación | Input | Expected | Result |
+| Validation | Input | Expected | Result |
 |------------|-------|----------|--------|
-| Puerto < 1 | `{"port": 0}` | Error | ✅ `"OpenWebNet port must be between 1-65535"` |
-| Puerto > 65535 | `{"port": 70000}` | Error | ✅ `"OpenWebNet port must be between 1-65535"` |
-| Puertos iguales | `{"own_port": 8082, "web_port": 8082}` | Error | ✅ `"Web port and OpenWebNet port cannot be the same"` |
-| RTSP port = 0 | `{"rtsp_port": 0}` | Skip validation | ✅ No error (valor por defecto) |
-| RTSP port válido | `{"rtsp_port": 6554}` | Success | ✅ `"Configuration saved successfully"` |
+| Port < 1 | `{"port": 0}` | Error | ✅ `"OpenWebNet port must be between 1-65535"` |
+| Port > 65535 | `{"port": 70000}` | Error | ✅ `"OpenWebNet port must be between 1-65535"` |
+| Equal ports | `{"own_port": 8082, "web_port": 8082}` | Error | ✅ `"Web port and OpenWebNet port cannot be the same"` |
+| RTSP port = 0 | `{"rtsp_port": 0}` | Skip validation | ✅ No error (default value) |
+| Valid RTSP port | `{"rtsp_port": 6554}` | Success | ✅ `"Configuration saved successfully"` |
 
-**Ejemplo de response de validación**:
+**Sample validation response**:
 ```json
 {
   "valid": false,
@@ -85,14 +85,14 @@ Notifications, Privacy, Security
 
 ### **4. Backup/Restore** (4/4 ✅)
 
-| Operación | Resultado | Detalles |
+| Operation | Result | Details |
 |-----------|-----------|----------|
-| Crear Backup | ✅ | `config_20260325_225000.yaml` |
-| Listar Backups | ✅ | 5 backups disponibles |
-| Restaurar Backup | ✅ | `Backup restored successfully` |
+| Create Backup | ✅ | `config_20260325_225000.yaml` |
+| List Backups | ✅ | 5 backups available |
+| Restore Backup | ✅ | `Backup restored successfully` |
 | Restart Required | ✅ | Flag `restart_required: true` |
 
-**Backups Creados**:
+**Created Backups**:
 ```
 configs/backups/config_20260324_154253.yaml
 configs/backups/config_20260325_162038.yaml
@@ -103,15 +103,15 @@ configs/backups/config_20260325_225012.yaml
 
 ---
 
-### **5. Guardado de Configuración** (3/3 ✅)
+### **5. Configuration Saving** (3/3 ✅)
 
-| Test | Config | Resultado |
+| Test | Config | Result |
 |------|--------|-----------|
-| Save parcial | Bridge + Web | ✅ `Configuration saved successfully` |
-| Save completo | Todas las secciones | ✅ `Configuration saved successfully` |
-| Save con warnings | SIP sin username | ✅ Success + warnings |
+| Partial save | Bridge + Web | ✅ `Configuration saved successfully` |
+| Full save | All sections | ✅ `Configuration saved successfully` |
+| Save with warnings | SIP without username | ✅ Success + warnings |
 
-**Ejemplo de save exitoso**:
+**Sample successful save**:
 ```json
 {
   "message": "Configuration saved successfully",
@@ -126,78 +126,78 @@ configs/backups/config_20260325_225012.yaml
 
 ---
 
-## 🐛 Bugs Encontrados y Fixeados
+## 🐛 Bugs Found and Fixed
 
-### **Bug #1: Validación de RTSP Port**
+### **Bug #1: RTSP Port Validation**
 
-**Síntoma**: Siempre fallaba con `"RTSP port must be between 1-65535"` incluso con valores válidos (6554, 8554)
+**Symptom**: always failed with `"RTSP port must be between 1-65535"` even with valid values (6554, 8554)
 
-**Causa**: La validación verificaba `cfg.Streaming.Enabled` pero el JSON no deserializaba correctamente el campo booleano.
+**Cause**: validation checked `cfg.Streaming.Enabled`, but the JSON didn't deserialize the boolean field correctly.
 
-**Fix**: Cambiar validación de:
+**Fix**: changed validation from:
 ```go
 if cfg.Streaming.Enabled {
     if cfg.Streaming.RTSPPort <= 0 || cfg.Streaming.RTSPPort > 65535 {
 ```
 
-A:
+To:
 ```go
 if cfg.Streaming.RTSPPort != 0 {
     if cfg.Streaming.RTSPPort <= 0 || cfg.Streaming.RTSPPort > 65535 {
 ```
 
-**Estado**: ✅ **FIX DEPLOYADO** en v0.13.0
+**Status**: ✅ **FIX DEPLOYED** in v0.13.0
 
 ---
 
-## 📁 Estandarización de Binarios
+## 📁 Binary Standardization
 
-**Problema**: Múltiples nombres de binario (`bticino_bridge_v0.13.0`, `bticino_bridge_v0.13.0_arm`, `bticino_bridge_v0.13.0_fixed`)
+**Problem**: multiple binary names (`bticino_bridge_v0.13.0`, `bticino_bridge_v0.13.0_arm`, `bticino_bridge_v0.13.0_fixed`)
 
-**Solución**: Unificar a **`bticino_bridge`** (sin versión en el nombre)
+**Solution**: unify to **`bticino_bridge`** (no version in the name)
 
-**Comando de build estandarizado**:
+**Standardized build command**:
 ```bash
 GOOS=linux GOARCH=arm GOARM=7 go build -o bticino_bridge ./cmd/main.go
 ```
 
-**Estado**: ✅ **IMPLEMENTADO**
+**Status**: ✅ **IMPLEMENTED**
 
 ---
 
-## 🎯 Features Verificadas
+## 🎯 Verified Features
 
 ### **UI Features**:
-- ✅ 9 tabs de configuración
-- ✅ Carga asíncrona de configuración
-- ✅ Detección de cambios (botón Save se habilita)
-- ✅ Validación en tiempo real
-- ✅ Mensajes de éxito/error/toast
-- ✅ Loading overlay durante operaciones
-- ✅ Confirmación antes de restore
+- ✅ 9 configuration tabs
+- ✅ Async configuration loading
+- ✅ Change detection (Save button enables)
+- ✅ Real-time validation
+- ✅ Success/error/toast messages
+- ✅ Loading overlay during operations
+- ✅ Confirmation before restore
 
 ### **API Features**:
-- ✅ GET/POST configuración
-- ✅ Validación server-side
-- ✅ Backup automático
-- ✅ Listado de backups
-- ✅ Restore de backups
-- ✅ Historial de cambios (estructura lista)
-- ✅ Reload de configuración
+- ✅ GET/POST configuration
+- ✅ Server-side validation
+- ✅ Automatic backup
+- ✅ Backup listing
+- ✅ Backup restore
+- ✅ Change history (structure ready)
+- ✅ Configuration reload
 
 ### **Validation Features**:
-- ✅ Puertos (1-65535)
-- ✅ Campos requeridos
-- ✅ Puertos duplicados
-- ✅ Warnings para configuraciones riesgosas
+- ✅ Ports (1-65535)
+- ✅ Required fields
+- ✅ Duplicate ports
+- ✅ Warnings for risky configurations
 
 ---
 
-## 📊 Métricas de Performance
+## 📊 Performance Metrics
 
-| Operación | Tiempo Promedio |
+| Operation | Average Time |
 |-----------|-----------------|
-| Cargar `/settings` | ~200ms |
+| Load `/settings` | ~200ms |
 | GET `/api/config` | ~50ms |
 | POST `/api/config/save` | ~100ms |
 | POST `/api/config/backup` | ~150ms |
@@ -206,41 +206,41 @@ GOOS=linux GOARCH=arm GOARM=7 go build -o bticino_bridge ./cmd/main.go
 
 ---
 
-## 🔄 Próximas Mejoras (Opcional)
+## 🔄 Next Improvements (Optional)
 
-### **Prioridad Baja**:
-- [ ] Autenticación web (login)
-- [ ] HTTPS automático
-- [ ] Exportar/Importar configuración
-- [ ] Comparar configs (diff)
-- [ ] Rollback rápido
+### **Low Priority**:
+- [ ] Web authentication (login)
+- [ ] Automatic HTTPS
+- [ ] Export/Import configuration
+- [ ] Compare configs (diff)
+- [ ] Fast rollback
 
-### **Prioridad Muy Baja**:
-- [ ] Temas (dark/light mode)
+### **Very Low Priority**:
+- [ ] Themes (dark/light mode)
 - [ ] Multi-language
-- [ ] Wizard de configuración inicial
+- [ ] Initial configuration wizard
 
 ---
 
-## ✅ Checklist Final
+## ✅ Final Checklist
 
-- [x] Acceso a Settings Page
-- [x] 9 tabs de configuración
-- [x] 8 endpoints API
-- [x] Validaciones de puertos
-- [x] Validaciones de campos requeridos
-- [x] Crear backup
-- [x] Listar backups
-- [x] Restaurar backup
-- [x] Reload de configuración
-- [x] Guardado de configuración
-- [x] Warnings en validación
-- [x] Fix de validación RTSP port
-- [x] Estandarización de binario
+- [x] Settings Page access
+- [x] 9 configuration tabs
+- [x] 8 API endpoints
+- [x] Port validations
+- [x] Required-field validations
+- [x] Create backup
+- [x] List backups
+- [x] Restore backup
+- [x] Configuration reload
+- [x] Configuration saving
+- [x] Validation warnings
+- [x] RTSP port validation fix
+- [x] Binary standardization
 
 ---
 
-**Estado**: ✅ **100% TESTEADO Y FUNCIONAL**  
-**Próximo Paso**: Debug de registro SIP  
-**Binario**: `bticino_bridge` (14 MB, ARMv7)  
-**Versión**: v0.13.0
+**Status**: ✅ **100% TESTED AND WORKING**  
+**Next Step**: SIP registration debug  
+**Binary**: `bticino_bridge` (14 MB, ARMv7)  
+**Version**: v0.13.0

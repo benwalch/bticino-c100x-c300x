@@ -282,8 +282,8 @@
             </div>
             <div class="form-group">
               <label for="hk_port">Port</label>
-              <!-- text a propósito: HomeKit.Port es string en el backend; un
-                   type="number" enviaría un número y rompería el guardado -->
+              <!-- text on purpose: HomeKit.Port is a string in the backend; a
+                   type="number" would send a number and break saving -->
               <input type="text" id="hk_port" inputmode="numeric" bind:value={config.config.HomeKit.Port} />
             </div>
             <div class="form-group">

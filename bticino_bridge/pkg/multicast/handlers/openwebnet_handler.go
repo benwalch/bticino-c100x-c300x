@@ -111,7 +111,7 @@ func (h *OpenWebNetHandler) Handle(listener interface{}, system string, message 
 		}, "openwebnet")
 
 	case "doorbell.floor":
-		// Timbre de rellano (boton del descansillo), distinto de la placa de calle
+		// Landing doorbell (landing button), distinct from the street panel
 		h.eventBus.PublishWithSource("doorbell.floor.pressed", event, "openwebnet")
 
 	case "video.stream":
@@ -172,7 +172,7 @@ func (h *OpenWebNetHandler) parseOpenWebNetCommand(command string) *OpenWebNetEv
 		return event
 	}
 
-	// Check for floor/landing doorbell (antes que el patron generico *7*...)
+	// Check for floor/landing doorbell (before the generic *7*... pattern)
 	if floorRingPattern.MatchString(command) {
 		event.EventType = "doorbell.floor"
 		event.Who = "7"

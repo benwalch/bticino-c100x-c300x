@@ -1,9 +1,9 @@
-// video_probe.go implementa una sonda de vídeo MÍNIMA y SEGURA para diagnóstico.
+// video_probe.go implements a MINIMAL and SAFE video probe for diagnostics.
 //
-// Reutiliza captureCooperative: pide UNA vez (sin reintentos) a bt_av_media que
-// duplique su RTP de vídeo y decodifica lo que llegue. NO hace self-INVITE ni
-// toca la señalización SIP. Pensada para usarse mientras el vídeo nativo ya está
-// activo (p. ej. tras pulsar el botón del "ojo"/autoencendido).
+// It reuses captureCooperative: it asks ONCE (no retries) bt_av_media to
+// duplicate its video RTP and decodes whatever arrives. It does NO self-INVITE
+// and does not touch SIP signaling. Meant to be used while native video is already
+// active (e.g. after pressing the "eye"/self-switch-on button).
 package sip
 
 import (
@@ -14,24 +14,24 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// VideoProbePort es el puerto UDP local para la sonda. Distinto del snapshot
-// (10004) y del relay (10002) para no colisionar.
+// VideoProbePort is the local UDP port for the probe. Different from snapshot
+// (10004) and relay (10002) to avoid collisions.
 const VideoProbePort = 10008
 
-// probeWarmupFrames: la sonda es un diagnóstico rápido, con menos calentamiento.
+// probeWarmupFrames: the probe is a quick diagnostic, with less warmup.
 const probeWarmupFrames = 8
 
-// VideoProbeResult resume el resultado de una sonda.
+// VideoProbeResult summarizes the result of a probe.
 type VideoProbeResult struct {
-	Ack       bool   `json:"ack"`        // *7*300 respondió *#*1## (ACK)
-	AckError  string `json:"ack_error"`  // vacío si ACK; si no, el error/NACK
-	Frames    int    `json:"frames"`     // fotogramas JPEG decodificados
-	JPEGBytes int    `json:"jpeg_bytes"` // tamaño del mejor fotograma
-	Note      string `json:"note"`       // pista de diagnóstico
+	Ack       bool   `json:"ack"`        // *7*300 answered *#*1## (ACK)
+	AckError  string `json:"ack_error"`  // empty if ACK; otherwise the error/NACK
+	Frames    int    `json:"frames"`     // decoded JPEG frames
+	JPEGBytes int    `json:"jpeg_bytes"` // size of the best frame
+	Note      string `json:"note"`       // diagnostic hint
 }
 
-// VideoProbe envía un único *7*300 y comprueba si llega RTP de vídeo que se
-// pueda decodificar. Devuelve el resultado y, si hubo, el mejor fotograma JPEG.
+// VideoProbe sends a single *7*300 and checks whether decodable video RTP arrives.
+// It returns the result and, if any, the best JPEG frame.
 func VideoProbe(own *openwebnet.Client, timeout time.Duration, logger *logrus.Logger) (*VideoProbeResult, []byte, error) {
 	if logger == nil {
 		logger = logrus.New()
@@ -50,13 +50,13 @@ func VideoProbe(own *openwebnet.Client, timeout time.Duration, logger *logrus.Lo
 
 	switch {
 	case res.Frames > 0:
-		res.Note = "vídeo OK: RTP fluyó y se decodificaron fotogramas"
+		res.Note = "video OK: RTP flowed and frames were decoded"
 	case res.Ack && res.Frames == 0:
-		res.Note = "*7*300 aceptado pero NO llegó RTP decodificable (¿sesión nativa activa?)"
+		res.Note = "*7*300 accepted but no decodable RTP arrived (native session active?)"
 	default:
-		res.Note = "*7*300 rechazado (NACK): bt_av_media no tiene stream que duplicar; pulsa el 'ojo' primero"
+		res.Note = "*7*300 rejected (NACK): bt_av_media has no stream to duplicate; press the 'eye' first"
 	}
 
-	logger.Infof("VideoProbe resultado: ack=%v frames=%d bytes=%d — %s", res.Ack, res.Frames, res.JPEGBytes, res.Note)
+	logger.Infof("VideoProbe result: ack=%v frames=%d bytes=%d — %s", res.Ack, res.Frames, res.JPEGBytes, res.Note)
 	return res, cap.jpeg, nil
 }

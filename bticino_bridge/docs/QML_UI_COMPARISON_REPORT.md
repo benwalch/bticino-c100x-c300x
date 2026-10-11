@@ -1,30 +1,30 @@
 # BTicino UI Comparison Report - Web vs QML
 
-**Fecha**: 2026-03-26  
-**Versión Web UI**: v0.14.1  
-**Versión QML UI**: Stock (2018-2020)  
-**Estado**: 📊 **ANÁLISIS COMPLETADO**
+**Date**: 2026-03-26  
+**Web UI Version**: v0.14.1  
+**QML UI Version**: Stock (2018-2020)  
+**Status**: 📊 **ANALYSIS COMPLETE**
 
 ---
 
-## 📊 Resumen Ejecutivo
+## 📊 Executive Summary
 
-| Característica | UI Web (bticino_bridge) | UI QML (Dispositivo) | Sincronización |
+| Feature | Web UI (bticino_bridge) | QML UI (Device) | Synchronization |
 |----------------|------------------------|---------------------|----------------|
-| **Tecnología** | HTML5/CSS3/JavaScript | Qt Quick 1.1 / QML | ❌ Diferente |
-| **Acceso** | http://device:8082 | Pantalla táctil del dispositivo | ✅ Complementarias |
-| **Configuración** | 12 tabs completas | Menús limitados | ✅ Web más completa |
-| **Edición** | ✅ Completa | ⚠️ Limitada | ✅ Web preferida |
-| **Backup/Restore** | ✅ Implementado | ❌ No disponible | ✅ Solo Web |
-| **Idiomas** | Inglés/Español | Multi-idioma (Qt) | ⚠️ Web mejorar |
+| **Technology** | HTML5/CSS3/JavaScript | Qt Quick 1.1 / QML | ❌ Different |
+| **Access** | http://device:8082 | Device touchscreen | ✅ Complementary |
+| **Configuration** | 12 full tabs | Limited menus | ✅ Web more complete |
+| **Editing** | ✅ Full | ⚠️ Limited | ✅ Web preferred |
+| **Backup/Restore** | ✅ Implemented | ❌ Not available | ✅ Web only |
+| **Languages** | English/Spanish | Multi-language (Qt) | ⚠️ Web needs improvement |
 
 ---
 
-## 🎯 Comparación Detallada
+## 🎯 Detailed Comparison
 
-### **1. Estructura de Menús**
+### **1. Menu Structure**
 
-#### **UI Web (12 tabs)**:
+#### **Web UI (12 tabs)**:
 ```
 Settings
 ├── Bridge
@@ -41,7 +41,7 @@ Settings
 └── Security
 ```
 
-#### **UI QML (Settings.qml)**:
+#### **QML UI (Settings.qml)**:
 ```
 Settings
 ├── WiFi Settings
@@ -57,79 +57,79 @@ Settings
     └── Add Actuation
 ```
 
-**Conclusión**: 
-- ✅ **UI Web**: Más orientada a configuración técnica (OpenWebNet, MQTT, SIP)
-- ✅ **UI QML**: Más orientada a usuario final (timbre, idioma, fecha)
-- ✅ **Ambas**: Complementarias, no conflictivas
+**Conclusion**: 
+- ✅ **Web UI**: more focused on technical configuration (OpenWebNet, MQTT, SIP)
+- ✅ **QML UI**: more focused on end users (doorbell, language, date)
+- ✅ **Both**: complementary, not conflicting
 
 ---
 
-### **2. Archivos QML Existentes**
+### **2. Existing QML Files**
 
-**Total**: 104 archivos `.qml`
+**Total**: 104 `.qml` files
 
-#### **Principales**:
-| Archivo QML | Propósito | Equivalente Web |
+#### **Main**:
+| QML File | Purpose | Web Equivalent |
 |-------------|-----------|-----------------|
-| `Settings.qml` | Menú principal configuración | `/settings` |
-| `ConfigurationMenu.qml` | Configurar dispositivos | `/settings/device` |
-| `WiFiSettings.qml` | Configurar WiFi | ❌ No disponible en Web |
-| `DateTimeSettings.qml` | Fecha y hora | ❌ No disponible en Web |
-| `LanguagesSettings.qml` | Idiomas | ❌ No disponible en Web |
-| `AccountsSettings.qml` | Cuentas SIP | `/settings/sip` ✅ |
-| `RingtonesExtra.qml` | Timbres | ❌ No disponible en Web |
-| `KeyPad.qml` | Teclado numérico | ❌ No disponible en Web |
-| `VideoCallPage.qml` | Videollamadas | ❌ No disponible en Web |
-| `AudioCallPage.qml` | Llamadas de audio | ❌ No disponible en Web |
+| `Settings.qml` | Main configuration menu | `/settings` |
+| `ConfigurationMenu.qml` | Configure devices | `/settings/device` |
+| `WiFiSettings.qml` | Configure WiFi | ❌ Not available on Web |
+| `DateTimeSettings.qml` | Date and time | ❌ Not available on Web |
+| `LanguagesSettings.qml` | Languages | ❌ Not available on Web |
+| `AccountsSettings.qml` | SIP accounts | `/settings/sip` ✅ |
+| `RingtonesExtra.qml` | Ringtones | ❌ Not available on Web |
+| `KeyPad.qml` | Numeric keypad | ❌ Not available on Web |
+| `VideoCallPage.qml` | Video calls | ❌ Not available on Web |
+| `AudioCallPage.qml` | Audio calls | ❌ Not available on Web |
 
 ---
 
-### **3. Estado de Sincronización**
+### **3. Synchronization Status**
 
-#### **✅ LO QUE ESTÁ SINCRONIZADO**:
+#### **✅ WHAT IS SYNCHRONIZED**:
 
-1. **Configuración SIP**:
-   - QML: `AccountsSettings.qml` → Edita usuarios SIP
-   - Web: `/settings/sip` → Edita configuración SIP completa
-   - **Sync**: ✅ Ambas editan `config.yaml`
+1. **SIP configuration**:
+    - QML: `AccountsSettings.qml` → Edits SIP users
+    - Web: `/settings/sip` → Edits full SIP configuration
+    - **Sync**: ✅ both edit `config.yaml`
 
-2. **Configuración de Red**:
-   - QML: `WiFiSettings.qml` → WiFi
-   - Web: `/settings/device` → IP, DNS, NTP
-   - **Sync**: ✅ Mismo archivo de configuración
+2. **Network configuration**:
+    - QML: `WiFiSettings.qml` → WiFi
+    - Web: `/settings/device` → IP, DNS, NTP
+    - **Sync**: ✅ same configuration file
 
 3. **Answering Machine**:
-   - QML: `AnsweringPage.qml` → Contestador
-   - Web: `/settings/audio` → Contestador + grabación
-   - **Sync**: ✅ Mismo backend
+    - QML: `AnsweringPage.qml` → Answering machine
+    - Web: `/settings/audio` → Answering machine + recording
+    - **Sync**: ✅ same backend
 
-#### **⚠️ LO QUE NO ESTÁ SINCRONIZADO**:
+#### **⚠️ WHAT IS NOT SYNCHRONIZED**:
 
-1. **Idioma**:
-   - QML: `LanguagesSettings.qml` → Cambia idioma del dispositivo
-   - Web: Solo inglés/español en UI
-   - **Gap**: Web debería leer idioma del dispositivo
+1. **Language**:
+    - QML: `LanguagesSettings.qml` → Changes the device language
+    - Web: English/Spanish only in UI
+    - **Gap**: Web should read the device language
 
-2. **Fecha/Hora**:
-   - QML: `DateTimeSettings.qml` → NTP, zona horaria
-   - Web: No disponible
-   - **Gap**: Web podría mostrar/editar NTP
+2. **Date/Time**:
+    - QML: `DateTimeSettings.qml` → NTP, time zone
+    - Web: Not available
+    - **Gap**: Web could show/edit NTP
 
-3. **Timbres**:
-   - QML: `RingtonesExtra.qml` → Selecciona timbre
-   - Web: No disponible
-   - **Gap**: Web podría mostrar timbres disponibles
+3. **Ringtones**:
+    - QML: `RingtonesExtra.qml` → Selects ringtone
+    - Web: Not available
+    - **Gap**: Web could show available ringtones
 
 4. **Quick Actions**:
-   - QML: Acciones rápidas en pantalla principal
-   - Web: No disponible
-   - **Gap**: Web podría configurar quick actions
+    - QML: quick actions on main screen
+    - Web: Not available
+    - **Gap**: Web could configure quick actions
 
 ---
 
-## 🔍 Análisis Técnico
+## 🔍 Technical Analysis
 
-### **Arquitectura QML**:
+### **QML Architecture**:
 
 ```qml
 // Settings.qml (extracto)
@@ -152,13 +152,13 @@ Page {
 }
 ```
 
-**Observaciones**:
-- Qt Quick 1.1 (versión antigua, 2011-2013)
-- Usa objetos globales (`global.answeringMachine`)
-- Traducciones con `qsTr()` y `trsl.empty`
-- Sin conexión directa con `config.yaml` del bridge
+**Notes**:
+- Qt Quick 1.1 (old version, 2011-2013)
+- Uses global objects (`global.answeringMachine`)
+- Translations with `qsTr()` and `trsl.empty`
+- No direct connection to the bridge's `config.yaml`
 
-### **Arquitectura Web**:
+### **Web Architecture**:
 
 ```javascript
 // config_ui.js (extracto)
@@ -174,67 +174,67 @@ async function loadConfig() {
 }
 ```
 
-**Observaciones**:
-- JavaScript moderno (ES6+)
-- Lee configuración desde API REST
-- Guarda en `config.yaml`
-- Sin conexión con UI QML
+**Notes**:
+- Modern JavaScript (ES6+)
+- Reads configuration from REST API
+- Saves to `config.yaml`
+- No connection to QML UI
 
 ---
 
-## 📝 Conclusiones
+## 📝 Conclusions
 
-### **✅ FORTALEZAS ACTUALES**:
+### **✅ CURRENT STRENGTHS**:
 
-1. **UI Web**:
-   - ✅ Más completa para configuración técnica
-   - ✅ Backup/Restore automático
-   - ✅ API REST para automatización
-   - ✅ No requiere pantalla táctil
+1. **Web UI**:
+    - ✅ More complete for technical configuration
+    - ✅ Automatic Backup/Restore
+    - ✅ REST API for automation
+    - ✅ No touchscreen required
 
-2. **UI QML**:
-   - ✅ Integrada en dispositivo
-   - ✅ Multi-idioma nativo
-   - ✅ Acceso sin red
-   - ✅ UI más pulida (Qt Quick)
+2. **QML UI**:
+    - ✅ Integrated in device
+    - ✅ Native multi-language
+    - ✅ Access without network
+    - ✅ More polished UI (Qt Quick)
 
-### **⚠️ DEBILIDADES**:
+### **⚠️ WEAKNESSES**:
 
-1. **UI Web**:
-   - ❌ Sin multi-idioma completo
-   - ❌ Sin acceso a configuración de pantalla
-   - ❌ Sin control de timbres nativos
+1. **Web UI**:
+    - ❌ No full multi-language
+    - ❌ No access to display settings
+    - ❌ No control of native ringtones
 
-2. **UI QML**:
-   - ❌ Sin backup/restore
-   - ❌ Sin API para automatización
-   - ❌ Configuración técnica limitada
-   - ❌ Qt Quick 1.1 (obsoleto)
+2. **QML UI**:
+    - ❌ No backup/restore
+    - ❌ No API for automation
+    - ❌ Limited technical configuration
+    - ❌ Qt Quick 1.1 (obsolete)
 
-### **🎯 OPORTUNIDADES DE MEJORA**:
+### **🎯 IMPROVEMENT OPPORTUNITIES**:
 
-#### **Corto Plazo** (Web UI):
-1. ✅ Agregar tab "Device" para NTP/Date/Time
-2. ✅ Leer idioma desde dispositivo
-3. ✅ Mostrar timbres disponibles
+#### **Short Term** (Web UI):
+1. ✅ Add "Device" tab for NTP/Date/Time
+2. ✅ Read language from device
+3. ✅ Show available ringtones
 
-#### **Mediano Plazo** (QML + Web):
-1. ⏳ Crear archivo de configuración compartido
-2. ⏳ Notificar cambios entre UIs
-3. ⏳ Sincronizar estado en tiempo real
+#### **Medium Term** (QML + Web):
+1. ⏳ Create shared configuration file
+2. ⏳ Notify changes between UIs
+3. ⏳ Sync state in real time
 
-#### **Largo Plazo** (QML Custom):
-1. ⏳ Crear skin QML personalizada "bticino_bridge"
-2. ⏳ Agregar tabs para MQTT, HomeKit, Streaming
-3. ⏳ Integrar API REST en QML
+#### **Long Term** (Custom QML):
+1. ⏳ Create custom "bticino_bridge" QML skin
+2. ⏳ Add tabs for MQTT, HomeKit, Streaming
+3. ⏳ Integrate REST API into QML
 
 ---
 
-## 🚀 Mejoras Futuras en QML
+## 🚀 Future QML Improvements
 
 ### **Idea 1: bticino_bridge QML Skin**
 
-Crear un archivo QML personalizado que se integre con la UI nativa:
+Create a custom QML file that integrates with the native UI:
 
 ```qml
 // bticino_bridge.qml
@@ -246,7 +246,7 @@ Page {
     id: page
     headerLabel: qsTr("BTicino Bridge")
     
-    // Configurar MQTT
+    // Configure MQTT
     Rectangle {
         Label { text: "MQTT Broker" }
         TextInput { 
@@ -255,7 +255,7 @@ Page {
         }
     }
     
-    // Configurar HomeKit
+    // Configure HomeKit
     Rectangle {
         Label { text: "HomeKit PIN" }
         TextInput { 
@@ -266,22 +266,22 @@ Page {
 }
 ```
 
-**Requisitos**:
-- Compilar skin QML (necesita toolchain Qt)
-- Integrar con `BtObjects` (objetos globales del dispositivo)
-- Testear en dispositivo real
+**Requirements**:
+- Compile QML skin (needs Qt toolchain)
+- Integrate with `BtObjects` (device global objects)
+- Test on real device
 
-**Dificultad**: 🔴 **ALTA** (requiere reverse engineering de BtObjects)
+**Difficulty**: 🔴 **HIGH** (requires reverse engineering of BtObjects)
 
 ---
 
-### **Idea 2: API REST para QML**
+### **Idea 2: REST API for QML**
 
-Exponer configuración vía API para que QML pueda leerla:
+Expose configuration via API so QML can read it:
 
 ```cpp
 // En bt_daemon o proceso nativo
-// Exponer objeto global para QML
+// Expose global object for QML
 class BticinoBridge : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString mqttHost READ mqttHost WRITE setMqttHost)
@@ -302,67 +302,67 @@ private:
 qmlRegisterType<BticinoBridge>("BtObjects", 2, 0, "BticinoBridge");
 ```
 
-**Requisitos**:
-- Modificar `bt_daemon` o proceso nativo
-- Compilar para ARM
-- Testear en dispositivo
+**Requirements**:
+- Modify `bt_daemon` or native process
+- Compile for ARM
+- Test on device
 
-**Dificultad**: 🟡 **MEDIA** (requiere C++ y Qt)
+**Difficulty**: 🟡 **MEDIUM** (requires C++ and Qt)
 
 ---
 
-### **Idea 3: Polling desde Web UI**
+### **Idea 3: Polling from Web UI**
 
-La UI web puede leer configuración QML existente:
+The web UI can read existing QML configuration:
 
 ```javascript
-// Leer idioma desde dispositivo
+// Read language from device
 async function getDeviceLanguage() {
     const response = await ssh('cat /home/bticino/.language');
     return response.trim();
 }
 
-// Leer timbre actual
+// Read current doorbell
 async function getCurrentRingtone() {
     const response = await ssh('cat /home/bticino/cfg/extra/ringtone.conf');
     return response.trim();
 }
 ```
 
-**Requisitos**:
-- SSH desde bridge al dispositivo (localhost)
-- Parsear archivos de configuración QML
-- Mostrar en UI web
+**Requirements**:
+- SSH from bridge to device (localhost)
+- Parse QML configuration files
+- Show in web UI
 
-**Dificultad**: 🟢 **BAJA** (solo JavaScript)
-
----
-
-## 📋 Recomendaciones
-
-### **Prioridad 1** (Inmediato):
-1. ✅ Documentar estructura QML existente
-2. ✅ Identificar archivos de configuración QML
-3. ✅ Crear API para leer configuración QML desde Web
-
-### **Prioridad 2** (Corto Plazo):
-1. ⏳ Agregar tab "Device" en Web UI (NTP, Date, Time)
-2. ⏳ Leer idioma desde dispositivo
-3. ⏳ Mostrar configuración de timbres
-
-### **Prioridad 3** (Mediano Plazo):
-1. ⏳ Investigar `BtObjects` en QML
-2. ⏳ Crear skin QML "bticino_bridge" básica
-3. ⏳ Integrar API REST en QML
-
-### **Prioridad 4** (Largo Plazo):
-1. ⏳ Skin QML completa con todas las features Web
-2. ⏳ Sincronización bidireccional en tiempo real
-3. ⏳ Reemplazar UI QML stock por custom
+**Difficulty**: 🟢 **LOW** (JavaScript only)
 
 ---
 
-## 📁 Archivos de Referencia
+## 📋 Recommendations
+
+### **Priority 1** (Immediate):
+1. ✅ Document existing QML structure
+2. ✅ Identify QML configuration files
+3. ✅ Create API to read QML configuration from Web
+
+### **Priority 2** (Short Term):
+1. ⏳ Add "Device" tab in Web UI (NTP, Date, Time)
+2. ⏳ Read language from device
+3. ⏳ Show ringtone configuration
+
+### **Priority 3** (Medium Term):
+1. ⏳ Investigate `BtObjects` in QML
+2. ⏳ Create basic "bticino_bridge" QML skin
+3. ⏳ Integrate REST API into QML
+
+### **Priority 4** (Long Term):
+1. ⏳ Full QML skin with all Web features
+2. ⏳ Real-time bidirectional sync
+3. ⏳ Replace stock QML UI with custom
+
+---
+
+## 📁 Reference Files
 
 ### **QML Stock**:
 ```
@@ -383,21 +383,21 @@ async function getCurrentRingtone() {
 ### **Web UI**:
 ```
 pkg/webserver/
-├── server.go (4669 líneas)
-├── config_manager.go (449 líneas)
-├── config_handlers.go (250 líneas)
-├── config_ui.js (500+ líneas embebidas)
-└── config_ui.css (300+ líneas embebidas)
+├── server.go (4669 lines)
+├── config_manager.go (449 lines)
+├── config_handlers.go (250 lines)
+├── config_ui.js (500+ embedded lines)
+└── config_ui.css (300+ embedded lines)
 ```
 
-### **Configuración**:
+### **Configuration**:
 ```
 /home/bticino/cfg/extra/config.yaml (4.4 KB)
-← ÚNICO archivo de configuración compartido
+← ONLY shared configuration file
 ```
 
 ---
 
-**Estado**: 📊 **ANÁLISIS COMPLETADO**  
-**Próximo Paso**: Implementar Prioridad 1 (leer configuración QML desde Web)  
-**Dificultad General**: 🟡 **MEDIA** (QML antiguo, pero documentado)
+**Status**: 📊 **ANALYSIS COMPLETE**  
+**Next Step**: Implement Priority 1 (read QML configuration from Web)  
+**Overall Difficulty**: 🟡 **MEDIUM** (old QML, but documented)

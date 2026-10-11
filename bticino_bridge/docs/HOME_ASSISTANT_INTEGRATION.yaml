@@ -1,17 +1,17 @@
 # BTicino Classe 300X - Home Assistant Integration
-# Configuración MQTT para Home Assistant
+# MQTT configuration for Home Assistant
 
-# 1. CONFIGURACIÓN MQTT (ya debería estar configurado en configuration.yaml)
+# 1. MQTT CONFIGURATION (should already be configured in configuration.yaml)
 mqtt:
   broker: 192.168.1.3
   port: 1883
   username: mqtt_user
   password: CHANGE_ME
-  discovery: true  # Importante: Habilita auto-discovery
+  discovery: true  # Important: enables auto-discovery
   discovery_prefix: homeassistant
 
-# 2. SENSORES MANUALES (por si auto-discovery no funciona)
-# Agrega esto a tu configuration.yaml de Home Assistant:
+# 2. MANUAL SENSORS (in case auto-discovery doesn't work)
+# Add this to your Home Assistant configuration.yaml:
 
 sensor:
   - platform: mqtt
@@ -100,7 +100,7 @@ binary_sensor:
     payload_off: "OFF"
     icon: mdi:volume-high
 
-# 3. AUTOMATIZACIONES ÚTILES
+# 3. USEFUL AUTOMATIONS
 automation:
   - id: bticino_connectivity_alert
     alias: "BTicino Connection Alert"
@@ -127,8 +127,8 @@ automation:
           name: BTicino SIP
           message: "SIP status changed to {{ trigger.to_state.state }}"
 
-# 4. COMANDOS MQTT (para enviar desde Home Assistant)
-# Usa estos servicios en scripts o automatizaciones:
+# 4. MQTT COMMANDS (to send from Home Assistant)
+# Use these services in scripts or automations:
 
 script:
   bticino_refresh_status:
@@ -155,8 +155,8 @@ script:
           topic: "homeassistant/sensor/bticino/commands/sip/status"
           payload: "check"
 
-# 5. DASHBOARD CARD EJEMPLO (Lovelace UI)
-# Agrega esta tarjeta a tu dashboard:
+# 5. EXAMPLE DASHBOARD CARD (Lovelace UI)
+# Add this card to your dashboard:
 
 type: entities
 title: BTicino Classe 300X
@@ -187,8 +187,8 @@ entities:
     name: "Audio Ch6"
 show_header_toggle: false
 
-# 6. TOPICS MQTT PARA MONITOREO MANUAL
-# Puedes usar MQTT Explorer o mosquitto_sub para monitorear:
+# 6. MQTT TOPICS FOR MANUAL MONITORING
+# You can use MQTT Explorer or mosquitto_sub to monitor:
 #
 # mosquitto_sub -h 192.168.1.3 -p 1883 -u mqtt_user -P CHANGE_ME -t "homeassistant/sensor/bticino/+/state"
 # mosquitto_sub -h 192.168.1.3 -p 1883 -u mqtt_user -P CHANGE_ME -t "homeassistant/binary_sensor/bticino/+/state"

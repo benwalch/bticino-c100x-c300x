@@ -1,82 +1,82 @@
 # BTicino Bridge - Svelte Migration Progress Report
 
-**Fecha**: 2026-03-27  
-**Versión**: v0.15.0 (Svelte)  
-**Estado**: ✅ **FASE 1 COMPLETADA**
+**Date**: 2026-03-27  
+**Version**: v0.15.0 (Svelte)  
+**Status**: ✅ **PHASE 1 COMPLETE**
 
 ---
 
-## 🎉 **Resumen Ejecutivo**
+## 🎉 **Executive Summary**
 
-### **Lo que teníamos antes**:
-- ❌ UI embebida en Go (4802 líneas en server.go)
-- ❌ HTML/CSS/JS mezclado con backend
-- ❌ Difícil mantenimiento
-- ❌ Sin hot reload
-- ❌ Múltiples scripts de deploy
+### **What we had before**:
+- ❌ UI embedded in Go (4802 lines in server.go)
+- ❌ HTML/CSS/JS mixed with backend
+- ❌ Hard maintenance
+- ❌ No hot reload
+- ❌ Multiple deploy scripts
 
-### **Lo que tenemos ahora**:
-- ✅ UI moderna con Svelte
-- ✅ Separación backend/frontend
-- ✅ Código limpio y mantenible
-- ✅ Hot reload en desarrollo
-- ✅ **Deploy único** (`make deploy`)
+### **What we have now**:
+- ✅ Modern Svelte UI
+- ✅ Backend/frontend separation
+- ✅ Clean, maintainable code
+- ✅ Hot reload in development
+- ✅ **Single deploy** (`make deploy`)
 
 ---
 
-## 📊 **Métricas del Cambio**
+## 📊 **Change Metrics**
 
-| Aspecto | Antes | Ahora | Mejora |
+| Aspect | Before | Now | Improvement |
 |---------|-------|-------|--------|
-| **Líneas en server.go** | 4802 | ~3000 | -37% |
-| **UI Framework** | HTML embebido | Svelte 4 | ✅ Moderno |
-| **Bundle Size** | 14MB (todo junto) | 13MB + 65KB | ✅ Separado |
-| **Deploy Scripts** | 4 diferentes | 1 único | ✅ Simplificado |
-| **Componentes** | 0 | 2 (Dashboard, Settings) | ✅ Reutilizables |
-| **Hot Reload** | ❌ No | ✅ Sí | ✅ Desarrollo rápido |
+| **server.go lines** | 4802 | ~3000 | -37% |
+| **UI Framework** | Embedded HTML | Svelte 4 | ✅ Modern |
+| **Bundle Size** | 14MB (all together) | 13MB + 65KB | ✅ Separate |
+| **Deploy Scripts** | 4 different | 1 single | ✅ Simplified |
+| **Components** | 0 | 2 (Dashboard, Settings) | ✅ Reusable |
+| **Hot Reload** | ❌ No | ✅ Yes | ✅ Fast development |
 
 ---
 
-## 📁 **Archivos Creados/Modificados**
+## 📁 **Created/Modified Files**
 
-### **Nuevos Archivos** (Svelte UI):
+### **New Files** (Svelte UI):
 ```
 web/
 ├── src/
-│   ├── main.js                    # Entry point (8 líneas)
-│   ├── App.svelte                 # Dashboard + Routing (330 líneas)
+│   ├── main.js                    # Entry point (8 lines)
+│   ├── App.svelte                 # Dashboard + Routing (330 lines)
 │   └── routes/
 │       └── settings/
-│           └── +page.svelte       # Settings page (510 líneas)
-├── index.html                     # HTML base (15 líneas)
-├── package.json                   # Dependencias (20 líneas)
-├── vite.config.js                 # Config Vite (25 líneas)
-└── svelte.config.js               # Config Svelte (5 líneas)
+│           └── +page.svelte       # Settings page (510 lines)
+├── index.html                     # Base HTML (15 lines)
+├── package.json                   # Dependencies (20 lines)
+├── vite.config.js                 # Vite config (25 lines)
+└── svelte.config.js               # Svelte config (5 lines)
 ```
 
-### **Archivos Modificados**:
+### **Modified Files**:
 ```
-scripts/deploy.sh                  # Deploy único (150 líneas)
-Makefile                           # Build commands (80 líneas)
+scripts/deploy.sh                  # Single deploy (150 lines)
+Makefile                           # Build commands (80 lines)
 ```
 
-### **Documentación Creada**:
+### **Created Documentation**:
 ```
-docs/SVELTE_SETUP.md               # Setup guide (300 líneas)
+docs/SVELTE_SETUP.md               # Setup guide (300 lines)
 docs/SPROGRESS_REPORT.md           # Este archivo
 ```
 
-**Total líneas nuevas**: ~1443 líneas  
-**Total líneas eliminadas**: ~1800 líneas (HTML embebido en server.go)  
-**Neto**: -357 líneas (más limpio!)
+**Total new lines**: ~1443 lines  
+**Total removed lines**: ~1800 lines (HTML embedded in server.go)  
+**Net**: -357 lines (cleaner!)
 
 ---
 
-## 🚀 **Comandos Disponibles**
+## 🚀 **Available Commands**
 
-### **Desarrollo**:
+### **Development**:
 ```bash
-# Instalar dependencias
+# Install dependencies
 make install
 
 # Development mode (hot reload)
@@ -87,12 +87,12 @@ make dev
 # - API: http://localhost:8082
 ```
 
-### **Producción**:
+### **Production**:
 ```bash
 # Build completo
 make build
 
-# Deploy a dispositivo
+# Deploy to device
 make deploy
 
 # Limpiar
@@ -101,10 +101,10 @@ make clean
 
 ---
 
-## 🎨 **Componentes Svelte**
+## 🎨 **Svelte Components**
 
 ### **1. Dashboard (`App.svelte`)**:
-- ✅ Navbar con navegación
+- ✅ Navbar with navigation
 - ✅ Status cards (Version, Uptime, Storage, MQTT)
 - ✅ Components status
 - ✅ Quick actions
@@ -137,47 +137,47 @@ make clean
 
 ---
 
-## 📊 **Estado de Implementación**
+## 📊 **Implementation Status**
 
-### **✅ Completado**:
-- [x] Setup de Svelte + Vite
+### **✅ Complete**:
+- [x] Svelte + Vite setup
 - [x] Dashboard component
-- [x] Settings page con 7 tabs
-- [x] Routing básico (hash-based)
+- [x] Settings page with 7 tabs
+- [x] Basic routing (hash-based)
 - [x] API integration
-- [x] Deploy script único
-- [x] Makefile actualizado
-- [x] Documentación
+- [x] Single deploy script
+- [x] Updated Makefile
+- [x] Documentation
 
-### **⏳ En Progreso**:
+### **⏳ In Progress**:
 - [ ] Controls page
 - [ ] Logs viewer
-- [ ] Device tab (leer de QML)
+- [ ] Device tab (read from QML)
 - [ ] Messages page
 
-### **📋 Pendiente**:
+### **📋 Pending**:
 - [ ] TypeScript migration
 - [ ] Unit tests (Vitest)
 - [ ] E2E tests (Playwright)
 - [ ] Dark mode
 - [ ] PWA support
-- [ ] WebSocket para updates en tiempo real
+- [ ] WebSocket for real-time updates
 
 ---
 
 ## 🔌 **API Integration**
 
-### **Endpoints Usados**:
+### **Endpoints Used**:
 
-| Endpoint | Método | Componente | Estado |
+| Endpoint | Method | Component | Status |
 |----------|--------|------------|--------|
-| `/api/status` | GET | Dashboard | ✅ Funcionando |
-| `/api/config` | GET | Settings | ✅ Funcionando |
-| `/api/config/save` | POST | Settings | ✅ Funcionando |
-| `/api/device/ntp` | GET | Settings (Device tab) | ⏳ Pendiente |
-| `/api/device/language` | GET | Settings (Device tab) | ⏳ Pendiente |
+| `/api/status` | GET | Dashboard | ✅ Working |
+| `/api/config` | GET | Settings | ✅ Working |
+| `/api/config/save` | POST | Settings | ✅ Working |
+| `/api/device/ntp` | GET | Settings (Device tab) | ⏳ Pending |
+| `/api/device/language` | GET | Settings (Device tab) | ⏳ Pending |
 
-### **Ejemplo de Uso**:
+### **Usage Example**:
 ```svelte
 <script>
   import { onMount } from 'svelte'
@@ -197,20 +197,20 @@ make clean
 
 ---
 
-## 🎯 **Próximos Pasos**
+## 🎯 **Next Steps**
 
-### **Inmediatos (Esta Semana)**:
+### **Immediate (This Week)**:
 1. ✅ Instalar dependencias: `make install`
 2. ✅ Probar en desarrollo: `make dev`
 3. ⏳ Crear Controls page
 4. ⏳ Crear Logs viewer
 
-### **Corto Plazo (Próxima Semana)**:
-1. ⏳ Device tab (leer de QML)
+### **Short Term (Next Week)**:
+1. ⏳ Device tab (read from QML)
 2. ⏳ Messages page
-3. ⏳ WebSocket para updates en tiempo real
+3. ⏳ WebSocket for real-time updates
 
-### **Largo Plazo (Este Mes)**:
+### **Long Term (This Month)**:
 1. ⏳ TypeScript migration
 2. ⏳ Unit tests
 3. ⏳ Dark mode
@@ -265,33 +265,33 @@ make clean
 
 ---
 
-## 🐛 **Issues Conocidos**
+## 🐛 **Known Issues**
 
-### **Menores**:
-- [ ] Settings page usa iframe (temporal)
-- [ ] Routing básico (hash-based)
-- [ ] Sin loading skeleton
+### **Minor**:
+- [ ] Settings page uses iframe (temporary)
+- [ ] Basic routing (hash-based)
+- [ ] No loading skeleton
 
-### **Medios**:
-- [ ] Device tab no lee de QML real
-- [ ] Sin validación de formularios
-- [ ] Sin confirmación antes de guardar
+### **Medium**:
+- [ ] Device tab doesn't read real QML
+- [ ] No form validation
+- [ ] No confirmation before saving
 
-### **Mayores**:
-- [ ] Sin tests automatizados
-- [ ] Sin CI/CD pipeline
-- [ ] Sin error boundaries
+### **Major**:
+- [ ] No automated tests
+- [ ] No CI/CD pipeline
+- [ ] No error boundaries
 
 ---
 
-## 📚 **Recursos**
+## 📚 **Resources**
 
-### **Documentación**:
+### **Documentation**:
 - [Svelte Docs](https://svelte.dev/docs)
 - [Vite Docs](https://vitejs.dev/guide/)
 - [Svelte Tutorial](https://svelte.dev/tutorial)
 
-### **Código**:
+### **Code**:
 - `web/src/App.svelte` - Dashboard
 - `web/src/routes/settings/+page.svelte` - Settings
 - `web/vite.config.js` - Vite config
@@ -299,42 +299,41 @@ make clean
 
 ---
 
-## ✅ **Checklist de Migración**
+## ✅ **Migration Checklist**
 
-### **Fase 1: Setup** ✅ COMPLETADA
-- [x] Crear proyecto Svelte
-- [x] Configurar Vite
-- [x] Crear Dashboard
-- [x] Crear Settings page
-- [x] Actualizar Makefile
-- [x] Actualizar deploy.sh
+### **Phase 1: Setup** ✅ COMPLETE
+- [x] Create Svelte project
+- [x] Configure Vite
+- [x] Create Dashboard
+- [x] Create Settings page
+- [x] Update Makefile
+- [x] Update deploy.sh
 
-### **Fase 2: Componentes** ⏳ EN PROGRESO
+### **Phase 2: Components** ⏳ IN PROGRESS
 - [x] Dashboard (80%)
 - [x] Settings (80%)
 - [ ] Controls (0%)
 - [ ] Logs (0%)
 - [ ] Messages (0%)
 
-### **Fase 3: Integración** ⏳ PENDIENTE
+### **Phase 3: Integration** ⏳ PENDING
 - [ ] Device QML integration
 - [ ] WebSocket updates
 - [ ] Real-time logs
 
-### **Fase 4: Testing** ⏳ PENDIENTE
+### **Phase 4: Testing** ⏳ PENDING
 - [ ] Unit tests
 - [ ] E2E tests
 - [ ] Performance tests
 
-### **Fase 5: Producción** ⏳ PENDIENTE
-- [ ] Deploy a dispositivo
+### **Phase 5: Production** ⏳ PENDING
+- [ ] Deploy to device
 - [ ] Performance testing
 - [ ] User acceptance testing
 
 ---
 
-**Estado**: ✅ **FASE 1 COMPLETADA**  
-**Próximo Hito**: FASE 2 (Componentes)  
-**ETA**: 1-2 semanas  
-**Dificultad**: 🟢 Media (Svelte es simple)
-
+**Status**: ✅ **PHASE 1 COMPLETE**  
+**Next Milestone**: PHASE 2 (Components)  
+**ETA**: 1-2 weeks  
+**Difficulty**: 🟢 Medium (Svelte is simple)

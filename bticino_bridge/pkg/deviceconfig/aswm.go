@@ -1,4 +1,4 @@
-// Package deviceconfig proporciona parsers para archivos de configuración del dispositivo BTicino
+// Package deviceconfig provides parsers for BTicino device configuration files
 package deviceconfig
 
 import (
@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// ASWMSettings representa la estructura del archivo aswm_settings.ini
+// ASWMSettings represents the structure of the aswm_settings.ini file
 type ASWMSettings struct {
 	Activated  int    `json:"activated"`
 	RingEnable int    `json:"ring_enable"`
@@ -18,7 +18,7 @@ type ASWMSettings struct {
 	Fps        int    `json:"fps"`
 }
 
-// ReadASWMSettings lee y parsea el archivo aswm_settings.ini
+// ReadASWMSettings reads and parses the aswm_settings.ini file
 func ReadASWMSettings(path string) (*ASWMSettings, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -32,17 +32,17 @@ func ReadASWMSettings(path string) (*ASWMSettings, error) {
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		// Ignorar comentarios y líneas vacías
+		// Ignore comments and empty lines
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 
-		// Parsear secciones [Answering Machine] y [Volumes]
+		// Parse [Answering Machine] and [Volumes] sections
 		if strings.HasPrefix(line, "[") {
 			continue
 		}
 
-		// Parsear key=value
+		// Parse key=value
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
 			continue
@@ -70,7 +70,7 @@ func ReadASWMSettings(path string) (*ASWMSettings, error) {
 	return aswm, nil
 }
 
-// GetAnsweringMachineStatus retorna el estado del contestador
+// GetAnsweringMachineStatus returns the answering machine status
 func GetAnsweringMachineStatus(path string) (activated, ringEnabled bool, memUsed string, err error) {
 	aswm, err := ReadASWMSettings(path)
 	if err != nil {
@@ -79,7 +79,7 @@ func GetAnsweringMachineStatus(path string) (activated, ringEnabled bool, memUse
 	return aswm.Activated == 1, aswm.RingEnable == 1, aswm.Memused, nil
 }
 
-// ASWMVolumes representa los volúmenes del contestador
+// ASWMVolumes represents the answering machine volumes
 type ASWMVolumes struct {
 	Ring         int `json:"ring"`
 	PlayAvi      int `json:"play_avi"`
@@ -94,7 +94,7 @@ type ASWMVolumes struct {
 	SipPe        int `json:"sip_pe"`
 }
 
-// ReadASWMVolumes lee los volúmenes del aswm_settings.ini
+// ReadASWMVolumes reads the volumes from aswm_settings.ini
 func ReadASWMVolumes(path string) (*ASWMVolumes, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -113,7 +113,7 @@ func ReadASWMVolumes(path string) (*ASWMVolumes, error) {
 			continue
 		}
 
-		// Detectar sección [Volumes]
+		// Detect [Volumes] section
 		if strings.HasPrefix(line, "[") {
 			inVolumesSection = strings.Contains(line, "Volumes")
 			continue

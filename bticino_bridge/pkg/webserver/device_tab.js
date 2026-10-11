@@ -1,10 +1,10 @@
 // BTicino Bridge - Device Tab Enhancement
-// Agrega soporte para NTP, Timezone, Language, Ringtone
+// Adds support for NTP, Timezone, Language, Ringtone
 
-// Leer configuración del dispositivo QML
+// Read QML device configuration
 async function loadDeviceConfig() {
     try {
-        // Leer NTP desde global.guiSettings.ntp
+        // Read NTP from global.guiSettings.ntp
         const ntpResponse = await fetch('/api/device/ntp');
         const ntpData = await ntpResponse.json();
         setValue('ntp_enabled', ntpData.enabled || false);
@@ -21,7 +21,7 @@ async function loadDeviceConfig() {
         const langData = await langResponse.json();
         setValue('language', langData.language || 'en');
         
-        // Leer timbre actual
+        // Read current doorbell
         const ringtoneResponse = await fetch('/api/device/ringtone');
         const ringtoneData = await ringtoneResponse.json();
         setValue('ringtone', ringtoneData.ringtone || 'default');
@@ -32,7 +32,7 @@ async function loadDeviceConfig() {
     }
 }
 
-// Guardar configuración del dispositivo
+// Save device configuration
 async function saveDeviceConfig() {
     try {
         const config = {
@@ -113,7 +113,7 @@ window.loadConfig = async function() {
     if (originalLoadConfig) {
         await originalLoadConfig();
     }
-    // Cargar configuración del dispositivo después de la config principal
+    // Load device configuration after the main config
     await loadDeviceConfig();
     await loadRingtones();
     await loadLanguages();
@@ -122,7 +122,7 @@ window.loadConfig = async function() {
 // Integrar con saveConfig existente
 const originalSaveConfig = window.saveConfig;
 window.saveConfig = async function() {
-    // Guardar configuración del dispositivo junto con la principal
+    // Save device configuration together with the main one
     await saveDeviceConfig();
     if (originalSaveConfig) {
         await originalSaveConfig();

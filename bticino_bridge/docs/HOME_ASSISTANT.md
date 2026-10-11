@@ -24,63 +24,63 @@ device-config mirror; **Configuration** holds the optional restart buttons.
 
 | Entity | Domain | State topic | Command topic | Notes |
 |---|---|---|---|---|
-| Puerta (door) | `lock` | `bticino/lock/state` | `bticino/lock/set` | `LOCK`/`UNLOCK`; opens the main door |
-| Contestador (answering machine) | `switch` | `bticino/voicemail/state` | `bticino/voicemail/set` | `ON`/`OFF` |
-| Sonido Timbre (doorbell sound) | `switch` | `bticino/doorbellsound/state` | `bticino/doorbellsound/set` | Ringer mute/unmute |
-| Pantalla (display) | `switch` | `bticino/display/state` | `bticino/display/set` | Screen on/off |
-| Luz Escalera (staircase light) | `button` | — | `bticino/light/set` | Momentary (press+release) |
-| Abrir Puerta (door open) | `button` | — | `bticino/door/open` | Momentary door pulse |
-| Marcar todos leídos | `button` | — | `bticino/messages/markallread/set` | Marks every message read |
+| Door | `lock` | `bticino/lock/state` | `bticino/lock/set` | `LOCK`/`UNLOCK`; opens the main door |
+| Answering machine | `switch` | `bticino/voicemail/state` | `bticino/voicemail/set` | `ON`/`OFF` |
+| Doorbell sound | `switch` | `bticino/doorbellsound/state` | `bticino/doorbellsound/set` | Ringer mute/unmute |
+| Display | `switch` | `bticino/display/state` | `bticino/display/set` | Screen on/off |
+| Staircase light | `button` | — | `bticino/light/set` | Momentary (press+release) |
+| Door open | `button` | — | `bticino/door/open` | Momentary door pulse |
+| Mark all as read | `button` | — | `bticino/messages/markallread/set` | Marks every message read |
 | Additional locks | `lock` | `bticino/lock/<id>/state` | `bticino/lock/<id>/set` | Only if configured (secondary gates) |
 
 ## Sensors (read-only)
 
 | Entity | Domain | State topic | Notes |
 |---|---|---|---|
-| Temperatura | `sensor` | `bticino/sensor/temperature` | °C, device internal |
-| Mensajes Nuevos | `sensor` | `bticino/sensor/new_messages` | Unread answering-machine messages |
-| Total Mensajes | `sensor` | `bticino/sensor/total_messages` | |
-| Almacenamiento | `sensor` | `bticino/sensor/storage_used` | % used |
-| Teclado | `sensor` | `bticino/sensor/keypad` | Last physical button pressed |
-| Evento Bus OpenWebNet | `sensor` | `bticino/sensor/bus_event` | Last raw OWN frame seen |
-| Diagnóstico Sistema | `sensor` | `bticino/sensor/system_diag` | |
+| Temperature | `sensor` | `bticino/sensor/temperature` | °C, device internal |
+| New messages | `sensor` | `bticino/sensor/new_messages` | Unread answering-machine messages |
+| Total messages | `sensor` | `bticino/sensor/total_messages` | |
+| Storage used | `sensor` | `bticino/sensor/storage_used` | % used |
+| Keypad | `sensor` | `bticino/sensor/keypad` | Last physical button pressed |
+| OWN bus event | `sensor` | `bticino/sensor/bus_event` | Last raw OWN frame seen |
+| System diagnostics | `sensor` | `bticino/sensor/system_diag` | |
 | Multicast | `sensor` | `bticino/sensor/multicast_count` | Multicast messages seen |
-| Registro de Actividad | `sensor` | `bticino/sensor/activity_log` | + `.../attributes` for history |
-| Información del Sistema | `sensor` | `bticino/sensor/system_info` | WHO=13 (IP/MAC/firmware…) in attributes |
+| Activity log | `sensor` | `bticino/sensor/activity_log` | + `.../attributes` for history |
+| System information | `sensor` | `bticino/sensor/system_info` | WHO=13 (IP/MAC/firmware…) in attributes |
 
 ### Diagnostic — network (`entity_category: diagnostic`)
 
 | Entity | State topic | Notes |
 |---|---|---|
-| Dirección IP | `bticino/sensor/system_info/attributes` | via `value_json.ip_address` |
-| Dirección MAC | `bticino/sensor/system_info/attributes` | via `value_json.mac_address` |
-| Señal WiFi (%) | `bticino/sensor/wifi_signal` | from `connmanctl` Strength, refreshed every 60 s |
+| IP address | `bticino/sensor/system_info/attributes` | via `value_json.ip_address` |
+| MAC address | `bticino/sensor/system_info/attributes` | via `value_json.mac_address` |
+| Wi-Fi signal (%) | `bticino/sensor/wifi_signal` | from `connmanctl` Strength, refreshed every 60 s |
 
 ### Device configuration (read-only mirror of the native settings)
 
 | Entity | State topic |
 |---|---|
-| Idioma (language) | `bticino/system/language` |
-| Zona horaria (timezone) | `bticino/system/timezone` |
-| Servidor NTP | `bticino/system/timezone` *(currently shares the timezone topic)* |
-| Fecha/hora | `bticino/system/datetime` |
-| Estado contestador | `bticino/answering/state` |
-| Memoria contestador | `bticino/answering/state` |
-| Tono S0 (entrance panel) | `bticino/audio/ringtone/s0` |
-| Volumen S0 | `bticino/audio/volume/s0` |
-| Volumen puerta | `bticino/audio/volume/door` |
-| Brillo pantalla | `bticino/display/brightness` |
-| Brillo cámara 20 | `bticino/camera/20/config` |
+| Language | `bticino/system/language` |
+| Time zone | `bticino/system/timezone` |
+| NTP server | `bticino/system/timezone` *(currently shares the timezone topic)* |
+| Date/time | `bticino/system/datetime` |
+| Answering machine status | `bticino/answering/state` |
+| Answering machine memory | `bticino/answering/state` |
+| S0 ringtone (entrance panel) | `bticino/audio/ringtone/s0` |
+| S0 volume | `bticino/audio/volume/s0` |
+| Door volume | `bticino/audio/volume/door` |
+| Display brightness | `bticino/display/brightness` |
+| Camera 20 brightness | `bticino/camera/20/config` |
 
 ## Binary sensors
 
 | Entity | Domain | State topic | Notes |
 |---|---|---|---|
-| Timbre (doorbell) | `binary_sensor` | `bticino/doorbell/state` | Entrance-panel ring |
-| Timbre rellano (floor) | `binary_sensor` | `bticino/doorbell_floor/state` | Landing/floor button (`*7*59#`), `device_class: occupancy` |
-| Estado SIP | `binary_sensor` | `bticino/sensor/sip_status` | SIP registration up/down |
-| LEDs (×7) | `binary_sensor` | `bticino/led/<name>/state` | Missed call, call green/red, etc. |
-| GPIO (×13) | `binary_sensor` | `bticino/gpio/<pin>/state` | Raw GPIO pins |
+| Doorbell | `binary_sensor` | `bticino/doorbell/state` | Entrance-panel ring |
+| Landing doorbell (floor) | `binary_sensor` | `bticino/doorbell_floor/state` | Landing/floor button (`*7*59#`), `device_class: occupancy` |
+| SIP status | `binary_sensor` | `bticino/sensor/sip_status` | SIP registration up/down |
+| LEDs (300X ×7: memo, wifi, answering, lock, missed call, green/red call; 100X ×11: muted, door lock, staircase, phone green/red, page 1–4, autosw, wifi) | `binary_sensor` | `bticino/led/<name>/state` | Sysfs names differ per model (`led_exc_call` vs `led_call_exp`, …); `mmc*` skipped |
+| GPIO (13 on 300X, 12 on 100X) | `binary_sensor` | `bticino/gpio/<pin>/state` | Pin list follows `DeviceVariant`; names carry the verified function |
 
 ## Events (`event` platform)
 
@@ -89,9 +89,9 @@ Each fires with a timestamp and an `event_type`; the payload is JSON on the topi
 
 | Entity | Topic | event_types |
 |---|---|---|
-| Timbre (evento) | `bticino/event/doorbell` | `pressed` |
-| Timbre rellano (evento) | `bticino/event/doorbell_floor` | `pressed` |
-| Llamada (evento) | `bticino/event/call` | `incoming`, `connected`, `ended` (incoming carries `caller`) |
+| Doorbell (event) | `bticino/event/doorbell` | `pressed` |
+| Landing doorbell (event) | `bticino/event/doorbell_floor` | `pressed` |
+| Call (event) | `bticino/event/call` | `incoming`, `connected`, `ended` (incoming carries `caller`) |
 
 These complement the `binary_sensor`/`sensor` versions: the binary sensors show
 current state, the event entities give a clean per-trigger event for automations.
@@ -100,8 +100,8 @@ current state, the event entities give a clean per-trigger event for automations
 
 | Entity | Domain | State topic | Values |
 |---|---|---|---|
-| Estado llamada | `sensor` | `bticino/call/state` | `INCOMING` / `CONNECTED` / `IDLE` |
-| Quién llama | `sensor` | `bticino/call/caller` | SIP user (e.g. `c300x`) |
+| Call status | `sensor` | `bticino/call/state` | `INCOMING` / `CONNECTED` / `IDLE` |
+| Caller | `sensor` | `bticino/call/caller` | SIP user (e.g. `c300x`) |
 
 **Total auto-discovered: ~42 entities** (43 with the doorbell camera below).
 
@@ -114,8 +114,8 @@ Two buttons in HA's **Configuration** section, **off by default**. Enable with
 
 | Button | Command topic | Action |
 |---|---|---|
-| Reiniciar bridge | `bticino/system/restart_bridge/set` | Relaunches the `bticino_bridge` process (setsid, ~2 s gap) |
-| Reiniciar dispositivo | `bticino/system/reboot/set` | **Reboots the whole intercom** (`/sbin/reboot`) |
+| Restart bridge | `bticino/system/restart_bridge/set` | Relaunches the `bticino_bridge` process (setsid, ~2 s gap) |
+| Restart device | `bticino/system/reboot/set` | **Reboots the whole intercom** (`/sbin/reboot`) |
 
 > ⚠️ The reboot button restarts the entire door unit. Restarting dropbear (SSH)
 > is intentionally **not** offered — the device has no service supervisor for it,
@@ -123,7 +123,7 @@ Two buttons in HA's **Configuration** section, **off by default**. Enable with
 
 ## Doorbell camera
 
-A **camera** entity (`camera.camara_timbre`, image topic `bticino/camera/doorbell`,
+A **camera** entity (`camera.doorbell_camera`, image topic `bticino/camera/doorbell`,
 base64 JPEG) that shows *who rang the bell*. When a doorbell rings or a call comes
 in — the moments when the native video session is active — the bridge captures a
 cooperative snapshot (single `*7*300`, validated at 688×480) and publishes it.
@@ -165,7 +165,7 @@ not just the still snapshot — for the duration of the call.
 - go2rtc serves the stream **`doorbell-video`** (video only). Point HA at it via the
   go2rtc / `webrtc-camera` integration (`http://<device-ip>:1984`), or add a generic
   camera to `rtsp://<device-ip>:6554/doorbell-video`.
-- Outside a call there is no live video (that's normal); `camera.camara_timbre` keeps
+- Outside a call there is no live video (that's normal); `camera.doorbell_camera` keeps
   showing the last snapshot as a preview.
 
 ```yaml
@@ -189,27 +189,27 @@ streaming:
 type: vertical-stack
 cards:
   - type: picture-entity          # only if video_on_demand: true
-    entity: camera.camara_timbre
-    name: Cámara timbre
+    entity: camera.doorbell_camera
+    name: Doorbell Camera
     camera_view: auto
   - type: entities
-    title: Videoportero BTicino
+    title: BTicino Video Intercom
     entities:
-      - entity: lock.bticino_puerta
-      - entity: binary_sensor.timbre
-      - entity: binary_sensor.timbre_rellano
-      - entity: sensor.estado_llamada
-      - entity: sensor.quien_llama
-      - entity: switch.contestador
-      - entity: sensor.mensajes_nuevos
-      - entity: sensor.temperatura
+      - entity: lock.bticino_door
+      - entity: binary_sensor.bticino_doorbell
+      - entity: binary_sensor.bticino_doorbell_floor
+      - entity: sensor.bticino_call_state
+      - entity: sensor.bticino_call_caller
+      - entity: switch.bticino_voicemail
+      - entity: sensor.bticino_new_messages
+      - entity: sensor.bticino_temperature
   - type: button
-    name: Abrir puerta
+    name: Open door
     tap_action:
       action: call-service
       service: button.press
       target:
-        entity_id: button.abrir_puerta
+        entity_id: button.bticino_door_open
 ```
 
 ## Automations

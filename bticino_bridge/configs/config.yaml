@@ -1,9 +1,9 @@
-# BTicino Bridge - Configuración Única y Completa
-# Versión: v0.14.1
-# Última actualización: 2026-03-26
+# BTicino Bridge - Single Complete Configuration
+# Version: v0.14.1
+# Last updated: 2026-03-26
 #
-# ESTE ES EL ÚNICO ARCHIVO DE CONFIGURACIÓN QUE SE USA
-# Los demás archivos en configs/ son solo ejemplos históricos
+# THIS IS THE ONLY CONFIGURATION FILE IN USE
+# The other files in configs/ are only historical examples
 # Features v0.14.1: QML→Bridge→MQTT sync (device config, ringtones, volumes, display)
 
 # ==================== BRIDGE ====================
@@ -30,7 +30,7 @@ sip:
   transport: "tcp"  # tcp, udp, tls - slyoldfox uses TCP
   domain: "YOUR_GATEWAY_ID.bs.iotleg.com"
   username: "webrtc"          # Per slyoldfox: register as webrtc@domain
-  password: "REDACTED_HA1"  # HA1 = MD5(webrtc:YOUR_GATEWAY_ID.bs.iotleg.com:webrtc)
+  password: "<CHANGE_ME>"  # HA1 = MD5(webrtc:<domain>:webrtc), see your flexisip.conf
   dev_addr: "20"
   use_ha1: true
   insecure_tls: false
@@ -154,7 +154,7 @@ servers:
     description: "BTicino Official SIP Server"
     required: false
 
-# ==================== NOTIFICACIONES ====================
+# ==================== NOTIFICATIONS ====================
 notifications:
   mqtt:
     enabled: true
@@ -176,7 +176,7 @@ notifications:
     bot_token: ""
     chat_id: ""
 
-# ==================== PRIVACIDAD ====================
+# ==================== PRIVACY ====================
 privacy:
   block_external_telemetry: true
   block_log_server: true
