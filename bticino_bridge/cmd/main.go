@@ -337,6 +337,10 @@ func main() {
 	logger.Info("🔧 Enhanced BTicino Components initialization complete")
 
 	// ==================== COMPONENT 2: Web Dashboard ====================
+	// LAN IP for user-facing log URLs (auto-detected; the old 300X IP
+	// 192.168.1.38 must not be hardcoded — DHCP changes it).
+	deviceIP := bticino.LocalOutboundIP()
+
 	if cfg.Web.Enabled {
 		logger.Info("🌐 Initializing Web Dashboard...")
 
@@ -350,7 +354,7 @@ func main() {
 			logger.WithError(err).Error("Failed to start web server, continuing without web interface")
 			webServer = nil
 		} else {
-			logger.Infof("✅ Web Dashboard: Started successfully on http://192.168.1.38:%d", cfg.Web.Port)
+			logger.Infof("✅ Web Dashboard: Started successfully on http://%s:%d", deviceIP, cfg.Web.Port)
 			logger.Info("  - Enhanced with real BTicino filesystem integration")
 			logger.Info("  - Message parsing from /home/bticino/cfg/extra/47/messages/")
 		}
@@ -394,7 +398,7 @@ func main() {
 		// Determine local IP for SIP
 		localIP := cfg.SIP.LocalHost
 		if localIP == "" {
-			localIP = "192.168.1.38"
+			localIP = deviceIP
 		}
 
 		// Create SIP configuration from main config
@@ -843,9 +847,11 @@ func main() {
 				}
 			}
 
-			// Detectar fin de llamada (colgar) en el bus: desarma el vídeo en
-			// vivo (live_on_call). Cubre llamada entrante y auto-llamada.
-			if cmd.Raw == bticino.CmdHangupIncoming || cmd.Raw == bticino.CmdHangupSelf || cmd.Raw == bticino.CmdHangupSelf420 {
+			// Detect call end (hangup) on the bus: disarms live
+			// video (live_on_call). Covers incoming and self calls.
+			// Structural match (bticino.IsCallHangup): WHO=8 WHAT=3#…,
+			// any WHERE (416/420 on 300X, 411 on 100X).
+			if bticino.IsCallHangup(cmd.Raw) {
 				eventBus.PublishWithSource("call.hangup", map[string]interface{}{
 					"raw": cmd.Raw,
 				}, "openwebnet_monitor")
@@ -957,11 +963,11 @@ func main() {
 	}
 
 	if udpProxy != nil {
-		logger.Infof("  UDP Proxy: Reenviando puerto %d -> %d", cfg.UDPProxy.ListenPort, cfg.UDPProxy.TargetPort)
+		logger.Infof("  UDP Proxy: Forwarding port %d -> %d", cfg.UDPProxy.ListenPort, cfg.UDPProxy.TargetPort)
 	}
 
 	if webServer != nil {
-		logger.Infof("  Web Dashboard: http://192.168.1.38:%d", cfg.Web.Port)
+		logger.Infof("  Web Dashboard: http://%s:%d", deviceIP, cfg.Web.Port)
 	}
 
 	if homekitBridge != nil {
@@ -1151,7 +1157,7 @@ func main() {
 				if webServer != nil {
 					logFields["web_server_enabled"] = true
 					logFields["web_server_port"] = cfg.Web.Port
-					logFields["web_dashboard_url"] = fmt.Sprintf("http://192.168.1.38:%d", cfg.Web.Port)
+					logFields["web_dashboard_url"] = fmt.Sprintf("http://%s:%d", deviceIP, cfg.Web.Port)
 				}
 
 				// HomeKit stats
@@ -1185,7 +1191,7 @@ func main() {
 
 	logger.Info("🚀 BTicino Bridge is fully operational. Press Ctrl+C to stop...")
 	if webServer != nil {
-		logger.Infof("🌐 Access the web dashboard at: http://192.168.1.38:%d", cfg.Web.Port)
+		logger.Infof("🌐 Access the web dashboard at: http://%s:%d", deviceIP, cfg.Web.Port)
 	}
 
 	// Wait for shutdown signal

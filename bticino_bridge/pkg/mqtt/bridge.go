@@ -1046,24 +1046,15 @@ func entityCategory(objectID string) string {
 	return ""
 }
 
-// localOutboundIP devuelve la IP LAN de la interfaz por defecto (truco: abrir un
-// socket UDP hacia una IP pública no envía nada pero fija la IP de origen de la
-// ruta). Cadena vacía si no se puede determinar.
+// localOutboundIP returns the LAN IP of the default interface.
+// Delegates to bticino.LocalOutboundIP (single implementation).
 func localOutboundIP() string {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		return ""
-	}
-	defer conn.Close()
-	if addr, ok := conn.LocalAddr().(*net.UDPAddr); ok {
-		return addr.IP.String()
-	}
-	return ""
+	return bticino.LocalOutboundIP()
 }
 
 // discovery publishes one HA MQTT discovery config message
 func (b *MQTTBridge) discovery(component, objectID string, cfg map[string]interface{}) {
-	// Asignar entity_category automáticamente si no se especificó una.
+	// Assign entity_category automatically if none was specified.
 	if _, has := cfg["entity_category"]; !has {
 		if cat := entityCategory(objectID); cat != "" {
 			cfg["entity_category"] = cat
@@ -1812,7 +1803,7 @@ func (b *MQTTBridge) PublishLEDStatus(leds map[string]bool) {
 	dp := b.dataPrefix()
 	for name, on := range leds {
 		// Skip mmc LEDs (SD card activity, not useful)
-		if name == "mmc0::" || name == "mmc2::" {
+		if name == "mmc0::" || name == "mmc1::" || name == "mmc2::" {
 			continue
 		}
 		b.publish(dp+"/led/"+name+"/state", boolState(on), true)

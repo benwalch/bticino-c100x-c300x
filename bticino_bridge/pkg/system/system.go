@@ -4,7 +4,6 @@
 package system
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,27 +12,34 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// RestartBridgeAsync relanza el binario actual desacoplado (setsid) tras una
-// breve pausa y termina este proceso. Hay un hueco de ~2s sin instancia (sin
-// solape de dos instancias a la vez).
+// RestartBridgeAsync relaunches the current binary detached (setsid) after a
+// brief pause and terminates this process. There is a ~2s gap with no instance
+// (no overlap of two instances at once).
 func RestartBridgeAsync(logger *logrus.Logger) {
-	logger.Warn("system: reinicio del bridge solicitado")
+	logger.Warn("system: bridge restart requested")
+
 	exe, err := os.Executable()
 	if err != nil {
-		logger.WithError(err).Error("restart_bridge: no se pudo determinar el binario")
+		logger.WithError(err).Error("restart_bridge: could not determine executable")
 		return
 	}
+
 	dir := filepath.Dir(exe)
+	args := append([]string(nil), os.Args[1:]...)
+
 	go func() {
-		// setsid + sleep para que el hijo sobreviva a nuestra salida y arranque
-		// cuando ya hayamos terminado.
-		cmd := exec.Command("setsid", "sh", "-c",
-			fmt.Sprintf("sleep 2; cd '%s' && exec '%s' > /tmp/bridge_deploy.log 2>&1", dir, exe))
+		// Start the replacement after the current process has exited.
+		script := `sleep 2; cd "$1" || exit 1; shift; exec "$@" > /var/log/bticino_bridge.log 2>&1`
+        cmdArgs := []string{"-c", script, "bridge-restart", dir, exe}
+        cmdArgs = append(cmdArgs, args...)
+        cmd := exec.Command("setsid", append([]string{"sh"}, cmdArgs...)...)
+
 		if err := cmd.Start(); err != nil {
-			logger.WithError(err).Error("restart_bridge: no se pudo relanzar")
+			logger.WithError(err).Error("restart_bridge: could not launch replacement")
 			return
 		}
-		logger.Warn("restart_bridge: relanzado, saliendo en 500ms")
+
+		logger.Warn("restart_bridge: replacement scheduled; exiting in 500ms")
 		time.Sleep(500 * time.Millisecond)
 		os.Exit(0)
 	}()

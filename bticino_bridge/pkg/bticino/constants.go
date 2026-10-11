@@ -10,6 +10,8 @@ package bticino
 
 import (
 	"fmt"
+	"net"
+	"strings"
 	"time"
 )
 
@@ -132,6 +134,7 @@ const (
 	CmdHangupIncoming    = "*8*3#1#4*416##"   // Hang up incoming call (WHERE=416)
 	CmdHangupSelf        = "*8*3#5#4*416##"   // Hang up self-call (WHERE=416)
 	CmdHangupSelf420     = "*8*3#5#4*420##"   // Hang up self-call (WHERE=420, variant) — NEW 2026-03-12
+	CmdHangupIncoming411 = "*8*3#1#4*411##"   // Hang up incoming call (WHERE=411, Classe 100X — seen on answered and unanswered rings 2026-10-11)
 	CmdRingIncoming      = "*8*9#1#4*20##"    // Doorbell notification (incoming call)
 	CmdRingSelf          = "*8*9#5#4*20##"    // Self-activation notification (eye)
 	CmdVoiceActive       = "*8*40#1#4*20##"   // Voice active on incoming call
@@ -278,6 +281,15 @@ const (
 	DeviceManufacturer = "Bticino-Legrand"
 	DeviceModel        = "Classe 300 X13E"
 	DeviceModelShort   = "C300X"
+
+	// DeviceVariant selects which indoor unit this bridge runs on.
+	// "c300x" for a Classe 300X, "c100x" for a Classe 100X. Change it
+	// and rebuild to retarget the unit.
+	DeviceVariant = "c300x"
+
+	// Supported variants (valid values for DeviceVariant).
+	DeviceVariant300X = "c300x"
+	DeviceVariant100X = "c100x"
 
 	// Network settings
 	DefaultNetworkInterface = "lo"
@@ -427,6 +439,7 @@ var CommandResponses = map[string]string{
 	"*8*9#1#4*20##":    "doorbell notification (incoming call)",
 	"*8*9#5#4*20##":    "self-activation notification (eye)",
 	"*8*3#1#4*416##":   "incoming call ended (hangup)",
+	"*8*3#1#4*411##":   "incoming call ended (hangup, WHERE=411, Classe 100X)",
 	"*8*3#5#4*416##":   "self-call ended (hangup)",
 	"*8*3#5#4*420##":   "self-call ended (hangup, WHERE=420 variant)",
 	"*8*40#1#4*20##":   "voice active on incoming call",
@@ -466,6 +479,7 @@ var OWNEventDescriptions = map[string]string{
 	"*8*9#1#4*20##":    "Incoming doorbell notification",
 	"*8*9#5#4*20##":    "Self-activation notification",
 	"*8*3#1#4*416##":   "Incoming call ended",
+	"*8*3#1#4*411##":   "Incoming call ended (WHERE=411, Classe 100X)",
 	"*8*3#5#4*416##":   "Self-call ended",
 	"*8*3#5#4*420##":   "Self-call ended (WHERE=420 variant)",
 	"*8*40#1#4*20##":   "Voice active on incoming call",
@@ -527,6 +541,7 @@ var OWNEventTypes = map[string]string{
 	"*8*1#5#4#20*16##": "camera_activated",
 	"*8*2#5#4*16##":    "intercom_active",
 	"*8*3#1#4*416##":   "call_ended",
+	"*8*3#1#4*411##":   "call_ended",
 	"*8*3#5#4*416##":   "call_ended",
 	"*8*3#5#4*420##":   "call_ended",
 	"*8*19*20##":       "door_open",
@@ -686,10 +701,56 @@ const (
 	HAIconActivityLog = "mdi:timeline-text"
 )
 
-// ==================== FUNCIONES HELPER ====================
+// ==================== HELPER FUNCTIONS ====================
 
-// BuildDoorOpenPress genera el comando OWN de pulsar boton puerta para un WHERE dado.
-// Ejemplo: BuildDoorOpenPress(20) -> "*8*19*20##", BuildDoorOpenPress(21) -> "*8*19*21##"
+// LocalOutboundIP returns the LAN IP of the default interface (trick: opening
+// a UDP socket to a public IP sends nothing but pins the source IP of the
+// route). Falls back to 127.0.0.1 when it cannot be determined. Use this
+// instead of hardcoding the device IP (it changes with DHCP).
+func LocalOutboundIP() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return "127.0.0.1"
+	}
+	defer conn.Close()
+	if addr, ok := conn.LocalAddr().(*net.UDPAddr); ok {
+		return addr.IP.String()
+	}
+	return "127.0.0.1"
+}
+
+// DeviceModelName returns the display name for the configured DeviceVariant.
+func DeviceModelName() string {
+	if DeviceVariant == DeviceVariant100X {
+		return "BTicino Classe 100X"
+	}
+	return "BTicino Classe 300X"
+}
+
+// SIPUsernameForVariant returns the intercom's SIP identity (INVITE target,
+// answerer username, Contact user) for the given device variant ("c300x" /
+// "c100x", see DeviceVariant). Unknown variants fall back to c300x.
+func SIPUsernameForVariant(variant string) string {
+	if variant == DeviceVariant100X {
+		return DeviceVariant100X
+	}
+	return DeviceVariant300X
+}
+
+// IsCallHangup reports whether a raw OWN frame ends a call (drives the
+// call.hangup event that disarms live video). Matches the WHO=8 WHAT=3#…
+// hangup family with any WHERE (416 and 420 on Classe 300X, 411 observed on
+// Classe 100X 2026-10-11) — model-agnostic, no variant branching needed.
+func IsCallHangup(raw string) bool {
+	switch raw {
+	case CmdHangupIncoming, CmdHangupSelf, CmdHangupSelf420, CmdHangupIncoming411:
+		return true
+	}
+	return strings.HasPrefix(raw, "*8*3#") && strings.HasSuffix(raw, "##")
+}
+
+// BuildDoorOpenPress builds the OWN press-door-button command for a given WHERE.
+// Example: BuildDoorOpenPress(20) -> "*8*19*20##", BuildDoorOpenPress(21) -> "*8*19*21##"
 func BuildDoorOpenPress(where int) string {
 	return fmt.Sprintf("*8*19*%d##", where)
 }

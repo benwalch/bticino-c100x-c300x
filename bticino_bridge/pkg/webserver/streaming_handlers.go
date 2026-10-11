@@ -1,10 +1,13 @@
-// Package webserver proporciona handlers API para streaming RTSP/WebRTC
+// Package webserver provides API handlers for RTSP/WebRTC streaming
 package webserver
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
+
+	"bticino_bridge/pkg/bticino"
 )
 
 // @Summary Get streaming status
@@ -67,7 +70,7 @@ func (ws *WebServer) handleAPIStreamingStart(w http.ResponseWriter, r *http.Requ
 		"message":     "Streaming initiated",
 		"stream_path": body.StreamPath,
 		"reason":      body.Reason,
-		"rtsp_url":    "rtsp://192.168.1.38:6554" + body.StreamPath,
+		"rtsp_url":    fmt.Sprintf("rtsp://%s:%d%s", bticino.LocalOutboundIP(), ws.config.Streaming.RTSPPort, body.StreamPath),
 		"timestamp":   time.Now(),
 	})
 }
@@ -215,7 +218,7 @@ func (ws *WebServer) handleAPIWebRTCStart(w http.ResponseWriter, r *http.Request
 	ws.writeJSON(w, map[string]interface{}{
 		"success":    true,
 		"message":    "WebRTC gateway started",
-		"webrtc_url": "ws://192.168.1.38:1984/api/ws",
+		"webrtc_url": fmt.Sprintf("ws://%s:1984/api/ws", bticino.LocalOutboundIP()),
 		"timestamp":  time.Now(),
 	})
 }

@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"bticino_bridge/pkg/bticino"
 	"bticino_bridge/pkg/events"
 	"bticino_bridge/pkg/openwebnet"
 	"github.com/sirupsen/logrus"
@@ -777,8 +778,8 @@ func (r *EnhancedRTSPServer) buildSDP(streamPath string, config *StreamConfig) s
 		cfg := r.sipClient.GetConfig()
 		localIP = cfg.LocalIP
 	} else {
-		localIP = "192.168.1.38"
-		r.logger.Warn("RTSP: No SIP client, using default IP for SDP")
+		localIP = bticino.LocalOutboundIP()
+		r.logger.Warn("RTSP: No SIP client, using detected LAN IP for SDP")
 	}
 
 	sdp := fmt.Sprintf(`v=0

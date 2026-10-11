@@ -389,9 +389,11 @@ func (ws *WebServer) Stop() error {
 }
 
 // injectVersion replaces the placeholder version string in HTML/JS/CSS content
-// with the actual version from the version package
+// with the actual version from the version package. It also replaces
+// {{DEVICE_IP}} with the auto-detected LAN IP.
 func (ws *WebServer) injectVersion(content string) string {
-	return strings.ReplaceAll(content, "{{VERSION}}", version.GetVersion())
+	content = strings.ReplaceAll(content, "{{VERSION}}", version.GetVersion())
+	return strings.ReplaceAll(content, "{{DEVICE_IP}}", bticino.LocalOutboundIP())
 }
 
 // Handler functions
@@ -1267,7 +1269,7 @@ func (ws *WebServer) getDashboardHTML() string {
                 </div>
                 <div class="card-content">
                     <p>Primary Port: <strong>20000</strong></p>
-                    <p>Device: <strong>192.168.1.38</strong></p>
+                    <p>Device: <strong>{{DEVICE_IP}}</strong></p>
                     <p>Commands Available: <strong>50+</strong></p>
                 </div>
             </div>

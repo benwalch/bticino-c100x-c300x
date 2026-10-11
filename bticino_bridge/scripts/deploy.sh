@@ -27,12 +27,15 @@ NC='\033[0m'
 # Variables
 SKIP_WEB=false
 SKIP_GO=false
+SKIP_CONFIG=false
+SKIP_DOCS=false
 DRY_RUN=false
 VERBOSE=false
 REMOTE="bticino"
 REMOTE_DIR="/home/bticino/cfg/extra"
+CONFIG_FILE="configs/config.yaml"
 
-# Parsear argumentos
+# Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
         --skip-web)
@@ -42,6 +45,18 @@ while [[ $# -gt 0 ]]; do
         --skip-go)
             SKIP_GO=true
             shift
+            ;;
+        --skip-config)
+            SKIP_CONFIG=true
+            shift
+            ;;
+        --skip-docs)
+            SKIP_DOCS=true
+            shift
+            ;;
+        --config)
+            CONFIG_FILE="$2"
+            shift 2
             ;;
         --dry-run)
             DRY_RUN=true
@@ -84,14 +99,16 @@ echo -e "${NC}"
 
 if [ "$DRY_RUN" = true ]; then
     echo -e "${YELLOW}=== DRY RUN MODE ===${NC}"
-    echo "Los siguientes pasos se ejecutarían:"
+    echo "The following steps would run:"
     [ "$SKIP_WEB" = false ] && echo "  - Build web frontend"
     [ "$SKIP_GO" = false ] && echo "  - Build Go binary"
     echo "  - Deploy to device"
+    [ "$SKIP_CONFIG" = false ] && echo "  - Deploy config: $CONFIG_FILE -> $REMOTE_DIR/config.yaml"
+    [ "$SKIP_DOCS" = false ] && echo "  - Deploy API docs: docs/ -> $REMOTE_DIR/docs/"
     exit 0
 fi
 
-# Paso 1: Build Web (si existe web/ y no se skip)
+# Step 1: Build Web (if web/ exists and not skipped)
 if [ "$SKIP_WEB" = false ] && [ -d "web" ]; then
     log "[1/3] Building web frontend..."
     if [ -f "web/package.json" ]; then
@@ -139,7 +156,7 @@ echo "Transferring VERSION file..."
 cat VERSION | ssh "$REMOTE" "cat > $REMOTE_DIR/VERSION"
 log_success "VERSION file transferred"
 
-base64 bticino_bridge | ssh "$REMOTE" "cd $REMOTE_DIR && base64 -d > bticino_bridge.new && chmod +x bticino_bridge.new"
+base64 < bticino_bridge | ssh "$REMOTE" "cd $REMOTE_DIR && base64 -d > bticino_bridge.new && chmod +x bticino_bridge.new"
 log_success "Binary transferred"
 
 # Backup
@@ -147,27 +164,63 @@ log "Creating backup..."
 ssh "$REMOTE" "cd $REMOTE_DIR && [ -f bticino_bridge ] && cp bticino_bridge bticino_bridge.backup.\$(date +%Y%m%d_%H%M%S) || true"
 log_success "Backup created"
 
-# Activar
+# Activate
 log "Activating new binary..."
 ssh "$REMOTE" "cd $REMOTE_DIR && mv bticino_bridge.new bticino_bridge"
 log_success "Binary activated"
 
-# Transferir web Svelte (si existe)
+# Transfer Svelte web files (if present)
 if [ "$SKIP_WEB" = false ] && [ -d "web/dist" ]; then
     log "Transferring Svelte web files..."
     ssh "$REMOTE" "cd $REMOTE_DIR && mkdir -p web/dist/assets"
-    # Copiar archivos con base64 (más confiable que scp)
-    base64 web/dist/index.html | ssh "$REMOTE" "base64 -d > $REMOTE_DIR/web/dist/index.html"
+    # Copy files with base64 (more reliable than scp)
+    base64 < web/dist/index.html | ssh "$REMOTE" "base64 -d > $REMOTE_DIR/web/dist/index.html"
     for file in web/dist/assets/*; do
         if [ -f "$file" ]; then
             filename=$(basename "$file")
-            base64 "$file" | ssh "$REMOTE" "base64 -d > $REMOTE_DIR/web/dist/assets/$filename"
+            base64 < "$file" | ssh "$REMOTE" "base64 -d > $REMOTE_DIR/web/dist/assets/$filename"
         fi
     done
     log_success "Svelte web files transferred"
 fi
 
-# Reiniciar servicio
+# Transfer config.yaml (matches '-config config.yaml' used on restart)
+if [ "$SKIP_CONFIG" = false ]; then
+    if [ -f "$CONFIG_FILE" ]; then
+        log "Transferring config ($CONFIG_FILE -> $REMOTE_DIR/config.yaml)..."
+        ssh "$REMOTE" "cd $REMOTE_DIR && [ -f config.yaml ] && cp config.yaml config.yaml.backup.\$(date +%Y%m%d_%H%M%S) || true"
+        base64 < "$CONFIG_FILE" | ssh "$REMOTE" "base64 -d > $REMOTE_DIR/config.yaml.new"
+        ssh "$REMOTE" "cd $REMOTE_DIR && mv config.yaml.new config.yaml"
+        log_success "Config transferred (remote backup created)"
+    else
+        log_warning "Config file $CONFIG_FILE not found, skipping config deploy"
+    fi
+else
+    log "Skipping config deploy (--skip-config)"
+fi
+
+# Transfer API docs for /api/docs/ (server does FileServer(http.Dir("docs")))
+if [ "$SKIP_DOCS" = false ]; then
+    if [ -d "docs" ]; then
+        log "Transferring API docs (docs/ -> $REMOTE_DIR/docs/)..."
+        ssh "$REMOTE" "mkdir -p $REMOTE_DIR/docs"
+        for file in docs/index.html docs/swagger.json docs/swagger.yaml docs/swagger-ui-bundle.js docs/swagger-ui-standalone-preset.js docs/swagger-ui.css; do
+            if [ -f "$file" ]; then
+                filename=$(basename "$file")
+                base64 < "$file" | ssh "$REMOTE" "base64 -d > $REMOTE_DIR/docs/$filename"
+            else
+                log_warning "Docs file $file not found, skipping"
+            fi
+        done
+        log_success "API docs transferred (check /api/docs/ with trailing slash)"
+    else
+        log_warning "docs/ directory not found, skipping docs deploy"
+    fi
+else
+    log "Skipping docs deploy (--skip-docs)"
+fi
+
+# Restart service
 log "Restarting service..."
 ssh "$REMOTE" "cd $REMOTE_DIR && pkill -9 bticino_bridge || true && sleep 2 && nohup ./bticino_bridge -config config.yaml > /var/log/bticino_bridge.log 2>&1 &"
 sleep 5
