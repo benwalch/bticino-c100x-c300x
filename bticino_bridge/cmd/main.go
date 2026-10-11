@@ -420,10 +420,9 @@ func main() {
 			username = "fquinto-gmx.com-1385B784-8A3B-4BF8-9037-A5FB2208B69A"
 		}
 
+		// SIP password: omitted on purpose — the client derives
+		// MD5(username:domain:username) unless sip.password is set.
 		password := cfg.SIP.Password
-		if password == "" {
-			password = "REDACTED_HA1"
-		}
 
 		devAddr := cfg.SIP.DevAddr
 		if devAddr == "" {
@@ -475,7 +474,7 @@ func main() {
 			sipClient = nil
 			sipStarted = false
 		} else {
-			logger.Info("SIP: Client started successfully (dual-role: webrtc + c300x)")
+			logger.Infof("SIP: Client started successfully (dual-role: webrtc + %s)", bticino.SIPUsernameForVariant(bticino.DeviceVariant))
 			// Expose SIP call state + hangup to the web API
 			if webServer != nil {
 				webServer.SetCallController(sipClient)
@@ -495,30 +494,33 @@ func main() {
 		// Select the video backend (default avmedia = cooperative *7*300)
 		rtspServer.SetVideoBackend(cfg.Streaming.VideoBackend)
 
-		// SEGURIDAD: activación de vídeo bajo demanda (self-INVITE, *7*300,
-		// snapshots) desactivada por defecto. Con false el servidor RTSP escucha
-		// pero nunca dispara comandos hacia el firmware nativo.
+		// SAFETY: on-demand video activation (self-INVITE, *7*300,
+		// snapshots) disabled by default. With false the RTSP server listens
+		// but never fires commands toward the native firmware.
 		rtspServer.SetVideoActivation(cfg.Streaming.VideoOnDemand)
 
-		// Vídeo en vivo durante una llamada entrante a nuestra unidad, por espejo
-		// PASIVO (tap AF_PACKET del leg de vídeo nativo en lo:5007 → relay 10002).
-		// CERO comandos al bus (Fase 0 2026-08-18: un *7*300 propio en llamada
-		// real se ignora). Independiente de video_on_demand.
-		// `sip.call.incoming` es específico de nuestro c300x (lo publica el cliente
-		// SIP al recibir un INVITE dirigido a nosotros), no actividad de otros pisos.
+		// Live video during an incoming call to our unit, via a PASSIVE
+		// mirror (AF_PACKET tap of the native video leg on lo:<native-port>
+		// → relay 10002; 5007 high-res on c300x, 5002 low-res on c100x, see
+		// bticino.DeviceVariant).
+		// ZERO commands to the bus (Phase 0 2026-08-18: an own *7*300 during a real
+		// call is ignored). Independent of video_on_demand.
+		// `sip.call.incoming` is specific to our unit (published by the SIP
+		// client on receiving an INVITE addressed to us), not other floors' activity.
 		if cfg.Streaming.LiveOnCall {
-			tap := sip.NewLoopbackRTPTap(sip.NativeVideoRTPPort,
+			nativePort := sip.NativeVideoRTPPortForVariant(bticino.DeviceVariant)
+			tap := sip.NewLoopbackRTPTap(nativePort,
 				sip.DefaultGStreamerConfig().VideoPort, logger)
 			liveVideo := sip.NewLiveVideoOnCall(tap, rtspServer, logger)
-			// Guard: el fin de llamada se detecta por tramas OWN (heurístico);
-			// si se pierde, desarmar solo (el tap es pasivo, pero callActive
-			// inhibiría el self-INVITE indefinidamente).
+			// Guard: call end is detected via OWN frames (heuristic);
+			// if missed, disarm alone (the tap is passive, but callActive
+			// would inhibit self-INVITE indefinitely).
 			liveVideo.SetGuardTimeout(5 * time.Minute)
 
-			// Armado principal: doorbell.pressed viene del monitor OWN (fiable
-			// en producción). Los sip.call.* se mantienen por si el cliente SIP
-			// llega a registrarse (en producción el REGISTER local suele fallar
-			// y esos eventos no se emiten). Start/Stop son idempotentes.
+			// Main arming: doorbell.pressed comes from the OWN monitor (reliable
+			// in production). The sip.call.* events are kept in case the SIP client
+			// manages to register (in production the local REGISTER usually fails
+			// and those events are not emitted). Start/Stop are idempotent.
 			eventBus.Subscribe("doorbell.pressed", func(_ *events.Event) {
 				liveVideo.Start("doorbell.pressed")
 			})
@@ -534,13 +536,13 @@ func main() {
 			eventBus.Subscribe("sip.call.ended", func(_ *events.Event) {
 				liveVideo.Stop()
 			})
-			logger.Info("   Live video on call: habilitado (espejo pasivo lo:5007, cero comandos)")
+			logger.Infof("   Live video on call: enabled (passive mirror lo:%d, zero commands)", nativePort)
 		}
 
-		// Sonda de vídeo cooperativa (diagnóstico): un único *7*300, sin retry ni
-		// self-INVITE. Endpoint gateado por POST + ?confirm=yes. Solo se cablea si
-		// hay cliente OpenWebNet. Es seguro (un solo comando) aunque el vídeo esté
-		// desactivado, por eso NO depende de VideoOnDemand.
+		// Cooperative video probe (diagnostics): a single *7*300, no retry or
+		// self-INVITE. Endpoint gated by POST + ?confirm=yes. Only wired if
+		// there is an OpenWebNet client. It is safe (a single command) even when video
+		// is disabled, hence it does NOT depend on VideoOnDemand.
 		if webServer != nil && owClient != nil {
 			ownForProbe := owClient
 			webServer.SetVideoProbeFunc(func() (map[string]interface{}, []byte, error) {
@@ -589,25 +591,25 @@ func main() {
 		} else {
 			logger.Infof("✅ RTSP: Enhanced server started on port %d", cfg.Streaming.RTSPPort)
 			logger.Infof("   RTSP streams:")
-			logger.Infof("     - rtsp://192.168.1.38:%d/doorbell (Full stream)", cfg.Streaming.RTSPPort)
-			logger.Infof("     - rtsp://192.168.1.38:%d/doorbell-video (Video only)", cfg.Streaming.RTSPPort)
-			logger.Infof("     - rtsp://192.168.1.38:%d/doorbell-recorder (HKSV recording)", cfg.Streaming.RTSPPort)
+			logger.Infof("     - rtsp://%s:%d/doorbell (Full stream)", deviceIP, cfg.Streaming.RTSPPort)
+			logger.Infof("     - rtsp://%s:%d/doorbell-video (Video only)", deviceIP, cfg.Streaming.RTSPPort)
+			logger.Infof("     - rtsp://%s:%d/doorbell-recorder (HKSV recording)", deviceIP, cfg.Streaming.RTSPPort)
 
-			// Servicio de snapshots JPEG bajo demanda (patrón cooperativo *7*300,
-			// sin self-INVITE). Solo se cablea si la activación de vídeo está
-			// habilitada y hay cliente OpenWebNet.
+			// On-demand JPEG snapshot service (cooperative *7*300 pattern,
+			// no self-INVITE). Only wired if video activation is
+			// enabled and there is an OpenWebNet client.
 			if webServer != nil && owClient != nil && cfg.Streaming.VideoOnDemand {
 				snapshotSvc := sip.NewSnapshotService(owClient, logger)
 				webServer.SetSnapshotFunc(snapshotSvc.Capture)
-				logger.Info("   Snapshot: capturas JPEG disponibles en GET /api/snapshot")
+				logger.Info("   Snapshot: JPEG captures available at GET /api/snapshot")
 
-				// Cámara del timbre en HA: al sonar el timbre / entrar una llamada,
-				// el MQTT bridge captura un snapshot cooperativo y lo publica.
+				// Doorbell camera in HA: when the doorbell rings / a call comes in,
+				// the MQTT bridge captures a cooperative snapshot and publishes it.
 				if mqttBridge != nil {
 					mqttBridge.SetCameraCapture(func() ([]byte, error) {
 						return snapshotSvc.Capture(12*time.Second, 0)
 					})
-					logger.Info("   Camera: entidad de cámara del timbre habilitada en Home Assistant")
+					logger.Info("   Camera: doorbell camera entity enabled in Home Assistant")
 				}
 			}
 		}

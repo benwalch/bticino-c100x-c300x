@@ -103,7 +103,7 @@ func NewInputMonitor(logger *logrus.Logger) *InputMonitor {
 			"/dev/input/event1", // TSC2005 touchscreen
 			"/dev/input/event2", // gpio-keys
 		},
-		GPIOPins:   []int{12, 13, 47, 49, 52, 54, 56, 58, 60, 154, 155, 176, 180}, // All 13 discovered GPIO pins
+		GPIOPins:   bticino.GPIOPinsForVariant(bticino.DeviceVariant),
 		Logger:     logger,
 		stopChan:   make(chan struct{}),
 		gpioStates: make(map[int]bool),
@@ -435,17 +435,27 @@ func (im *InputMonitor) GetCurrentGPIOStates() map[int]bool {
 	return states
 }
 
-// IsScreenActive checks if screen appears to be active based on GPIO states
-// GPIO 12 = amplificador audio activo (indica sesion video/llamada en curso)
-// GPIO 180 = comunicacion establecida (cualquier tipo)
+// IsScreenActive checks if screen appears to be active based on GPIO states.
+// 300X: GPIO 12 (audio amplifier) or 180 (established communication).
+// 100X: GPIO 64 (amplifier, answered) or 77 (phone path, ring+call).
 func (im *InputMonitor) IsScreenActive() bool {
 	states := im.GetCurrentGPIOStates()
 
-	// GPIO 12 (amplificador audio) ON indica sesion activa
+	if bticino.DeviceVariant == bticino.DeviceVariant100X {
+		if state, exists := states[64]; exists && state {
+			return true
+		}
+		if state, exists := states[77]; exists && state {
+			return true
+		}
+		return false
+	}
+
+	// GPIO 12 (audio amplifier) ON indicates an active session
 	if state, exists := states[12]; exists && state {
 		return true
 	}
-	// GPIO 180 (comunicacion establecida) ON indica llamada activa
+	// GPIO 180 (established communication) ON indicates an active call
 	if state, exists := states[180]; exists && state {
 		return true
 	}

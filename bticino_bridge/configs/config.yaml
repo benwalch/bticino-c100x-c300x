@@ -27,27 +27,30 @@ sip:
   local_port: 5060
   server_host: "127.0.0.1"  # Flexisip local
   server_port: 5060
-  transport: "tcp"  # tcp, udp, tls - slyoldfox uses TCP
+  transport: "tcp"  # tcp, udp, tls
+  # look for the right domain for your device under /home/bticino/cfg/extra/90/flexisip/flexisip.conf
   domain: "YOUR_GATEWAY_ID.bs.iotleg.com"
   username: "webrtc"          # Per slyoldfox: register as webrtc@domain
-  password: "<CHANGE_ME>"  # HA1 = MD5(webrtc:<domain>:webrtc), see your flexisip.conf
+  # password: omit it — the bridge derives MD5(username:domain:username) at
+  # startup (same convention as the answerer identity). Set sip.password only
+  # to override with the md5 hash from your flexisip users.db.txt.
   dev_addr: "20"
   use_ha1: true
-  insecure_tls: false
-  sip_target: "c300x"         # INVITE target: c300x@domain (the intercom)
+  insecure_tls: true
+  sip_target: "c100x"         # INVITE target: c100x@domain (the intercom; c300x on Classe 300X)
 
 # ==================== MQTT ====================
 mqtt:
   enabled: true
-  host: "192.168.1.3"
+  host: "<CHANGE_ME>"
   port: 1883
-  username: "mqtt_user"
-  password: "CHANGE_ME"
+  username: "<CHANGE_ME>"
+  password: "<CHANGE_ME>"
   client_id: "bticino_bridge"
   topic_prefix: "bticino"
-  # Botones de reinicio en HA (sección Configuration): reiniciar el bridge y
-  # reiniciar el dispositivo. DESACTIVADO por defecto (el reboot reinicia todo
-  # el videoportero). Ponlo a true para exponerlos.
+  # Restart buttons in HA (Configuration section): restart the bridge and
+  # reboot the device. DISABLED by default (reboot restarts the whole
+  # video intercom). Set to true to expose them.
   enable_system_buttons: false
 
 # ==================== WEB DASHBOARD ====================
@@ -59,10 +62,10 @@ web:
 
 # ==================== HOMEKIT ====================
 homekit:
-  enabled: true
+  enabled: false
   name: "BTicino Bridge"
   manufacturer: "BTicino"
-  model: "Classe 300X"
+  model: "Classe C100X"
   port: "8081"
   pin: "12345678"
   storage_path: "./homekit_data"
@@ -89,23 +92,25 @@ streaming:
   webrtc_enabled: false
   webrtc_port: 8889
   recording_path: "/home/bticino/cfg/extra/recordings"
-  max_duration: 60  # segundos
+  max_duration: 60  # seconds
   auto_stop_on_last_client: true
-  # SEGURIDAD: activación de vídeo bajo demanda (self-INVITE del RTSP, arranque
-  # automático al pulsar el timbre y snapshots). DESACTIVADO por defecto: activar
-  # vídeo compite con el firmware nativo y puede provocar inestabilidad/reinicio.
-  # Ponlo a true SOLO cuando el pipeline de vídeo esté validado en tu equipo.
+  # SAFETY: on-demand video activation (RTSP self-INVITE, automatic
+  # start on doorbell press, and snapshots). DISABLED by default: enabling
+  # video competes with the native firmware and can cause instability/reboot.
+  # Set to true ONLY once the video pipeline is validated on your unit.
   video_on_demand: false
-  # Backend de vídeo de la cámara (solo aplica si video_on_demand: true):
-  #   avmedia   -> comando *7*300: bt_av_media duplica su RTP hacia nosotros
-  #                (cooperativo con el firmware nativo; no compite por /dev/video0)
-  #   gstreamer -> pipeline GStreamer directo con la VPU (compite con el nativo,
-  #                puede fallar con "Internal data stream error" en frío)
-  #   auto      -> intenta avmedia y cae a gstreamer si no fluye RTP
+  # Camera video backend (only applies if video_on_demand: true):
+  #   avmedia   -> *7*300 command: bt_av_media duplicates its RTP towards us
+  #                (cooperative with the native firmware; doesn't fight over /dev/video0)
+  #   gstreamer -> direct GStreamer pipeline with the VPU (competes with native,
+  #                may fail with "Internal data stream error" when cold)
+  #   auto      -> tries avmedia and falls back to gstreamer if no RTP flows
   video_backend: "avmedia"
-  # Vídeo en vivo durante una llamada entrante a NUESTRA unidad, por espejo
-  # pasivo (tap del leg de vídeo nativo en lo:5007 hacia el relay). No envía
-  # ningún comando al bus; independiente de video_on_demand.
+  # Live video during an incoming call to OUR unit, via passive
+  # mirror (tap of the native video leg on lo:<native-port> towards the
+  # relay; 5007 high-res on c300x, 5002 low-res on c100x, selected via
+  # bticino.DeviceVariant in the code — rebuild after changing it). Sends
+  # no commands to the bus; independent of video_on_demand.
   live_on_call: true
 
 # ==================== NETWORK ====================
@@ -119,11 +124,11 @@ network:
       - "192.168.1.1"
       - "8.8.8.8"
   firewall:
-    block_telemetry: true  # Bloquear telemetría a BTicino
-    block_cloud: false     # Bloquear cloud Netatmo
-    allow_updates: false   # Permitir actualizaciones automáticas
+    block_telemetry: true  # Block telemetry to BTicino
+    block_cloud: false     # Block Netatmo cloud
+    allow_updates: false   # Allow automatic updates
 
-# ==================== SERVERS EXTERNOS ====================
+# ==================== EXTERNAL SERVERS ====================
 servers:
   cloud:
     enabled: false
@@ -184,23 +189,23 @@ privacy:
   disable_auto_updates: true
   local_logging: true
 
-# ==================== SEGURIDAD ====================
+# ==================== SECURITY ====================
 security:
-  # Basic Auth para TODO el dashboard y la API (incluye /api/config, que
-  # contiene contraseñas en claro). Activado sin web_password → el servidor
-  # responde 503 (fail-closed). El navegador pedirá login una sola vez.
+  # Basic Auth for the WHOLE dashboard and API (includes /api/config, which
+  # contains plaintext passwords). Enabled without web_password → the server
+  # responds 503 (fail-closed). The browser will ask for login only once.
   web_auth_required: true
-  web_username: "admin"
-  web_password: "CHANGE_ME"
-  web_https_enabled: false  # Habilitar HTTPS
-  api_rate_limit: 100       # Requests por minuto
-  config_audit_log: true    # Log de cambios de configuración
+  web_username: "<CHANGE_ME>"
+  web_password: "<CHANGE_ME>"
+  web_https_enabled: false  # Enable HTTPS
+  api_rate_limit: 100       # Requests per minute
+  config_audit_log: true    # Configuration change log
 
-# ==================== BLOQUEOS ADICIONALES ====================
+# ==================== ADDITIONAL LOCKS ====================
 additional_locks:
-  # - name: "Puerta Trasera"
+  # - name: "Back Door"
   #   where: 21
-  # - name: "Puerta Lateral"
+  # - name: "Side Door"
   #   where: 22
 
 # ==================== UDP PROXY ====================

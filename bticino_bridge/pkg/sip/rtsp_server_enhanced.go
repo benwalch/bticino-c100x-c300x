@@ -993,11 +993,12 @@ func (r *EnhancedRTSPServer) ensureSIPCallActive() error {
 
 	r.logger.Info("=== ENSURESIP: Initiating SIP call for RTSP streaming ===")
 
-	// Per slyoldfox: INVITE target is the intercom's SIP identity (e.g., "c300x")
-	// NOT the domain. buildInviteRequest will format it as c300x@domain.
+	// Per slyoldfox: INVITE target is the intercom's SIP identity
+	// (c300x/c100x per DeviceVariant), NOT the domain. buildInviteRequest
+	// will format it as <user>@domain.
 	target := r.sipClient.config.SIPTarget
 	if target == "" {
-		target = "c300x"
+		target = bticino.SIPUsernameForVariant(bticino.DeviceVariant)
 	}
 	if err := r.sipClient.MakeCall(target); err != nil {
 		return fmt.Errorf("failed to make SIP call: %v", err)

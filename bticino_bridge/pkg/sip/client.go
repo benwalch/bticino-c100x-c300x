@@ -11,6 +11,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"bticino_bridge/pkg/bticino"
 	"bticino_bridge/pkg/events"
 )
 
@@ -51,10 +52,14 @@ func (c CallState) String() string {
 }
 
 type SIPConfig struct {
-	Enabled       bool            `yaml:"enabled"`
-	ServerAddr    string          `yaml:"server_addr"`
-	Domain        string          `yaml:"domain"`
-	Username      string          `yaml:"username"`
+	Enabled    bool   `yaml:"enabled"`
+	ServerAddr string `yaml:"server_addr"`
+	Domain     string `yaml:"domain"`
+	Username   string `yaml:"username"`
+	// Password is the webrtc identity's HA1 hash. Empty (recommended: omit
+	// it from config entirely) derives MD5(username:domain:username), the
+	// same convention the answerer identity already uses. Set it only to
+	// override with the hash from your flexisip users.db.txt.
 	Password      string          `yaml:"password"`
 	LocalIP       string          `yaml:"local_ip"`
 	LocalPort     int             `yaml:"local_port"`
@@ -66,7 +71,7 @@ type SIPConfig struct {
 	UseHA1        bool            `yaml:"use_ha1"`
 	InsecureTLS   bool            `yaml:"insecure_tls"` // Skip TLS certificate verification
 	Transport     string          `yaml:"transport"`    // "tcp", "udp", or "tls" (default: tls)
-	SIPTarget     string          `yaml:"sip_target"`   // INVITE target user (default: "c300x")
+	SIPTarget     string          `yaml:"sip_target"`   // INVITE target user (default: per DeviceVariant)
 }
 
 type MediaPortConfig struct {
@@ -88,7 +93,7 @@ type SIPMessage struct {
 }
 
 // sipIdentity represents one SIP registration (one TCP connection to Flexisip).
-// We need two: "webrtc" (the caller) and "c300x" (the answerer).
+// We need two: "webrtc" (the caller) and the answerer (c300x/c100x per variant).
 type sipIdentity struct {
 	username string
 	password string // HA1 hash
@@ -103,7 +108,7 @@ type BTicinoSIPClient struct {
 	config        *SIPConfig
 	conn          net.Conn // webrtc connection (kept for backward compat)
 	webrtcID      *sipIdentity
-	c300xID       *sipIdentity
+	localID       *sipIdentity
 	callState     CallState
 	callID        string
 	fromTag       string
@@ -123,6 +128,9 @@ type BTicinoSIPClient struct {
 	// streaming), so an incoming INVITE with an unknown Call-ID can be told
 	// apart as a REAL external call (e.g. a companion/app calling the unit).
 	originatedCalls map[string]time.Time
+	// answerUser is the intercom's SIP identity (INVITE target / answerer),
+	// derived from bticino.DeviceVariant ("c300x" or "c100x").
+	answerUser string
 }
 
 type VideoStreamInfo struct {
@@ -164,7 +172,15 @@ func NewBTicinoSIPClient(config *SIPConfig, eventBus events.EventBus, logger *lo
 	}
 
 	if config.SIPTarget == "" {
-		config.SIPTarget = "c300x"
+		config.SIPTarget = bticino.SIPUsernameForVariant(bticino.DeviceVariant)
+	}
+
+	// No password configured: derive the webrtc HA1 the same way the
+	// answerer identity does (MD5(username:domain:username)). Flexisip
+	// accounts created with password == username authenticate with this.
+	if config.Password == "" {
+		config.Password = fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s:%s:%s",
+			config.Username, config.Domain, config.Username))))
 	}
 
 	if config.TLSConfig == nil {
@@ -187,6 +203,7 @@ func NewBTicinoSIPClient(config *SIPConfig, eventBus events.EventBus, logger *lo
 		stopCh:          make(chan struct{}),
 		callConnectedCh: make(chan struct{}, 1),
 		originatedCalls: make(map[string]time.Time),
+		answerUser:      bticino.SIPUsernameForVariant(bticino.DeviceVariant),
 	}
 }
 
@@ -198,12 +215,12 @@ func (c *BTicinoSIPClient) Start() error {
 		return fmt.Errorf("SIP client already running")
 	}
 
-	c.logger.Info("Starting BTicino SIP client (dual-role: webrtc + c300x)")
+	c.logger.Infof("Starting BTicino SIP client (dual-role: webrtc + %s)", c.answerUser)
 	c.logger.Infof("SIP Config: server=%s, domain=%s, username=%s, devaddr=%s",
 		c.config.ServerAddr, c.config.Domain, c.config.Username, c.config.DevAddr)
 
-	// Compute HA1 for c300x: MD5(c300x:<domain>:c300x)
-	c300xHA1 := fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("c300x:%s:c300x", c.config.Domain))))
+	// Compute HA1 for the answerer identity: MD5(<user>:<domain>:<user>)
+	answerHA1 := fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s:%s:%s", c.answerUser, c.config.Domain, c.answerUser))))
 
 	c.webrtcID = &sipIdentity{
 		username: c.config.Username, // "webrtc"
@@ -213,9 +230,9 @@ func (c *BTicinoSIPClient) Start() error {
 		cseq:     1,
 	}
 
-	c.c300xID = &sipIdentity{
-		username: "c300x",
-		password: c300xHA1,
+	c.localID = &sipIdentity{
+		username: c.answerUser,
+		password: answerHA1,
 		fromTag:  c.generateTag(),
 		callID:   c.generateCallID(),
 		cseq:     1,
@@ -233,16 +250,16 @@ func (c *BTicinoSIPClient) Start() error {
 	c.conn = c.webrtcID.conn // backward compat
 	c.logger.Info("webrtc registered successfully")
 
-	// Register c300x identity (separate TCP connection)
-	c.logger.Info("=== Registering c300x identity ===")
-	if err := c.registerIdentity(c.c300xID); err != nil {
+	// Register answerer identity (separate TCP connection)
+	c.logger.Infof("=== Registering %s identity ===", c.answerUser)
+	if err := c.registerIdentity(c.localID); err != nil {
 		// Not fatal — we can still try calls, but auto-answer won't work
-		c.logger.WithError(err).Warn("Failed to register c300x identity — auto-answer disabled")
-		c.c300xID = nil
+		c.logger.WithError(err).Warnf("Failed to register %s identity — auto-answer disabled", c.answerUser)
+		c.localID = nil
 	} else {
-		c.logger.Info("c300x registered successfully")
-		// Start listener for incoming INVITEs on c300x connection
-		go c.c300xListener()
+		c.logger.Infof("%s registered successfully", c.answerUser)
+		// Start listener for incoming INVITEs on the answerer connection
+		go c.localListener()
 	}
 
 	c.callState = Registered
@@ -251,7 +268,7 @@ func (c *BTicinoSIPClient) Start() error {
 		"domain":    c.config.Domain,
 		"username":  c.config.Username,
 		"server":    c.config.ServerAddr,
-		"dual_role": c.c300xID != nil,
+		"dual_role": c.localID != nil,
 	}, "sip")
 
 	// Start re-registration timer
@@ -284,10 +301,10 @@ func (c *BTicinoSIPClient) Stop() error {
 		c.webrtcID.conn.Close()
 	}
 
-	// Unregister and close c300x
-	if c.c300xID != nil && c.c300xID.conn != nil {
-		c.unregisterIdentity(c.c300xID)
-		c.c300xID.conn.Close()
+	// Unregister and close answerer identity
+	if c.localID != nil && c.localID.conn != nil {
+		c.unregisterIdentity(c.localID)
+		c.localID.conn.Close()
 	}
 
 	close(c.stopCh)
@@ -414,46 +431,46 @@ func (c *BTicinoSIPClient) unregisterIdentity(id *sipIdentity) {
 	id.conn.Write([]byte(msg))
 }
 
-// c300xListener listens for incoming SIP messages on the c300x connection.
-// When an INVITE arrives (from Flexisip routing the webrtc INVITE to c300x),
-// it auto-answers with 200 OK.
-func (c *BTicinoSIPClient) c300xListener() {
-	c.logger.Info("c300x listener started — waiting for incoming INVITEs")
+// localListener listens for incoming SIP messages on the answerer identity
+// connection. When an INVITE arrives (from Flexisip routing the webrtc
+// INVITE to the answerer), it auto-answers with 200 OK.
+func (c *BTicinoSIPClient) localListener() {
+	c.logger.Infof("%s listener started — waiting for incoming INVITEs", c.answerUser)
 
 	for {
 		select {
 		case <-c.stopCh:
-			c.logger.Info("c300x listener stopping")
+			c.logger.Infof("%s listener stopping", c.answerUser)
 			return
 		default:
 		}
 
-		if c.c300xID == nil || c.c300xID.conn == nil {
-			c.logger.Warn("c300x connection lost, listener exiting")
+		if c.localID == nil || c.localID.conn == nil {
+			c.logger.Warnf("%s connection lost, listener exiting", c.answerUser)
 			return
 		}
 
-		msg, err := c.readSIPMessageFrom(c.c300xID.conn, 60*time.Second)
+		msg, err := c.readSIPMessageFrom(c.localID.conn, 60*time.Second)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				// Timeout is normal — just keep listening
 				continue
 			}
-			c.logger.WithError(err).Warn("c300x listener: read error")
+			c.logger.WithError(err).Warnf("%s listener: read error", c.answerUser)
 			// Try to reconnect
 			time.Sleep(2 * time.Second)
 			continue
 		}
 
-		c.logger.Infof("c300x listener: received %s (status=%s)", msg.Method, msg.StatusCode)
+		c.logger.Infof("%s listener: received %s (status=%s)", c.answerUser, msg.Method, msg.StatusCode)
 
 		if msg.Method == "INVITE" {
 			c.handleIncomingInvite(msg)
 		} else if msg.Method == "OPTIONS" {
 			// Flexisip keepalive — respond with 200 OK
-			c.respondToOptions(c.c300xID, msg)
+			c.respondToOptions(c.localID, msg)
 		} else if msg.Method == "ACK" {
-			c.logger.Info("c300x listener: received ACK — SIP session fully established!")
+			c.logger.Infof("%s listener: received ACK — SIP session fully established!", c.answerUser)
 			// The ACK completes the 3-way handshake
 			c.mutex.Lock()
 			c.callState = Connected
@@ -470,9 +487,9 @@ func (c *BTicinoSIPClient) c300xListener() {
 				"reason": "auto_answer_ack_received",
 			}, "sip")
 		} else if msg.Method == "BYE" {
-			c.logger.Info("c300x listener: received BYE — call ended by remote")
+			c.logger.Infof("%s listener: received BYE — call ended by remote", c.answerUser)
 			// Send 200 OK for BYE
-			c.sendBYEResponse(c.c300xID, msg)
+			c.sendBYEResponse(c.localID, msg)
 			c.mutex.Lock()
 			c.callState = Registered
 			c.sessionActive = false
@@ -481,14 +498,14 @@ func (c *BTicinoSIPClient) c300xListener() {
 				"reason": "remote_bye",
 			}, "sip")
 		} else {
-			c.logger.Infof("c300x listener: ignoring %s", msg.Method)
+			c.logger.Infof("%s listener: ignoring %s", c.answerUser, msg.Method)
 		}
 	}
 }
 
-// handleIncomingInvite auto-answers an INVITE received on the c300x identity
+// handleIncomingInvite auto-answers an INVITE received on the answerer identity
 func (c *BTicinoSIPClient) handleIncomingInvite(invite *SIPMessage) {
-	c.logger.Info("=== c300x: Auto-answering incoming INVITE ===")
+	c.logger.Infof("=== %s: Auto-answering incoming INVITE ===", c.answerUser)
 	c.logger.Debugf("INVITE:\n%s", invite.Raw)
 
 	// Extract key headers from the INVITE
@@ -524,7 +541,7 @@ func (c *BTicinoSIPClient) handleIncomingInvite(invite *SIPMessage) {
 			viaHeaders = []string{via}
 		}
 	}
-	c.logger.Infof("c300x auto-answer: Call-ID=%s, From=%s, To=%s, ViaCount=%d", callID, from, to, len(viaHeaders))
+	c.logger.Infof("%s auto-answer: Call-ID=%s, From=%s, To=%s, ViaCount=%d", c.answerUser, callID, from, to, len(viaHeaders))
 
 	// Is this our own self-INVITE (video streaming) or a real external call?
 	c.mutex.Lock()
@@ -532,7 +549,7 @@ func (c *BTicinoSIPClient) handleIncomingInvite(invite *SIPMessage) {
 	c.mutex.Unlock()
 	if !isOwn {
 		caller := extractSIPUser(from)
-		c.logger.Infof("=== c300x: REAL incoming call from %q (Call-ID=%s) ===", caller, callID)
+		c.logger.Infof("=== %s: REAL incoming call from %q (Call-ID=%s) ===", c.answerUser, caller, callID)
 		c.eventBus.PublishWithSource("sip.call.incoming", map[string]interface{}{
 			"caller":  caller,
 			"from":    from,
@@ -546,7 +563,7 @@ func (c *BTicinoSIPClient) handleIncomingInvite(invite *SIPMessage) {
 	// First send 100 Trying
 	tryingMsg := c.build100Trying(callID, from, to, viaHeaders, recordRoute, cseqHeader)
 	c.logger.Debugf("Sending 100 Trying:\n%s", tryingMsg)
-	if _, err := c.c300xID.conn.Write([]byte(tryingMsg)); err != nil {
+	if _, err := c.localID.conn.Write([]byte(tryingMsg)); err != nil {
 		c.logger.WithError(err).Error("Failed to send 100 Trying")
 		return
 	}
@@ -565,10 +582,10 @@ func (c *BTicinoSIPClient) handleIncomingInvite(invite *SIPMessage) {
 	sdp := c.buildSDP()
 	okMsg := c.build200OK(callID, from, toWithTag, viaHeaders, recordRoute, cseqHeader, sdp)
 
-	c.logger.Infof("c300x: Sending 200 OK with SDP (tag=%s)", toTag)
+	c.logger.Infof("%s: Sending 200 OK with SDP (tag=%s)", c.answerUser, toTag)
 	c.logger.Debugf("200 OK:\n%s", okMsg)
 
-	if _, err := c.c300xID.conn.Write([]byte(okMsg)); err != nil {
+	if _, err := c.localID.conn.Write([]byte(okMsg)); err != nil {
 		c.logger.WithError(err).Error("Failed to send 200 OK")
 		return
 	}
@@ -580,13 +597,13 @@ func (c *BTicinoSIPClient) handleIncomingInvite(invite *SIPMessage) {
 	c.callState = IncomingCall
 	c.mutex.Unlock()
 
-	c.logger.Info("c300x: 200 OK sent, waiting for ACK from caller...")
-	// ACK will be received by the c300xListener loop
+	c.logger.Infof("%s: 200 OK sent, waiting for ACK from caller...", c.answerUser)
+	// ACK will be received by the localListener loop
 }
 
 // extractSIPUser pulls the user part out of a From/To header value, e.g.
-// `"Doorbell" <sip:c300x@domain>;tag=abc` -> "c300x". Falls back to the raw
-// header if no SIP URI is found.
+// `"Doorbell" <sip:c100x@domain>;tag=abc` -> "c100x" (c300x on Classe 300X).
+// Falls back to the raw header if no SIP URI is found.
 func extractSIPUser(header string) string {
 	start := strings.Index(header, "sip:")
 	if start < 0 {
@@ -636,8 +653,8 @@ func (c *BTicinoSIPClient) build200OK(callID, from, to string, viaHeaders, recor
 		transport = "tcp"
 	}
 
-	contact := fmt.Sprintf("<sip:c300x@%s:%d;transport=%s>",
-		c.config.LocalIP, c.config.LocalPort, transport)
+	contact := fmt.Sprintf("<sip:%s@%s:%d;transport=%s>",
+		c.answerUser, c.config.LocalIP, c.config.LocalPort, transport)
 
 	lines := []string{
 		"SIP/2.0 200 OK",
@@ -745,7 +762,7 @@ func (c *BTicinoSIPClient) respondToOptions(id *sipIdentity, options *SIPMessage
 }
 
 // MakeCall sends INVITE from the webrtc identity and waits for the full
-// SIP handshake to complete (including auto-answer from c300x identity).
+// SIP handshake to complete (including auto-answer from the answerer identity).
 // Returns only when the call is Connected or an error occurs.
 func (c *BTicinoSIPClient) MakeCall(target string) error {
 	c.mutex.Lock()
@@ -883,13 +900,13 @@ func (c *BTicinoSIPClient) MakeCall(target string) error {
 	}
 
 	if !gotOK {
-		// If we didn't get 200 OK from the webrtc side, wait for the c300x auto-answer
-		// path to complete (the ACK received on c300x listener signals Connected)
-		c.logger.Info("=== MAKECALL: No 200 OK on webrtc conn yet, waiting for c300x auto-answer path ===")
+		// If we didn't get 200 OK from the webrtc side, wait for the answerer auto-answer
+		// path to complete (the ACK received on the local listener signals Connected)
+		c.logger.Infof("=== MAKECALL: No 200 OK on webrtc conn yet, waiting for %s auto-answer path ===", c.answerUser)
 
 		select {
 		case <-c.callConnectedCh:
-			c.logger.Info("=== MAKECALL: Connected via c300x auto-answer! ===")
+			c.logger.Infof("=== MAKECALL: Connected via %s auto-answer! ===", c.answerUser)
 		case <-time.After(15 * time.Second):
 			c.logger.Warn("=== MAKECALL: Timeout waiting for call to connect ===")
 			c.mutex.Lock()
@@ -1244,7 +1261,7 @@ func (c *BTicinoSIPClient) Hangup() error {
 func (c *BTicinoSIPClient) buildByeRequest() string {
 	target := c.config.SIPTarget
 	if target == "" {
-		target = "c300x"
+		target = bticino.SIPUsernameForVariant(bticino.DeviceVariant)
 	}
 	requestURI := fmt.Sprintf("sip:%s@%s", target, c.config.Domain)
 	from := fmt.Sprintf("sip:%s@%s;tag=%s", c.config.Username, c.config.Domain, c.webrtcID.fromTag)
@@ -1301,9 +1318,9 @@ func (c *BTicinoSIPClient) registrationManager() {
 					}
 				}
 
-				if c.c300xID != nil {
-					if err := c.reRegisterIdentity(c.c300xID); err != nil {
-						c.logger.WithError(err).Error("Failed to refresh c300x registration")
+				if c.localID != nil {
+					if err := c.reRegisterIdentity(c.localID); err != nil {
+						c.logger.WithError(err).Errorf("Failed to refresh %s registration", c.answerUser)
 					}
 				}
 			}
@@ -1593,23 +1610,6 @@ func (c *BTicinoSIPClient) handleAuthChallenge(response *SIPMessage) error {
 		return c.handleAuthChallengeForIdentity(c.webrtcID, response)
 	}
 	return fmt.Errorf("no webrtc identity")
-}
-
-func (c *BTicinoSIPClient) calculateAuthResponse(realm, nonce, requestURI string) string {
-	ha1 := fmt.Sprintf("%s:%s:%s", c.config.Username, realm, c.config.Password)
-	ha1Hash := fmt.Sprintf("%x", md5.Sum([]byte(ha1)))
-	ha2 := fmt.Sprintf("REGISTER:%s", requestURI)
-	ha2Hash := fmt.Sprintf("%x", md5.Sum([]byte(ha2)))
-	responseData := fmt.Sprintf("%s:%s:%s", ha1Hash, nonce, ha2Hash)
-	return fmt.Sprintf("%x", md5.Sum([]byte(responseData)))
-}
-
-func (c *BTicinoSIPClient) calculateAuthResponseHA1(realm, nonce, requestURI string) string {
-	ha1 := c.config.Password
-	ha2 := fmt.Sprintf("REGISTER:%s", requestURI)
-	ha2Hash := fmt.Sprintf("%x", md5.Sum([]byte(ha2)))
-	responseData := fmt.Sprintf("%s:%s:%s", ha1, nonce, ha2Hash)
-	return fmt.Sprintf("%x", md5.Sum([]byte(responseData)))
 }
 
 func (c *BTicinoSIPClient) buildAuthenticatedRegisterRequest(realm, nonce, qop string) string {

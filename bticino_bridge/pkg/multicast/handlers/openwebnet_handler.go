@@ -40,10 +40,10 @@ var (
 	// Doorbell press: *8*1#1#4# (based on slyoldfox observations)
 	doorbellPattern = regexp.MustCompile(`\*8\*1#1#4#`)
 
-	// Floor/landing doorbell (timbre de rellano): *7*59#...
+	// Floor/landing doorbell (landing doorbell): *7*59#...
 	floorRingPattern = regexp.MustCompile(`\*7\*59#`)
 
-	// Video stream events: *7*300#127#0#0#1#5007#0*##
+	// Video stream events: *7*300#127#0#0#1#5002#1*##
 	videoStreamPattern = regexp.MustCompile(`\*7\*(\d+)#(.+)##`)
 
 	// Mute/unmute events: *#8**33*0## (mute) and *#8**33*1## (unmute)

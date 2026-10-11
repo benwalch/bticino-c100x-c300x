@@ -512,8 +512,12 @@ func (ws *WebServer) handleAPIStatus(w http.ResponseWriter, r *http.Request) {
 		"version":      version.GetVersion(),
 		"timestamp":    time.Now(),
 		"uptime":       ws.getUptime(),
-		"boot_time":    ws.startTime.Format(time.RFC3339), // permite verificar reinicios aunque el restart haga timeout
+		"boot_time":    ws.startTime.Format(time.RFC3339), // allows verifying restarts even if the restart times out
 		"storage_used": storageUsed,
+		"device": map[string]interface{}{
+			"variant": bticino.DeviceVariant,
+			"model":   bticino.DeviceModelName(),
+		},
 		"components": map[string]interface{}{
 			"message_parser": map[string]interface{}{
 				"status":         "active",
@@ -737,8 +741,8 @@ func (ws *WebServer) handleCallHangup(w http.ResponseWriter, r *http.Request) {
 func (ws *WebServer) handleAPISystem(w http.ResponseWriter, r *http.Request) {
 	system := map[string]interface{}{
 		"device_info": map[string]interface{}{
-			"model":        "BTicino Classe 300X",
-			"ip":           "192.168.1.38",
+			"model":        bticino.DeviceModelName(),
+			"ip":           bticino.LocalOutboundIP(),
 			"architecture": "ARM v7l",
 		},
 		"filesystem": map[string]interface{}{

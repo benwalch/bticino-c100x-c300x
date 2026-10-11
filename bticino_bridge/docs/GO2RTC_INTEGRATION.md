@@ -8,14 +8,14 @@ go2rtc runs **on the device** (ARM binary in `/home/bticino/cfg/extra/go2rtc/`) 
 
 ## Architecture (v0.18.0 — live video on call)
 
-Since v0.18.0 the **live video during a call** does **not** use a self-INVITE against an external SIP server. When a call rings your unit, a passive AF_PACKET tap mirrors the native video leg (cleartext H.264 RTP on `lo:5007`) into the bridge's RTP relay, which serves it over RTSP as **`/doorbell-video`**. No commands are sent to the device bus. See `docs/HOME_ASSISTANT.md` and the CHANGELOG v0.18.0 entry.
+Since v0.18.0 the **live video during a call** does **not** use a self-INVITE against an external SIP server. When a call rings your unit, a passive AF_PACKET tap mirrors the native video leg (cleartext H.264 RTP on `lo:5002`) into the bridge's RTP relay, which serves it over RTSP as **`/doorbell-video`**. No commands are sent to the device bus. See `docs/HOME_ASSISTANT.md` and the CHANGELOG v0.18.0 entry.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    BTicino Classe 300X                             │
 ├─────────────────────────────────────────────────────────────────┤
 │  Native call ringing  ──►  bt_av_media streams H.264 RTP         │
-│                            (cleartext) to  lo:5007               │
+│                            (cleartext) to  lo:5002               │
 │         │                                                        │
 │         │  passive AF_PACKET tap (read-only, zero bus commands)  │
 │         ▼                                                        │

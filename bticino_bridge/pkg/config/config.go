@@ -165,27 +165,28 @@ type StreamingConfig struct {
 	RecordingPath        string `yaml:"recording_path"`
 	MaxDuration          int    `yaml:"max_duration"`
 	AutoStopOnLastClient bool   `yaml:"auto_stop_on_last_client"`
-	// VideoBackend selecciona cómo se obtiene el vídeo de la cámara:
-	//   "avmedia"   → comando *7*300 pidiendo a bt_av_media que duplique su RTP
-	//                 (cooperativo con el firmware nativo; toca el puerto 30007)
-	//   "gstreamer" → pipeline GStreamer directo capturando /dev/video0 con la VPU
-	//                 (compite con los procesos nativos; puede fallar en frío)
-	//   "auto"      → intenta avmedia y, si no fluye RTP, cae a gstreamer
+	// VideoBackend selects how the camera video is obtained:
+	//   "avmedia"   → *7*300 command asking bt_av_media to duplicate its RTP
+	//                 (cooperative with the native firmware; touches port 30007)
+	//   "gstreamer" → direct GStreamer pipeline capturing /dev/video0 with the VPU
+	//                 (competes with native processes; may fail on cold start)
+	//   "auto"      → tries avmedia and, if no RTP flows, falls back to gstreamer
 	VideoBackend string `yaml:"video_backend"`
-	// VideoOnDemand habilita la ACTIVACIÓN de vídeo bajo demanda: self-INVITE
-	// del servidor RTSP, arranque automático de vídeo al pulsar el timbre y
-	// snapshots. DESACTIVADO por defecto por seguridad: activar vídeo compite
-	// con el firmware nativo y, si algo se reintenta, puede reiniciar el equipo.
-	// Con false, ninguna de esas vías envía comandos al dispositivo nativo.
+	// VideoOnDemand enables on-demand video ACTIVATION: self-INVITE
+	// from the RTSP server, automatic video start on doorbell press and
+	// snapshots. DISABLED by default for safety: enabling video competes
+	// with the native firmware and, if anything retries, may reboot the unit.
+	// With false, none of those paths sends commands to the native device.
 	VideoOnDemand bool `yaml:"video_on_demand"`
-	// LiveOnCall habilita el vídeo en vivo durante una llamada entrante a
-	// nuestra unidad mediante un espejo PASIVO (tap del leg de vídeo nativo en
-	// lo:5007 → relay). CERO comandos al bus: es aún más seguro que el snapshot
-	// cooperativo. Independiente de VideoOnDemand.
+	// LiveOnCall enables live video during an incoming call to
+	// our unit via a PASSIVE mirror (tap of the native video leg on
+	// lo:<native-port> → relay; 5007 high-res on c300x, 5002 low-res on
+	// c100x, selected via bticino.DeviceVariant). ZERO commands to the bus: even safer than the cooperative
+	// snapshot. Independent of VideoOnDemand.
 	LiveOnCall bool `yaml:"live_on_call"`
 }
 
-// Backends de vídeo soportados
+// Supported video backends
 const (
 	VideoBackendAVMedia   = "avmedia"
 	VideoBackendGStreamer = "gstreamer"

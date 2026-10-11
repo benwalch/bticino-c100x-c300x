@@ -6,8 +6,9 @@
   let error = null
   let eventSource = null
 
-  // Función de cada pin monitorizado, según HARDWARE.md (tabla "GPIO Usage").
-  const GPIO_INFO = {
+  // Function of each monitored pin. Tables differ per model (pins 60/176/180
+  // mean different things on 300X vs 100X); selected via status.device.variant.
+  const GPIO_INFO_300X = {
     12:  { label: 'TV demod power',   desc: 'tda9885 video demodulator power' },
     13:  { label: 'Input',            desc: 'sysfs input — function not identified' },
     47:  { label: 'Input',            desc: 'sysfs input (high) — function not identified' },
@@ -21,6 +22,55 @@
     155: { label: 'Audio path B',     desc: 'Enable audio path' },
     176: { label: 'PoE reset',        desc: 'Microsemi PoE controller reset' },
     180: { label: '5V audio',        desc: 'Enable 5V audio stage — goes OFF while recording (avoids feedback)' }
+  }
+
+  // Classe 100X GPIO functions, verified on-device 2026-10-11 (sysfs-logical).
+  const GPIO_INFO_100X = {
+    47:  { label: 'Extra power',   desc: 'ADDITIONAL_PWR rail (static ON)' },
+    64:  { label: 'Amplifier',     desc: 'en_ampli — ON while answered (brief pulse on chime)' },
+    67:  { label: 'Telecoil',      desc: 'en_tcoil — ON only while answered' },
+    71:  { label: 'TV demod',      desc: 'tda9885 power — ON during ring+call' },
+    73:  { label: 'Suppl ringer',  desc: 'en_suppl_ring — chime pulse, unmuted only' },
+    77:  { label: 'Phone path',    desc: 'en_phon — ON during ring+call' },
+    148: { label: 'Safe lock',     desc: 'SECURE_LOCK service (static, not the release)' },
+    176: { label: 'PoE reset',     desc: 'rst_microsemi — inverted: 0 in session, 1 idle' },
+    180: { label: 'LCD DEV4',      desc: 'LCD select line (static)' },
+    187: { label: 'LCD DEV1',      desc: 'LCD select line (static)' },
+    189: { label: 'LCD DEV2',      desc: 'LCD select line (static)' },
+    190: { label: 'LCD DEV3',      desc: 'LCD select line (static)' }
+  }
+
+  function gpioInfo(pin) {
+    const table = status?.device?.variant === 'c100x' ? GPIO_INFO_100X : GPIO_INFO_300X
+    return table[pin]
+  }
+
+  // Friendly names for sysfs LEDs. Names differ per model: Classe 300X uses
+  // led_lock/led_vct_*/led_memo/led_exc_call/led_gwifi/led_ans_machine, while
+  // Classe 100X (C100X) uses led_door_lock/led_horn_*/led_p*/led_star/
+  // led_call_exp/led_autosw/led_wifi. Unknown LEDs fall back to the raw name.
+  // Verified on C100X; 300X entries below the verified block are legacy guesses.
+  const LED_INFO = {
+    // --- Classe 100X (verified on device) ---
+    led_call_exp:  { label: 'Muted',           desc: 'Ringer excluded — ON while doorbell sound is muted' },
+    led_door_lock: { label: 'Door lock',       desc: 'ON while the door-release key is active' },
+    led_star:      { label: 'Staircase light', desc: 'ON while the staircase-light (star) key is active' },
+    led_horn_r:    { label: 'Phone red',       desc: 'ON while the red (hangup) phone key is active' },
+    led_horn_g:    { label: 'Phone green',     desc: 'Likely the green (answer) phone key — unconfirmed' },
+    led_p1:        { label: 'Page dot 1',      desc: 'Page/dot indicator 1' },
+    led_p2:        { label: 'Page dot 2',      desc: 'Page/dot indicator 2 — unconfirmed' },
+    led_p3:        { label: 'Page dot 3',      desc: 'Page/dot indicator 3 — unconfirmed' },
+    led_p4:        { label: 'Page dot 4',      desc: 'Page/dot indicator 4 — unconfirmed' },
+    led_autosw:    { label: 'Autoswitch',      desc: 'Function not identified' },
+    led_wifi:      { label: 'WiFi',            desc: 'Function not identified' },
+    // --- Classe 300X (legacy names) ---
+    led_lock:        { label: 'Door lock',       desc: 'Door open (lock active)' },
+    led_vct_green:   { label: 'Video call',      desc: 'Active video communication' },
+    led_vct_red:     { label: 'Video call red',  desc: 'Unknown' },
+    led_memo:        { label: 'Messages',        desc: 'Pending messages' },
+    led_exc_call:    { label: 'Missed call (?)', desc: '300X-only; never verified ON' },
+    led_gwifi:       { label: 'WiFi',            desc: 'Unknown (WiFi?)' },
+    led_ans_machine: { label: 'Answering',       desc: 'Unknown (answering machine?)' }
   }
   
   onMount(async () => {
@@ -125,8 +175,8 @@
       <h3>LEDs Status</h3>
       <div class="leds">
         {#each Object.entries(status.leds) as [name, on]}
-        <div class="led {on ? 'on' : 'off'}">
-          <span class="led-name">{name}</span>
+        <div class="led {on ? 'on' : 'off'}" title={LED_INFO[name]?.desc || 'Function unknown'}>
+          <span class="led-name">{LED_INFO[name]?.label || name}</span>
           <span class="led-status">{on ? '✅ On' : '❌ Off'}</span>
         </div>
         {/each}
@@ -137,10 +187,10 @@
       <h3>GPIO Status</h3>
       <div class="gpios">
         {#each Object.entries(status.gpio) as [pin, on]}
-        <div class="gpio {on ? 'on' : 'off'}" title={GPIO_INFO[pin]?.desc || 'Function unknown'}>
+        <div class="gpio {on ? 'on' : 'off'}" title={gpioInfo(pin)?.desc || 'Function unknown'}>
           <span class="gpio-pin">GPIO {pin}</span>
-          {#if GPIO_INFO[pin]}
-          <span class="gpio-label">{GPIO_INFO[pin].label}</span>
+          {#if gpioInfo(pin)}
+          <span class="gpio-label">{gpioInfo(pin).label}</span>
           {/if}
           <span class="gpio-status">{on ? '✅ High' : '❌ Low'}</span>
         </div>

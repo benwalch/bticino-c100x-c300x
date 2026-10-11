@@ -51,7 +51,6 @@ const (
 	OpenWebNetLocalPort  = 30006
 	OpenWebNetConfigPort = 30007
 	SIPServerPort        = 5060
-	SIPMediaPort         = 5007
 )
 
 // ==================== OpenWebNet COMMANDS (verified on real device) ====================
@@ -279,13 +278,13 @@ const (
 // BTicino Device Information
 const (
 	DeviceManufacturer = "Bticino-Legrand"
-	DeviceModel        = "Classe 300 X13E"
-	DeviceModelShort   = "C300X"
+	DeviceModel        = "Classe 100 X16E"
+	DeviceModelShort   = "C100X"
 
 	// DeviceVariant selects which indoor unit this bridge runs on.
-	// "c300x" for a Classe 300X, "c100x" for a Classe 100X. Change it
-	// and rebuild to retarget the unit.
-	DeviceVariant = "c300x"
+	// Change to "c300x" for a Classe 300X, "c100x" for a Classe 100X,
+	// then rebuild. It switches model-specific tables (LEDs, …).
+	DeviceVariant = "c100x"
 
 	// Supported variants (valid values for DeviceVariant).
 	DeviceVariant300X = "c300x"
@@ -296,9 +295,8 @@ const (
 	DefaultGateway          = "192.168.1.1"
 
 	// SIP Configuration
-	SIPDomain          = "bs.iotleg.com"
-	SIPServer          = "sipserver.bs.iotleg.com"
-	SIPDefaultUsername = "c300x"
+	SIPDomain = "bs.iotleg.com"
+	SIPServer = "sipserver.bs.iotleg.com"
 
 	// MyHome Web Portal
 	MyHomePortal     = "www.myhomeweb.com"
@@ -592,94 +590,185 @@ var OWNEventTypes = map[string]string{
 	"*#130**1*2##": "system_status",
 }
 
-// ==================== GPIO (verificados mediante pruebas fisicas) ====================
+// ==================== GPIO (verified through physical testing) ====================
 //
-// | GPIO | Funcion confirmada                  | Evidencia                                             |
-// |------|--------------------------------------|-------------------------------------------------------|
-// | 12   | Amplificador audio (altavoz activo)  | ON con video/llamada, OFF al colgar                   |
-// | 13   | Desconocido                          | Sin cambios en ninguna prueba                          |
-// | 47   | Permanente ON                        | Hardware/alimentacion                                  |
-// | 49   | Sensor proximidad / despertar        | Solo se activa con timbre externo (pulso 3s)           |
-// | 52   | Permanente ON                        | Hardware/alimentacion                                  |
-// | 54   | Permanente ON                        | Hardware/alimentacion                                  |
-// | 56   | Modo inactivo/standby                | ON=reposo. OFF cuando comms bidireccionales activas    |
-// | 58   | Desconocido                          | Sin cambios en ninguna prueba                          |
-// | 60   | Rele audio bidireccional (microfono) | ON solo al pulsar telefono. OFF=solo escucha           |
-// | 154  | Indicador llamada entrante           | Pulso breve solo con timbre externo                    |
-// | 155  | Conversacion activa (entrante)       | ON durante conversacion entrante, no en auto-activacion|
-// | 176  | Permanente ON                        | Hardware/bus SCS                                       |
-// | 180  | Comunicacion establecida             | ON durante cualquier comunicacion activa               |
-
-// GPIOPins lista de todos los pines GPIO monitorizados
-var GPIOPins = []int{12, 13, 47, 49, 52, 54, 56, 58, 60, 154, 155, 176, 180}
-
-// GPIONames mapea pin GPIO a nombre legible (legacy: usado por webserver)
-var GPIONames = []string{
-	"gpio12", "gpio13", "gpio47", "gpio49", "gpio52",
-	"gpio54", "gpio56", "gpio58", "gpio60",
-	"gpio154", "gpio155", "gpio176", "gpio180",
-}
-
-// GPIOFunctions mapea pin GPIO a descripcion de su funcion confirmada
-var GPIOFunctions = map[int]string{
-	12:  "Amplificador audio (altavoz)",
-	13:  "Desconocido",
-	47:  "Permanente ON (alimentacion)",
-	49:  "Sensor proximidad / despertar",
-	52:  "Permanente ON (alimentacion)",
-	54:  "Permanente ON (alimentacion)",
-	56:  "Modo inactivo/standby",
-	58:  "Desconocido",
-	60:  "Rele audio bidireccional (microfono)",
-	154: "Indicador llamada entrante",
-	155: "Conversacion activa (entrante)",
-	176: "Permanente ON (bus SCS)",
-	180: "Comunicacion establecida",
-}
-
-// ==================== LEDs (verificados en /sys/class/leds/) ====================
+// Classe 300X (original target):
+// | GPIO | Confirmed function                    | Evidence                                                |
+// |------|-----------------------------------------|-------------------------------------------------------|
+// | 12   | Audio amplifier (active speaker)        | ON with video/call, OFF on hangup                     |
+// | 13   | Unknown                               | No changes in any test                                  |
+// | 47   | Permanently ON                        | Hardware/power                                          |
+// | 49   | Proximity / wake-up sensor            | Only triggers with outdoor doorbell (3s pulse)          |
+// | 52   | Permanently ON                        | Hardware/power                                          |
+// | 54   | Permanently ON                        | Hardware/power                                          |
+// | 56   | Idle/standby mode                     | ON=idle. OFF when two-way comms active                  |
+// | 58   | Unknown                               | No changes in any test                                  |
+// | 60   | Two-way audio relay (microphone)        | ON only when phone pressed. OFF=listen only           |
+// | 154  | Incoming call indicator               | Brief pulse only with outdoor doorbell                  |
+// | 155  | Active conversation (incoming)        | ON during incoming conversation, not on self-activation |
+// | 176  | Permanently ON                        | Hardware/SCS bus                                        |
+// | 180  | Established communication             | ON during any active communication                      |
 //
-// | LED sysfs       | Funcion confirmada                                                |
-// |-----------------|-------------------------------------------------------------------|
-// | led_lock        | Puerta abierta: se ilumina durante pulsacion larga de llave       |
-// | led_vct_green   | Comunicacion video activa: ON durante sesion video/audio           |
-// | led_memo        | Mensajes pendientes: se apaga al acceder al menu de mensajes      |
-// | led_exc_call    | Desconocido (nunca visto ON en pruebas)                           |
-// | led_gwifi       | Desconocido (nunca visto ON en pruebas)                           |
-// | led_ans_machine | Desconocido (nunca visto ON en pruebas)                           |
-// | led_vct_red     | Desconocido (nunca visto ON en pruebas)                           |
+// Classe 100X (C100X), verified on-device 2026-10-11 (sysfs-logical levels):
+// | GPIO | Kernel name      | Behavior                                              |
+// |------|------------------|-------------------------------------------------------|
+// | 64   | en_ampli         | 1 while answered (brief pulse on chime)               |
+// | 67   | en_tcoil         | 1 only while answered                                 |
+// | 71   | tda9885 power    | 1 during ring+call                                    |
+// | 73   | en_suppl_ring    | ~1s pulse with chime, only when unmuted               |
+// | 77   | en_phon          | 1 during ring+call                                    |
+// | 148  | SECURE_LOCK      | static 0 (safe-lock service, not the release)         |
+// | 176  | rst_microsemi    | 0 in session, 1 idle (inverted)                       |
+// | 180+ | LCD_DEV*         | static 0                                              |
+// | 47   | ADDITIONAL_PWR   | static 1                                              |
+// | 60/61/128/191 | hw_ver_car* | static version strapping (1/1/1/0)               |
+
+// GPIOPinsByModel lists the polled GPIO pins per device variant.
+var GPIOPinsByModel = map[string][]int{
+	DeviceVariant300X: {12, 13, 47, 49, 52, 54, 56, 58, 60, 154, 155, 176, 180},
+	DeviceVariant100X: {47, 64, 67, 71, 73, 77, 148, 176, 180, 187, 189, 190},
+}
+
+// GPIOPinsForVariant returns the polled pins for the given variant,
+// falling back to c300x for unknown values.
+func GPIOPinsForVariant(variant string) []int {
+	if pins, ok := GPIOPinsByModel[variant]; ok {
+		return pins
+	}
+	return GPIOPinsByModel[DeviceVariant300X]
+}
+
+// GPIOFunctionsByModel maps device variant to pin → function description.
+var GPIOFunctionsByModel = map[string]map[int]string{
+	DeviceVariant300X: {
+		12:  "Audio amplifier (speaker)",
+		13:  "Unknown",
+		47:  "Always ON (power)",
+		49:  "Proximity sensor / wake-up",
+		52:  "Always ON (power)",
+		54:  "Always ON (power)",
+		56:  "Idle/standby mode",
+		58:  "Unknown",
+		60:  "Two-way audio relay (microphone)",
+		154: "Incoming call indicator",
+		155: "Active conversation (incoming)",
+		176: "Always ON (SCS bus)",
+		180: "Communication established",
+	},
+	DeviceVariant100X: {
+		47:  "Additional power rail (static ON)",
+		64:  "Speaker amplifier (ON while answered)",
+		67:  "Telecoil, answer-only",
+		71:  "TV demodulator power (ON in session)",
+		73:  "Supplementary ringer (chime pulse, unmuted only)",
+		77:  "Phone path (ON during ring+call)",
+		148: "Safe-lock service (static)",
+		176: "PoE controller reset (inverted: 0 in session)",
+		180: "LCD select DEV4 (static)",
+		187: "LCD select DEV1 (static)",
+		189: "LCD select DEV2 (static)",
+		190: "LCD select DEV3 (static)",
+	},
+}
+
+// ==================== LEDs (verified in /sys/class/leds/) ====================
 //
-// Nota: Cada boton fisico tambien tiene su propio LED, pero estos son controlados
-// por el chip I2C del teclado, no via GPIO sysfs.
+// Classe 300X sysfs names
+// | LED sysfs       | Confirmed function                                                  |
+// |-----------------|---------------------------------------------------------------------|
+// | led_lock        | Door open: lights up during long key press                          |
+// | led_vct_green   | Active video communication: ON during video/audio session           |
+// | led_memo        | Pending messages: turns off when opening the message menu           |
+// | led_exc_call    | Unknown (never seen ON in tests; 300X-only, "missed call" is a guess)|
+// | led_gwifi       | Unknown (never seen ON in tests)                                    |
+// | led_ans_machine | Unknown (never seen ON in tests)                                    |
+// | led_vct_red     | Unknown (never seen ON in tests)                                    |
+//
+// Classe 100X (C100X) sysfs names
+// | LED sysfs       | Confirmed function                                                  |
+// |-----------------|---------------------------------------------------------------------|
+// | led_call_exp    | Ringer excluded (mute): ON while doorbell sound is muted            |
+// | led_door_lock   | Door lock: ON while the door-release key is active                  |
+// | led_star        | Staircase light: ON while the star key is active                    |
+// | led_horn_r      | Red phone key (hangup): ON while active call                        |
+// | led_horn_g      | Green phone key (answer), ON while active call                      |
+// | led_p1..p4      | Page/dot indicators (p1, p2, p3 ,p4)               |
+// | led_autosw      | Unknown                                                             |
+// | led_wifi        | Unknown                                                             |
+//
+// Note: each physical button also has its own LED, but those are controlled
+// by the keypad I2C chip, not via GPIO sysfs
 
-// LEDNames lista de LEDs sysfs del dispositivo (nombres reales en /sys/class/leds/)
-var LEDNames = []string{
-	"led_lock",
-	"led_vct_green",
-	"led_vct_red",
-	"led_memo",
-	"led_exc_call",
-	"led_gwifi",
-	"led_ans_machine",
+// LEDFunctionsByModel maps device variant ("c300x" / "c100x", see
+// DeviceVariant) to its sysfs LED name → function description table.
+// The 300X set was never fully verified (led_exc_call etc. were never seen
+// ON); the 100X set was verified on-device 2026-10-11 unless noted.
+var LEDFunctionsByModel = map[string]map[string]string{
+	DeviceVariant300X: {
+		"led_lock":        "Door open (lock active)",
+		"led_vct_green":   "Active video communication",
+		"led_vct_red":     "Unknown",
+		"led_memo":        "Pending messages",
+		"led_exc_call":    "Unknown (missed call?)",
+		"led_gwifi":       "Unknown (WiFi?)",
+		"led_ans_machine": "Unknown (answering machine?)",
+	},
+	DeviceVariant100X: {
+		"led_call_exp":  "Ringer excluded (mute)",
+		"led_door_lock": "Door lock (release key active)",
+		"led_star":      "Staircase light (star key active)",
+		"led_horn_r":    "Red phone key (hangup)",
+		"led_horn_g":    "Green phone key (answer, unconfirmed)",
+		"led_p1":        "Programmable Button 1",
+		"led_p2":        "Programmable Button 2",
+		"led_p3":        "Programmable Button 3",
+		"led_p4":        "Programmable Button 4",
+		"led_autosw":    "Unknown",
+		"led_wifi":      "Unknown",
+	},
 }
 
-// LEDFunctions mapea nombre LED sysfs a descripcion de su funcion confirmada
-var LEDFunctions = map[string]string{
-	"led_lock":        "Puerta abierta (cerradura activa)",
-	"led_vct_green":   "Comunicacion video activa",
-	"led_vct_red":     "Desconocido",
-	"led_memo":        "Mensajes pendientes",
-	"led_exc_call":    "Desconocido (llamada perdida?)",
-	"led_gwifi":       "Desconocido (WiFi?)",
-	"led_ans_machine": "Desconocido (contestador?)",
+// LEDEntity describes one LED for MQTT discovery.
+type LEDEntity struct {
+	ObjectID string
+	Name     string
+	Sysfs    string
+	Icon     string
 }
 
-// Network Filter Ports (for tcpdump filtering)
-var FilteredPorts = []int{
-	5007,  // SIP media
-	5060,  // SIP signaling
-	20000, // OpenWebNet main
-	30006, // OpenWebNet local
+// LEDEntitiesByModel lists the MQTT discovery entities per device variant.
+var LEDEntitiesByModel = map[string][]LEDEntity{
+	DeviceVariant300X: {
+		{ObjectID: "bticino_led_memo", Name: "LED Message", Sysfs: "led_memo", Icon: "mdi:message-alert"},
+		{ObjectID: "bticino_led_wifi", Name: "LED WiFi", Sysfs: "led_gwifi", Icon: "mdi:wifi"},
+		{ObjectID: "bticino_led_answering", Name: "LED Answering Machine", Sysfs: "led_ans_machine", Icon: "mdi:voicemail"},
+		{ObjectID: "bticino_led_lock", Name: "LED Lock", Sysfs: "led_lock", Icon: "mdi:lock"},
+		{ObjectID: "bticino_led_missed_call", Name: "LED Missed Call", Sysfs: "led_exc_call", Icon: "mdi:phone-missed"},
+		{ObjectID: "bticino_led_call_green", Name: "LED Green Call", Sysfs: "led_vct_green", Icon: "mdi:phone-in-talk"},
+		{ObjectID: "bticino_led_call_red", Name: "LED Red Call", Sysfs: "led_vct_red", Icon: "mdi:phone-hangup"},
+	},
+	DeviceVariant100X: {
+		{ObjectID: "bticino_led_muted", Name: "LED Muted", Sysfs: "led_call_exp", Icon: "mdi:bell-off"},
+		{ObjectID: "bticino_led_door_lock", Name: "LED Door Lock", Sysfs: "led_door_lock", Icon: "mdi:lock"},
+		{ObjectID: "bticino_led_staircase", Name: "LED Staircase Light", Sysfs: "led_star", Icon: "mdi:lightbulb"},
+		{ObjectID: "bticino_led_phone_red", Name: "LED Phone Red", Sysfs: "led_horn_r", Icon: "mdi:phone-hangup"},
+		{ObjectID: "bticino_led_phone_green", Name: "LED Phone Green", Sysfs: "led_horn_g", Icon: "mdi:phone-in-talk"},
+		{ObjectID: "bticino_led_page1", Name: "LED Page 1", Sysfs: "led_p1", Icon: "mdi:numeric-1-circle"},
+		{ObjectID: "bticino_led_page2", Name: "LED Page 2", Sysfs: "led_p2", Icon: "mdi:numeric-2-circle"},
+		{ObjectID: "bticino_led_page3", Name: "LED Page 3", Sysfs: "led_p3", Icon: "mdi:numeric-3-circle"},
+		{ObjectID: "bticino_led_page4", Name: "LED Page 4", Sysfs: "led_p4", Icon: "mdi:numeric-4-circle"},
+		{ObjectID: "bticino_led_autosw", Name: "LED Autoswitch", Sysfs: "led_autosw", Icon: "mdi:swap-horizontal"},
+		{ObjectID: "bticino_led_wifi_100x", Name: "LED WiFi", Sysfs: "led_wifi", Icon: "mdi:wifi"},
+	},
+}
+
+// LEDEntitiesForVariant returns the discovery entities for the given variant,
+// falling back to c300x for unknown values.
+func LEDEntitiesForVariant(variant string) []LEDEntity {
+	if entities, ok := LEDEntitiesByModel[variant]; ok {
+		return entities
+	}
+	return LEDEntitiesByModel[DeviceVariant300X]
 }
 
 // Home Assistant Device Class Mappings

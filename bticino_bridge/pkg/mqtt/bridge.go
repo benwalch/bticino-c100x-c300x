@@ -325,8 +325,8 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	dp := b.dataPrefix()
 
 	device := map[string]interface{}{
-		"identifiers":  []string{"bticino_classe300x"},
-		"name":         "BTicino Classe 300X",
+		"identifiers":  []string{"bticino_classe100x"},
+		"name":         "BTicino Classe 100X",
 		"model":        bticino.DeviceModel,
 		"manufacturer": bticino.DeviceManufacturer,
 		"sw_version":   "Bridge v" + version.GetVersion(),
@@ -526,31 +526,22 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- LEDs as binary sensors (14-20) ---
-	ledEntities := []struct {
-		objectID string
-		name     string
-		sysfs    string
-		icon     string
-	}{
-		{"bticino_led_memo", "LED Mensaje", "led_memo", "mdi:message-alert"},
-		{"bticino_led_wifi", "LED WiFi", "led_gwifi", "mdi:wifi"},
-		{"bticino_led_answering", "LED Contestador", "led_ans_machine", "mdi:voicemail"},
-		{"bticino_led_lock", "LED Cerradura", "led_lock", "mdi:lock"},
-		{"bticino_led_missed_call", "LED Llamada Perdida", "led_exc_call", "mdi:phone-missed"},
-		{"bticino_led_call_green", "LED Llamada Verde", "led_vct_green", "mdi:phone-in-talk"},
-		{"bticino_led_call_red", "LED Llamada Rojo", "led_vct_red", "mdi:phone-hangup"},
-	}
+	// --- LEDs as binary sensors (model-specific: c300x vs c100x) ---
+	// Entity table comes from bticino.LEDEntitiesByModel, selected via
+	// bticino.DeviceVariant (change the const + rebuild to switch units).
+	ledEntities := bticino.LEDEntitiesForVariant(bticino.DeviceVariant)
+	b.logger.Infof("MQTT discovery: advertising %d LED entities for variant %s",
+		len(ledEntities), bticino.DeviceVariant)
 
 	for _, led := range ledEntities {
-		b.discovery("binary_sensor", led.objectID, map[string]interface{}{
-			"name":         led.name,
-			"unique_id":    led.objectID,
-			"object_id":    led.objectID,
-			"state_topic":  dp + "/led/" + led.sysfs + "/state",
+		b.discovery("binary_sensor", led.ObjectID, map[string]interface{}{
+			"name":         led.Name,
+			"unique_id":    led.ObjectID,
+			"object_id":    led.ObjectID,
+			"state_topic":  dp + "/led/" + led.Sysfs + "/state",
 			"payload_on":   "ON",
 			"payload_off":  "OFF",
-			"icon":         led.icon,
+			"icon":         led.Icon,
 			"device":       device,
 			"availability": avail,
 		})
@@ -608,13 +599,19 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- GPIO individual sensors (25-37) ---
-	gpioPins := []int{12, 13, 47, 49, 52, 54, 56, 58, 60, 154, 155, 176, 180}
+	// --- GPIO individual sensors (model-specific pin list) ---
+	gpioPins := bticino.GPIOPinsForVariant(bticino.DeviceVariant)
+	b.logger.Infof("MQTT discovery: advertising %d GPIO entities for variant %s",
+		len(gpioPins), bticino.DeviceVariant)
 	for _, pin := range gpioPins {
 		objID := fmt.Sprintf("bticino_gpio_%d", pin)
+		name := fmt.Sprintf("GPIO %d", pin)
+		if fn, ok := bticino.GPIOFunctionsByModel[bticino.DeviceVariant][pin]; ok {
+			name = fmt.Sprintf("GPIO %d (%s)", pin, fn)
+		}
 		b.discovery("binary_sensor", objID, map[string]interface{}{
-			"name":         fmt.Sprintf("GPIO %d", pin),
-			"unique_id":    fmt.Sprintf("bticino_c300x_gpio_%d", pin),
+			"name":         name,
+			"unique_id":    fmt.Sprintf("bticino_intercom_gpio_%d", pin),
 			"object_id":    objID,
 			"state_topic":  fmt.Sprintf("%s/gpio/%d/state", dp, pin),
 			"payload_on":   "ON",

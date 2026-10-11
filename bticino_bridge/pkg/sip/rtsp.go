@@ -12,6 +12,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"bticino_bridge/pkg/bticino"
 	"bticino_bridge/pkg/events"
 )
 
@@ -570,7 +571,7 @@ func (r *RTSPServer) ensureSIPCallActive() error {
 
 	target := r.sipClient.config.SIPTarget
 	if target == "" {
-		target = "c300x"
+		target = bticino.SIPUsernameForVariant(bticino.DeviceVariant)
 	}
 	if err := r.sipClient.MakeCall(target); err != nil {
 		return fmt.Errorf("failed to make SIP call: %v", err)

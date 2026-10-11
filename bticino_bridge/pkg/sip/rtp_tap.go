@@ -7,29 +7,45 @@ import (
 	"sync"
 	"syscall"
 
+	"bticino_bridge/pkg/bticino"
 	"github.com/sirupsen/logrus"
 )
 
-// NativeVideoRTPPort es el puerto loopback al que bt_av_media envía el vídeo
-// H.264 (RTP PT=96, EN CLARO) durante una llamada: es el leg SIP local que el
-// propio firmware arma con sus *7*300 (tipo 0 → 5007). Verificado en la Fase 0
-// del 2026-08-18: flujo sostenido (~205 pps) desde el ring hasta colgar.
-const NativeVideoRTPPort = 5007
+// Native video RTP ports: loopback ports to which bt_av_media sends the
+// H.264 video (RTP PT=96, IN CLEAR) during a call, i.e. the local SIP legs
+// the firmware itself sets up with its *7*300. The 300X serves high-res
+// (type 0 → 5007); the 100X has no high-res leg, only low-res (type 1 →
+// 5002). Verified in Phase 0 on 2026-08-18: sustained flow (~205 pps) from
+// ring until hangup.
+const (
+	NativeVideoRTPPort300X = 5007
+	NativeVideoRTPPort100X = 5002
+)
 
-// frameSource abstrae la fuente de tramas crudas (AF_PACKET real en el device,
-// una fuente sintética en los tests).
+// NativeVideoRTPPortForVariant returns the tap source port for the given
+// device variant ("c300x" / "c100x", see bticino.DeviceVariant). Unknown
+// variants fall back to the 300X high-res leg.
+func NativeVideoRTPPortForVariant(variant string) int {
+	if variant == bticino.DeviceVariant100X {
+		return NativeVideoRTPPort100X
+	}
+	return NativeVideoRTPPort300X
+}
+
+// frameSource abstracts the raw frame source (real AF_PACKET on the device,
+// a synthetic source in tests).
 type frameSource interface {
-	// ReadFrame llena buf y devuelve el tamaño y el pkttype (PACKET_HOST,
-	// PACKET_OUTGOING...) de la trama. Error de timeout → reintentable.
+	// ReadFrame fills buf and returns the size and the pkttype (PACKET_HOST,
+	// PACKET_OUTGOING...) of the frame. Timeout error → retryable.
 	ReadFrame(buf []byte) (n int, pkttype byte, err error)
 	Close() error
 }
 
-// LoopbackRTPTap es un espejo PASIVO: captura en `lo` los datagramas UDP
-// destinados a srcPort (el leg de vídeo nativo) y reenvía su payload RTP a
-// 127.0.0.1:dstPort (la entrada del relay). No envía NINGÚN comando al bus ni
-// abre sockets que compitan con los procesos nativos (patrón no-interferencia):
-// el socket AF_PACKET es de solo escucha, como tcpdump/minicap.
+// LoopbackRTPTap is a PASSIVE mirror: it captures on `lo` the UDP datagrams
+// destined to srcPort (the native video leg) and forwards their RTP payload to
+// 127.0.0.1:dstPort (the relay input). It sends NO command to the bus nor
+// opens sockets competing with native processes (non-interference pattern):
+// the AF_PACKET socket is listen-only, like tcpdump/minicap.
 type LoopbackRTPTap struct {
 	srcPort int
 	dstPort int

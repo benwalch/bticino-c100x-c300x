@@ -44,7 +44,11 @@
       }
       
       if (statusData.leds) {
-        controls.doorbell_sound.on = statusData.leds.led_ans_machine !== false
+        // Mute indicator: Classe 100X exposes led_call_exp (ON = muted),
+        // Classe 300X guesses led_ans_machine. Prefer the 100X name.
+        const muted = statusData.leds.led_call_exp === true ||
+          (statusData.leds.led_call_exp === undefined && statusData.leds.led_ans_machine === false)
+        controls.doorbell_sound.on = !muted
       }
       
       error = null

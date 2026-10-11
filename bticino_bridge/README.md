@@ -12,7 +12,7 @@ Apple HomeKit, a Svelte web dashboard, a REST API and hardware-accelerated
 
 | Component | Status |
 |---|---|
-| **Live video on call (:6554 `/doorbell-video`)** | ✅ Working — passive AF_PACKET tap of the native video leg (`lo:5007`, cleartext H.264) → relay → RTSP → go2rtc → HA. **Zero bus commands**; on by default (`streaming.live_on_call: true`), independent of `video_on_demand` |
+| **Live video on call (:6554 `/doorbell-video`)** | ✅ Working — passive AF_PACKET tap of the native video leg (`lo:5002`, cleartext H.264) → relay → RTSP → go2rtc → HA. **Zero bus commands**; on by default (`streaming.live_on_call: true`), independent of `video_on_demand` |
 | **RTSP on-demand video (:6554 `/doorbell`)** | 🧪 Experimental — **off by default** (`video_on_demand: false`). Self-INVITE activation competes with the native camera; only enable once validated on your unit |
 | **Camera snapshots** | ✅ Working — cooperative single `*7*300` (VPU decode → JPEG); doorbell camera published to MQTT on ring |
 | **Web/API authentication** | ✅ Working — optional HTTP Basic Auth over the whole server (`security.web_auth_required` + `web_username`/`web_password`); fail-closed if enabled without a password |
@@ -31,7 +31,7 @@ Apple HomeKit, a Svelte web dashboard, a REST API and hardware-accelerated
 | HomeKit (:8081) | ⚠️ Implemented, not verified |
 
 **v0.18.0** — live video during a call via a **passive** mirror: a read-only
-AF_PACKET tap on `lo:5007` (where the firmware already streams cleartext H.264 RTP
+AF_PACKET tap on `lo:5002` (where the firmware already streams cleartext H.264 RTP
 for the whole call) feeds the existing relay → RTSP `/doorbell-video` → go2rtc → HA.
 A real doorbell ring proved a bridge-issued `*7*300` is ignored mid-call (the native
 firmware holds both video slots), so the tap sends **zero commands to the bus**.

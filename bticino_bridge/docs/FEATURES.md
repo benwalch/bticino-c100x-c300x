@@ -117,7 +117,7 @@ Remote Commands                 OpenWebNet
 Two ways to view the door camera over RTSP:
 
 **A) Live video on call (v0.18.0, on by default, recommended).** When a call rings
-your unit the firmware already streams cleartext H.264 RTP on `lo:5007`. The bridge
+your unit the firmware already streams cleartext H.264 RTP on `lo:5002`. The bridge
 runs a **passive AF_PACKET tap** (read-only, like tcpdump) that mirrors those packets
 into the RTP relay, exposed as RTSP `/doorbell-video`. It sends **zero commands to the
 OWN bus** (no self-INVITE, no `*7*300`), so there is no watchdog risk or slot
@@ -429,14 +429,18 @@ The bridge reads physical hardware events from the intercom device.
 - `/dev/input/event1` - Touchscreen
 - `/dev/input/event2` - GPIO keys
 
-**GPIO monitoring** (13 pins via sysfs):
-Pins 12, 13, 47, 49, 52, 54, 56, 58, 60, 154, 155, 176, 180. States published
+**GPIO monitoring** (sysfs, pin list per `DeviceVariant`):
+300X: pins 12, 13, 47, 49, 52, 54, 56, 58, 60, 154, 155, 176, 180.
+100X (verified): 47, 64, 67, 71, 73, 77, 148, 176, 180, 187, 189, 190
+(ring = 77/71, answer = 64+67, chime = 73 when unmuted). States published
 to MQTT every 30 seconds and via SSE on change.
 
-**LED monitoring** (9 LEDs):
-`led_ans_machine`, `led_exc_call`, `led_gwifi`, `led_lock`, `led_memo`,
-`led_vct_green`, `led_vct_red`, `mmc0::`, `mmc2::`. States published to MQTT
-and SSE.
+**LED monitoring** (sysfs `/sys/class/leds`, names differ per model):
+Classe 300X: `led_ans_machine`, `led_exc_call`, `led_gwifi`, `led_lock`,
+`led_memo`, `led_vct_green`, `led_vct_red`. Classe 100X (verified): `led_call_exp`
+(mute), `led_door_lock`, `led_star`, `led_horn_g`, `led_horn_r`, `led_p1..p4`
+(page dots), `led_autosw`, `led_wifi`. (`mmc*` storage LEDs are skipped.)
+States published to MQTT and SSE.
 
 **Temperature**: Read from the device's thermal zone, published as an MQTT sensor.
 

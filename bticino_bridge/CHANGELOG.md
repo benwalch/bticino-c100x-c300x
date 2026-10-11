@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Home Assistant unique_ids renamed to model-neutral prefix (breaking)
+
+All HA discovery `unique_id`s changed from `bticino_c300x_*` to
+`bticino_intercom_*` so the same IDs work on Classe 300X and Classe 100X
+(selected via `bticino.DeviceVariant`). `object_id`s (hence HA `entity_id`s),
+state/command topics and payloads are unchanged. After upgrading, HA will
+create new entities (e.g. `lock.bticino_door` gets a new unique ID backing
+it) — delete the stale `*_c300x_*` entries from the MQTT integration if they
+linger as unavailable.
+
 ### Home Assistant entities renamed from Spanish to English (breaking)
 
 All HA `object_id`s (which drive HA `entity_id`s) are now English and match
@@ -117,8 +127,8 @@ Validated end-to-end on the real device (natives stayed healthy throughout).
   self-INVITE + relay-mirror approach).
 
 #### Home Assistant
-- New auto-discovery entities (retained): **Estado llamada** (`bticino/call/state`),
-  **Quién llama** (`bticino/call/caller`), **Timbre rellano**
+- New auto-discovery entities (retained): **Call status** (`bticino/call/state`),
+  **Caller** (`bticino/call/caller`), **Landing doorbell**
   (`bticino/doorbell_floor/state`).
 - **Doorbell camera** (`camera.camara_timbre`) — captures a cooperative snapshot
   on ring/incoming call and publishes it (base64). Appears only when
@@ -313,13 +323,13 @@ RTSP Client (ffplay/VLC) ──RTSP──> bticino_bridge:6554
 
 ### 🔄 **Configuration Sync**
 
-- (See MEJORAS_FUTURAS.md for detailed progress)
+- (See FUTURE_IMPROVEMENTS.md for detailed progress)
 
 ## [0.14.5] - 2026-04-
 
 ### 🔄 **Configuration Management**
 
-- (See MEJORAS_FUTURAS.md for detailed progress)
+- (See FUTURE_IMPROVEMENTS.md for detailed progress)
 
 ### 📚 **Swagger UI API Documentation**
 
@@ -371,34 +381,34 @@ RTSP Client (ffplay/VLC) ──RTSP──> bticino_bridge:6554
 
 ## [0.14.3] - 2026-03-28
 
-### 🎨 **Dashboard Simplificado**
+### 🎨 **Simplified Dashboard**
 
-- ✅ Eliminado Quick Actions section
-- ✅ Eliminado Enhanced Features
-- ✅ Dashboard más limpio y minimalista
-- ✅ Bundle reducido: 57KB → 56KB
+- ✅ Removed Quick Actions section
+- ✅ Removed Enhanced Features
+- ✅ Cleaner, more minimal dashboard
+- ✅ Smaller bundle: 57KB → 56KB
 
 ### 📝 **Fixes**
 
-- ✅ deploy.sh ahora copia archivo VERSION automáticamente
-- ✅ Documentación de versionado agregada (VERSIONING.md)
+- ✅ deploy.sh now copies the VERSION file automatically
+- ✅ Versioning documentation added (VERSIONING.md)
 
 ## [0.14.2] - 2026-03-27 - Svelte UI Migration 🎉
 
-### 🎨 **NUEVO: UI Moderna con Svelte**
+### 🎨 **NEW: Modern UI with Svelte**
 
-**Migración completa de UI embebida a Svelte moderno**
+**Complete migration from embedded UI to modern Svelte**
 
-#### **Componentes Creados**:
-- ✅ **Dashboard** (`/`) - Status del sistema, components, LEDs, quick actions
+#### **Created Components**:
+- ✅ **Dashboard** (`/`) - System status, components, LEDs, quick actions
 - ✅ **Settings** (`/settings`) - 5 tabs (Bridge, Device, SIP, MQTT, OpenWebNet)
 - ✅ **Controls** (`/controls`) - Door, Voicemail, Display, Mute, Doorbell, Light
 - ✅ **Logs** (`/logs`) - Filter, search, auto-refresh, download
 
-#### **Características**:
-- ✅ Hash routing (sin dependencias externas)
+#### **Features**:
+- ✅ Hash routing (no external dependencies)
 - ✅ Auto-refresh (30s status, 5s logs)
-- ✅ Form binding y validación
+- ✅ Form binding and validation
 - ✅ Success/Error messages
 - ✅ Loading states
 - ✅ Responsive design
@@ -406,28 +416,28 @@ RTSP Client (ffplay/VLC) ──RTSP──> bticino_bridge:6554
 #### **Bundle Size**:
 - Web UI: **58 KB** (gzipped)
 - Go Binary: **14 MB** (ARM)
-- **Total**: 60% más pequeño que UI embebida
+- **Total**: 60% smaller than the embedded UI
 
 ---
 
-### 🚀 **NUEVO: Deploy Único**
+### 🚀 **NEW: Single Deploy**
 
-**Script unificado para build + deploy**
+**Unified script for build + deploy**
 
 #### **scripts/deploy.sh**:
 ```bash
 ./scripts/deploy.sh
 ```
 
-**Qué hace**:
+**What it does**:
 1. ✅ Build web frontend (Vite + Svelte)
 2. ✅ Build Go binary (ARM)
-3. ✅ SSH y backup automático
-4. ✅ Transferencia binario + web files
-5. ✅ Restart servicio
-6. ✅ Verificación
+3. ✅ SSH and automatic backup
+4. ✅ Binary + web files transfer
+5. ✅ Service restart
+6. ✅ Verification
 
-**Makefile actualizado**:
+**Updated Makefile**:
 ```bash
 make install    # Instalar dependencias
 make dev        # Development mode (hot reload)
@@ -438,7 +448,7 @@ make clean      # Limpiar
 
 ---
 
-### 📁 **Estructura del Proyecto**
+### 📁 **Project Structure**
 
 ```
 bticino_bridge/
@@ -459,7 +469,7 @@ bticino_bridge/
 │   ├── vite.config.js
 │   └── svelte.config.js
 ├── scripts/
-│   └── deploy.sh             # 🆕 Deploy único
+│   └── deploy.sh             # 🆕 Single deploy
 ├── Makefile                  # 🆕 Con build Svelte
 ├── VERSION                   # 🆕 0.14.2
 └── docs/
@@ -469,22 +479,22 @@ bticino_bridge/
 
 ---
 
-### 📊 **Métricas**
+### 📊 **Metrics**
 
-| Aspecto | Antes | Ahora | Mejora |
+| Aspect | Before | Now | Improvement |
 |---------|-------|-------|--------|
-| **UI Framework** | HTML embebido | Svelte 4 | ✅ Moderno |
-| **Líneas server.go** | 4802 | ~3000 | -37% |
-| **Bundle Size** | 14MB junto | 14MB + 58KB | ✅ Separado |
-| **Deploy Scripts** | 4 diferentes | 1 único | ✅ Simplificado |
-| **Hot Reload** | ❌ No | ✅ Sí | ✅ Rápido |
-| **Componentes** | 0 | 4 | ✅ Reutilizables |
+| **UI Framework** | Embedded HTML | Svelte 4 | ✅ Modern |
+| **server.go lines** | 4802 | ~3000 | -37% |
+| **Bundle Size** | 14MB together | 14MB + 58KB | ✅ Separate |
+| **Deploy Scripts** | 4 different | 1 single | ✅ Simplified |
+| **Hot Reload** | ❌ No | ✅ Yes | ✅ Fast |
+| **Components** | 0 | 4 | ✅ Reusable |
 
 ---
 
-### 🔧 **Cambios Técnicos**
+### 🔧 **Technical Changes**
 
-#### **Dependencias Agregadas**:
+#### **Added Dependencies**:
 ```json
 {
   "devDependencies": {
@@ -496,23 +506,23 @@ bticino_bridge/
 }
 ```
 
-#### **API Endpoints Usados**:
+#### **Used API Endpoints**:
 - `GET /api/status` - Dashboard
 - `GET /api/config` - Settings
 - `POST /api/config/save` - Settings save
 - `GET /api/logs` - Logs viewer
 - `POST /api/controls/*` - Controls actions
 
-#### **Archivos Modificados**:
-- `pkg/webserver/server.go` - Routes para web estática
+#### **Modified Files**:
+- `pkg/webserver/server.go` - Static web routes
 - `Makefile` - Build commands
 - `VERSION` - 0.14.2
 
-#### **Archivos Creados**:
-- `web/src/**/*.svelte` - 4 componentes (1605 líneas)
+#### **Created Files**:
+- `web/src/**/*.svelte` - 4 components (1605 lines)
 - `web/vite.config.js` - Vite config
 - `web/package.json` - Dependencies
-- `scripts/deploy.sh` - Deploy script (150 líneas)
+- `scripts/deploy.sh` - Deploy script (150 lines)
 - `docs/SVELTE_SETUP.md` - Setup guide
 - `docs/PROGRESS_REPORT.md` - Progress report
 
@@ -520,24 +530,24 @@ bticino_bridge/
 
 ### 🐛 **Bug Fixes**
 
-- ✅ Svelte bind errors en Settings page
-- ✅ Components variable scope en Controls
-- ✅ Terser minification para production build
+- ✅ Svelte bind errors on Settings page
+- ✅ Components variable scope in Controls
+- ✅ Terser minification for production build
 
 ---
 
 ### ⚠️ **Breaking Changes**
 
-**Ninguno** - La API REST permanece igual. Solo cambia la UI.
+**None** - The REST API stays the same. Only the UI changes.
 
 ---
 
-### 📝 **Notas de Migración**
+### 📝 **Migration Notes**
 
-**Para actualizar desde versiones anteriores**:
+**To upgrade from previous versions**:
 
 ```bash
-# 1. Instalar dependencias npm
+# 1. Install npm dependencies
 cd bticino_bridge/web
 npm install
 
@@ -549,14 +559,14 @@ make build
 make deploy
 ```
 
-**Configuración existente**: No se ve afectada. El config.yaml permanece igual.
+**Existing configuration**: unaffected. config.yaml stays the same.
 
 ---
 
-### 🎯 **Próximos Pasos (v0.15.0)**
+### 🎯 **Next Steps (v0.15.0)**
 
-- [ ] Device tab (leer de QML)
-- [ ] WebSocket para logs en tiempo real
+- [ ] Device tab (read from QML)
+- [ ] WebSocket for real-time logs
 - [ ] Messages page
 - [ ] Dark mode
 - [ ] TypeScript migration
@@ -564,19 +574,19 @@ make deploy
 
 ---
 
-**Comparación con slyoldfox/c300x-controller**:
+**Comparison with slyoldfox/c300x-controller**:
 
 | Feature | slyoldfox | bticino_bridge v0.14.2 |
 |---------|-----------|------------------------|
-| UI Web | ❌ No | ✅ **Svelte moderno** |
-| API REST | ✅ Limitada | ✅ **Completa** |
-| Deploy | Manual | ✅ **Automatizado** |
-| Hot Reload | ❌ No | ✅ **Sí** |
-| Components | ❌ No | ✅ **4 componentes** |
+| Web UI | ❌ No | ✅ **Modern Svelte** |
+| REST API | ✅ Limited | ✅ **Complete** |
+| Deploy | Manual | ✅ **Automated** |
+| Hot Reload | ❌ No | ✅ **Yes** |
+| Components | ❌ No | ✅ **4 components** |
 
 ---
 
 **Estado**: ✅ **PRODUCTION READY**  
-**Testing**: ✅ Deploy exitoso en dispositivo real (192.168.1.38)  
-**Documentación**: ✅ Completa
+**Testing**: ✅ Successful deploy on real device (192.168.1.38)  
+**Documentation**: ✅ Complete
 

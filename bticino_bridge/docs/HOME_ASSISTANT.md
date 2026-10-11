@@ -154,7 +154,7 @@ Related REST endpoints (diagnostics, always available):
 ## Live video during a call (`live_on_call`)
 
 When a call comes in **to your unit**, the bridge passively mirrors the native
-video leg (a read-only packet tap on `lo:5007`, where the firmware already streams
+video leg (a read-only packet tap on `lo:5002`, where the firmware already streams
 cleartext H.264 RTP for the whole call) into the RTSP relay, which **go2rtc**
 publishes as a live WebRTC/HLS stream. HA can then show **live video** (motion) —
 not just the still snapshot — for the duration of the call.
