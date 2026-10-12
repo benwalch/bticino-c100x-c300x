@@ -23,6 +23,10 @@ The software was originally written for Classe 300X — verify 300X assumptions
 - `bticino_bridge` restart / rebuild / redeploy
 - Any file write on device
 - `ffplay`/`ffmpeg` RTSP captures longer than ~15 s
+- Deployment is always a separate approval: running `scripts/deploy.sh`
+  (or transferring binaries/config/web to the device by any other means)
+  requires an explicit go-ahead every time — even inside an otherwise
+  approved write command. Never bundle it silently.
 
 ## Forbidden
 - `reboot`, flashing, `iptables` changes, dropping SSH (`dropbear`) management

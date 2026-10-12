@@ -18,6 +18,16 @@ spec → plan before implementation.
 
 ## Other
 
+- **Log rotation that actually works.** `/var/log` is a tmpfs symlink
+  (`/var/volatile/log`, 261M) and the bridge logs via shell redirect, so the
+  `logging.max_size/max_files` config is decorative and nothing ever rotates:
+  on 2026-10-12 the SIP listener flood filled tmpfs 100% and silenced all
+  logging for ~19h with the process alive. Options: (a) bridge-managed file
+  output honoring `MaxSize`/`MaxFiles` (+ make `logging.level/file` actually
+  take effect — currently only `--log-level` applies); (b) a `logrotate`
+  config on device; (c) keep `--log-level warn` on the starter. Partial
+  mitigation landed: routine SIP listener traffic downgraded to Debug.
+
 - **Access/lock event classifier by duration.** The OpenWebNet bus
   emits lock events (unlock → lock + duration) from **any floor**
   (without identifying the specific floor — building privacy). Empirical pattern
