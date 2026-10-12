@@ -1239,25 +1239,31 @@ func (c *BTicinoSIPClient) Hangup() error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	if !c.sessionActive {
-		return nil
-	}
+	// Always end in a clean state, even if no BYE is needed: callState and
+	// sessionActive have diverged before (Connected with sessionActive=false
+	// after a dropped self-call), which then blocked every new MakeCall.
+	// BYE is only sent when we believe a dialog is actually up.
+	if c.sessionActive {
+		c.logger.Info("Sending BYE to end call")
 
-	c.logger.Info("Sending BYE to end call")
+		byeMsg := c.buildByeRequest()
 
-	byeMsg := c.buildByeRequest()
-
-	if c.webrtcID != nil && c.webrtcID.conn != nil {
-		if _, err := c.webrtcID.conn.Write([]byte(byeMsg)); err != nil {
-			c.logger.WithError(err).Error("Failed to send BYE")
-			return err
+		if c.webrtcID != nil && c.webrtcID.conn != nil {
+			if _, err := c.webrtcID.conn.Write([]byte(byeMsg)); err != nil {
+				c.logger.WithError(err).Error("Failed to send BYE")
+				c.callState = Registered
+				c.sessionActive = false
+				c.eventBus.PublishWithSource("sip.call.ended", map[string]interface{}{}, "sip")
+				return err
+			}
 		}
+
+		c.sessionActive = false
 	}
-
-	c.sessionActive = false
-	c.callState = Registered
-
-	c.eventBus.PublishWithSource("sip.call.ended", map[string]interface{}{}, "sip")
+	if c.callState != Registered || c.sessionActive {
+		c.callState = Registered
+		c.eventBus.PublishWithSource("sip.call.ended", map[string]interface{}{}, "sip")
+	}
 
 	return nil
 }

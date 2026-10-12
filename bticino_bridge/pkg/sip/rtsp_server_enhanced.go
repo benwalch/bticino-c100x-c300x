@@ -43,7 +43,28 @@ type EnhancedRTSPServer struct {
 	streams         map[string]*StreamConfig // Configured streams
 	videoBackend    string                   // "avmedia" | "gstreamer" | "auto"
 	videoActivation bool                     // if false, ensureSIPCallActive does NOT activate anything (safety)
+
+	// Self-INVITE circuit breaker: repeated dials that yield no media
+	// (idle unit, NACKed *7*300) back off instead of storming flexisip
+	// and bt_av_media on every RTSP reconnect. Guarded by mutex.
+	selfDialing           bool      // a MakeCall is currently in flight
+	selfCallGen           uint64    // increments per dial; outcome watchers check it
+	selfCallFailures      int       // consecutive dials with no media flow
+	selfCallCooldownUntil time.Time // no dialing before this (after maxSelfCallFailures)
+	// coopActivated marks that the single cooperative *7*300 for the
+	// current active period was already sent (see ensureSIPCallActive).
+	// Reset whenever a new active period starts or the call ends.
+	coopActivated bool
 }
+
+// Self-INVITE storm protection: after this many consecutive no-media dials,
+// dialing pauses for selfCallCooldown.
+const (
+	maxSelfCallFailures = 3
+	selfCallCooldown    = 2 * time.Minute
+	// How long after a dial to judge media outcome (INVITE + *7*300 + flow).
+	selfCallOutcomeDelay = 12 * time.Second
+)
 
 // StreamConfig configures an individual RTSP stream
 type StreamConfig struct {
@@ -960,6 +981,12 @@ func (r *EnhancedRTSPServer) releaseSelfCallIfIdle(reason string) {
 	}
 	r.mutex.Lock()
 	r.callActive = false
+	// Fresh chance for the next viewer: reset the breaker and invalidate
+	// any in-flight outcome watchers.
+	r.selfCallGen++
+	r.selfCallFailures = 0
+	r.selfCallCooldownUntil = time.Time{}
+	r.coopActivated = false
 	r.mutex.Unlock()
 	r.eventBus.PublishWithSource("sip.call.ended", map[string]interface{}{
 		"reason": reason,
@@ -991,6 +1018,52 @@ func (r *EnhancedRTSPServer) ensureSIPCallActive() error {
 		return fmt.Errorf("SIP client not available (not registered)")
 	}
 
+	// Circuit breaker: after repeated no-media dials, pause instead of
+	// storming flexisip/bt_av_media on every RTSP reconnect.
+	r.mutex.Lock()
+	if time.Now().Before(r.selfCallCooldownUntil) {
+		r.mutex.Unlock()
+		r.logger.Debug("Self-INVITE in cooldown after repeated no-media attempts, skipping dial")
+		return fmt.Errorf("self-INVITE cooling down after repeated no-media attempts")
+	}
+	if r.selfDialing {
+		// A dial is already in flight from another session: join its media
+		// via the shared relay instead of sending a duplicate INVITE.
+		r.mutex.Unlock()
+		r.logger.Debug("Self-INVITE already in progress, joining it")
+		return nil
+	}
+	r.selfDialing = true
+	r.selfCallGen++
+	gen := r.selfCallGen
+	r.mutex.Unlock()
+	defer func() {
+		r.mutex.Lock()
+		r.selfDialing = false
+		r.mutex.Unlock()
+	}()
+
+	// Recover a stale self-call: the RTSP flag and the SIP state can diverge
+	// (flag cleared on TEARDOWN drain while a self-call stayed Connected),
+	// which then blocks every new MakeCall. If media already flows the call
+	// is healthy: adopt it. Otherwise hang up (always resets state, never
+	// touches native calls — those returned above) and dial fresh below.
+	switch r.sipClient.GetCallState() {
+	case Registered, Idle:
+		// clean slate, proceed to dial
+	default:
+		if r.waitVideoFlow(2 * time.Second) {
+			r.logger.Info("SIP self-call already feeding the relay, reusing it")
+			r.mutex.Lock()
+			r.callActive = true
+			r.selfCallFailures = 0
+			r.mutex.Unlock()
+			return nil
+		}
+		r.logger.Warn("Stale SIP self-call with no media flow — hanging up and redialing")
+		_ = r.sipClient.Hangup()
+	}
+
 	r.logger.Info("=== ENSURESIP: Initiating SIP call for RTSP streaming ===")
 
 	// Per slyoldfox: INVITE target is the intercom's SIP identity
@@ -1001,6 +1074,7 @@ func (r *EnhancedRTSPServer) ensureSIPCallActive() error {
 		target = bticino.SIPUsernameForVariant(bticino.DeviceVariant)
 	}
 	if err := r.sipClient.MakeCall(target); err != nil {
+		r.noteSelfCallFailure(gen)
 		return fmt.Errorf("failed to make SIP call: %v", err)
 	}
 
@@ -1018,8 +1092,66 @@ func (r *EnhancedRTSPServer) ensureSIPCallActive() error {
 	// Fallback: *7*300 commands (needs ownClient)
 	go r.activateMediaStreamsWhenConnected()
 
+	// Judge the outcome asynchronously: media flowing within
+	// selfCallOutcomeDelay resets the breaker, silence counts toward it.
+	go r.trackSelfCallOutcome(gen)
+
 	r.logger.Infof("=== SIP call initiated to %s for RTSP streaming ===", target)
 	return nil
+}
+
+// trackSelfCallOutcome implements the circuit breaker: if no RTP reaches
+// the relay within selfCallOutcomeDelay of a dial (and the call is still
+// ours), it counts a failure; maxSelfCallFailures consecutive failures open
+// a selfCallCooldown pause. Any media flow resets the count. Superseded
+// watchers (newer dial generation) and torn-down or native calls are
+// ignored. Never blocks the SETUP path: runs in its own goroutine.
+func (r *EnhancedRTSPServer) trackSelfCallOutcome(gen uint64) {
+	time.Sleep(selfCallOutcomeDelay)
+
+	r.mutex.RLock()
+	if gen != r.selfCallGen || !r.callActive || r.externalCall {
+		r.mutex.RUnlock()
+		return
+	}
+	r.mutex.RUnlock()
+
+	flowing := r.waitVideoFlow(2 * time.Second)
+
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	if gen != r.selfCallGen {
+		return // superseded by a newer dial while checking
+	}
+	if !r.callActive || r.externalCall {
+		return // torn down or handed to a native call meanwhile
+	}
+	if flowing {
+		r.selfCallFailures = 0
+		return
+	}
+	r.selfCallFailures++
+	if r.selfCallFailures >= maxSelfCallFailures && time.Now().After(r.selfCallCooldownUntil) {
+		r.selfCallCooldownUntil = time.Now().Add(selfCallCooldown)
+		r.logger.Warnf("Self-INVITE yielded no media %d times in a row — pausing dials for %s",
+			r.selfCallFailures, selfCallCooldown)
+	}
+}
+
+// noteSelfCallFailure records an immediate dial failure (MakeCall error)
+// toward the breaker without waiting for the outcome delay.
+func (r *EnhancedRTSPServer) noteSelfCallFailure(gen uint64) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	if gen != r.selfCallGen {
+		return
+	}
+	r.selfCallFailures++
+	if r.selfCallFailures >= maxSelfCallFailures {
+		r.selfCallCooldownUntil = time.Now().Add(selfCallCooldown)
+		r.logger.Warnf("Self-INVITE failed %d times in a row — pausing dials for %s",
+			r.selfCallFailures, selfCallCooldown)
+	}
 }
 
 // SetOpenWebNetClient sets the OpenWebNet client for *7*300 video stream activation
