@@ -81,9 +81,9 @@ hardware:
 
 # ==================== LOGGING ====================
 logging:
-  level: "debug"
-  file: "/var/log/bticino_bridge.log"
-  max_size: "10MB"
+  level: 'info'
+  file: '/var/log/bticino_bridge.log'
+  max_size: 10MB
   max_files: 5
 
 # ==================== STREAMING (RTSP/WebRTC) ====================
