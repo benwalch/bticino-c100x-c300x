@@ -1,6 +1,7 @@
 package sip
 
 import (
+	"bytes"
 	"crypto/md5"
 	"crypto/tls"
 	"fmt"
@@ -102,6 +103,9 @@ type sipIdentity struct {
 	callID   string
 	cseq     int
 	mutex    sync.Mutex
+	// readBuf holds leftover TCP bytes from a previous read that did not
+	// yet form a complete SIP message (framing, see readSIPMessagesFrom).
+	readBuf []byte
 }
 
 type BTicinoSIPClient struct {
@@ -1354,83 +1358,112 @@ func (c *BTicinoSIPClient) reRegisterIdentity(id *sipIdentity) error {
 	return fmt.Errorf("re-registration failed for %s: %s", id.username, response.StatusCode)
 }
 
-// readSIPMessageFrom reads one or more SIP messages from a connection with a timeout.
-// TCP may deliver multiple SIP messages in a single read.
-// Returns a slice of parsed messages.
-func (c *BTicinoSIPClient) readSIPMessagesFrom(conn net.Conn, timeout time.Duration) ([]*SIPMessage, error) {
-	conn.SetReadDeadline(time.Now().Add(timeout))
-	buffer := make([]byte, 16384)
-	n, err := conn.Read(buffer)
-	if err != nil {
-		return nil, err
+// identityForConn returns the SIP identity owning conn, or nil.
+func (c *BTicinoSIPClient) identityForConn(conn net.Conn) *sipIdentity {
+	if c.webrtcID != nil && c.webrtcID.conn == conn {
+		return c.webrtcID
 	}
-
-	raw := string(buffer[:n])
-	c.logger.Debugf("readSIPMessages: got %d bytes", n)
-
-	// Split on SIP message boundaries. Each SIP message starts with "SIP/2.0" (response)
-	// or a method like "INVITE", "ACK", "BYE", "OPTIONS", etc.
-	var messages []*SIPMessage
-	remaining := raw
-
-	for len(remaining) > 0 {
-		remaining = strings.TrimLeft(remaining, "\r\n")
-		if len(remaining) == 0 {
-			break
-		}
-
-		// Find where the next SIP message starts after this one
-		// SIP messages are separated by double CRLF after headers, then body based on Content-Length
-		msg := c.parseSingleSIPMessage(remaining)
-		if msg == nil {
-			break
-		}
-		messages = append(messages, msg)
-
-		// Try to find the next message start after this one
-		// Look for next "SIP/2.0" or known method at start of a line
-		consumedLen := len(msg.Raw)
-		if consumedLen >= len(remaining) {
-			break
-		}
-		remaining = remaining[consumedLen:]
+	if c.localID != nil && c.localID.conn == conn {
+		return c.localID
 	}
-
-	if len(messages) == 0 {
-		// Fallback: return the whole thing as one message
-		msg := c.parseSingleSIPMessage(raw)
-		if msg != nil {
-			messages = append(messages, msg)
-		} else {
-			return nil, fmt.Errorf("failed to parse SIP message")
-		}
-	}
-
-	return messages, nil
+	return nil
 }
 
-// parseSingleSIPMessage parses one SIP message from raw text.
-// Returns the message with Raw set to only the consumed portion.
-// Properly handles multi-value headers like Via and Record-Route.
-func (c *BTicinoSIPClient) parseSingleSIPMessage(raw string) *SIPMessage {
-	if len(raw) == 0 {
-		return nil
-	}
+// splitSIPStream parses as many COMPLETE SIP messages as possible from buf.
+// Framing follows RFC 3261 §7.5 over TCP: headers end at the first empty
+// line, then exactly Content-Length body bytes follow (case-insensitive
+// header name, compact form "l:" accepted). Returns the messages and how
+// many leading bytes were consumed; a trailing incomplete message stays
+// unconsumed for the next read. Garbage before a valid start line is
+// skipped (resync) so one malformed chunk cannot stall the stream.
+func splitSIPStream(buf []byte) (msgs []*SIPMessage, consumed int) {
+	for {
+		// Skip leading blank lines.
+		start := 0
+		for start < len(buf) && (buf[start] == '\r' || buf[start] == '\n') {
+			start++
+		}
+		if start >= len(buf) {
+			// Rest is blank: consume it too (consumed, not len(buf) —
+			// returning len(buf) here would rewind past already-returned
+			// messages and replay them forever).
+			return msgs, consumed + len(buf)
+		}
+		if start > 0 {
+			buf = buf[start:]
+			consumed += start
+		}
 
-	lines := strings.Split(raw, "\r\n")
+		// Find the end of the header block.
+		hdrEnd := indexDoubleCRLF(buf)
+		if hdrEnd < 0 {
+			return msgs, consumed // need more data
+		}
+
+		msg, bodyLen, ok := parseSIPHeaderBlock(buf[:hdrEnd])
+		if !ok {
+			// Not a SIP start line: drop this line and resync.
+			if i := indexCRLF(buf); i >= 0 {
+				consumed += i + 2
+				buf = buf[i+2:]
+				continue
+			}
+			return msgs, consumed
+		}
+
+		total := hdrEnd + 4 + bodyLen
+		if len(buf) < total {
+			return msgs, consumed // body incomplete: wait for more data
+		}
+
+		if bodyLen > 0 {
+			msg.Body = string(buf[hdrEnd+4 : total])
+		}
+		msg.Raw = string(buf[:total])
+		msgs = append(msgs, msg)
+		buf = buf[total:]
+		consumed += total
+	}
+}
+
+// indexDoubleCRLF returns the index of the first "\r\n\r\n" (or "\n\n"
+// fallback) in b, or -1.
+func indexDoubleCRLF(b []byte) int {
+	if i := bytes.Index(b, []byte("\r\n\r\n")); i >= 0 {
+		return i
+	}
+	return bytes.Index(b, []byte("\n\n"))
+}
+
+// indexCRLF returns the index of the first line break in b, or -1.
+func indexCRLF(b []byte) int {
+	for i := 0; i < len(b); i++ {
+		if b[i] == '\n' {
+			return i
+		}
+	}
+	return -1
+}
+
+// parseSIPHeaderBlock parses the header block (without the trailing empty
+// line) into a message and reports the declared body length. ok=false when
+// the first line is not a SIP request/status line.
+func parseSIPHeaderBlock(block []byte) (msg *SIPMessage, bodyLen int, ok bool) {
+	// Normalize lone LF so Split works on both CRLF and LF streams.
+	block = bytes.ReplaceAll(block, []byte("\r\n"), []byte("\n"))
+	lines := bytes.Split(block, []byte("\n"))
 	if len(lines) == 0 {
-		return nil
+		return nil, 0, false
 	}
 
-	msg := &SIPMessage{
+	firstLine := strings.Fields(string(lines[0]))
+	if len(firstLine) < 3 {
+		return nil, 0, false
+	}
+
+	msg = &SIPMessage{
 		Headers: make(map[string]string),
 	}
-
-	firstLine := strings.Fields(lines[0])
-	if len(firstLine) < 3 {
-		return nil
-	}
-
 	if strings.HasPrefix(firstLine[0], "SIP/") {
 		msg.Version = firstLine[0]
 		msg.StatusCode = firstLine[1]
@@ -1441,58 +1474,101 @@ func (c *BTicinoSIPClient) parseSingleSIPMessage(raw string) *SIPMessage {
 		msg.Version = firstLine[2]
 	}
 
-	bodyStart := -1
-	consumedLines := 1
-	for i, line := range lines[1:] {
-		consumedLines++
+	for _, lb := range lines[1:] {
+		line := string(lb)
 		if line == "" {
-			bodyStart = i + 2
-			break
+			continue
 		}
-		if colonIndex := strings.Index(line, ":"); colonIndex > 0 {
-			key := strings.TrimSpace(line[:colonIndex])
-			value := strings.TrimSpace(line[colonIndex+1:])
-			// Collect multi-value headers (Via, Record-Route) into slices
-			keyLower := strings.ToLower(key)
-			if keyLower == "via" || keyLower == "v" {
-				msg.ViaHeaders = append(msg.ViaHeaders, value)
-			} else if keyLower == "record-route" {
-				msg.RecordRoute = append(msg.RecordRoute, value)
+		// Folded continuation lines (RFC 3261 §7.3.1): appended to the
+		// previous header. Tracked minimally — continuation without a
+		// preceding header is ignored.
+		if line[0] == ' ' || line[0] == '\t' {
+			continue
+		}
+		colonIndex := strings.Index(line, ":")
+		if colonIndex <= 0 {
+			continue
+		}
+		key := strings.TrimSpace(line[:colonIndex])
+		value := strings.TrimSpace(line[colonIndex+1:])
+		keyLower := strings.ToLower(key)
+		switch keyLower {
+		case "via", "v":
+			msg.ViaHeaders = append(msg.ViaHeaders, value)
+		case "record-route":
+			msg.RecordRoute = append(msg.RecordRoute, value)
+		case "content-length", "l":
+			fmt.Sscanf(value, "%d", &bodyLen)
+		}
+		msg.Headers[key] = value
+	}
+	if bodyLen < 0 {
+		bodyLen = 0
+	}
+	return msg, bodyLen, true
+}
+
+// readSIPMessagesFrom reads one or more SIP messages from a connection with
+// a timeout. TCP may deliver fragments or several messages per read, so
+// bytes accumulate in the owning identity's readBuf until at least one
+// complete message is framed; leftovers are kept for the next call instead
+// of being dropped.
+func (c *BTicinoSIPClient) readSIPMessagesFrom(conn net.Conn, timeout time.Duration) ([]*SIPMessage, error) {
+	deadline := time.Now().Add(timeout)
+	conn.SetReadDeadline(deadline)
+
+	var buf []byte
+	if id := c.identityForConn(conn); id != nil {
+		id.mutex.Lock()
+		buf = append([]byte(nil), id.readBuf...)
+		id.mutex.Unlock()
+	}
+
+	tmp := make([]byte, 16384)
+	for {
+		msgs, consumed := splitSIPStream(buf)
+		if len(msgs) > 0 {
+			leftover := append([]byte(nil), buf[consumed:]...)
+			if id := c.identityForConn(conn); id != nil {
+				id.mutex.Lock()
+				id.readBuf = leftover
+				id.mutex.Unlock()
 			}
-			msg.Headers[key] = value
+			c.logger.Debugf("readSIPMessages: %d message(s), %d bytes consumed, %d leftover",
+				len(msgs), consumed, len(leftover))
+			return msgs, nil
+		}
+		// No complete message yet (or only garbage, which splitSIPStream
+		// already skipped): read more, honoring the original deadline.
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("timeout waiting for complete SIP message")
+		}
+		conn.SetReadDeadline(deadline)
+		n, err := conn.Read(tmp)
+		if err != nil {
+			return nil, err
+		}
+		if n == 0 {
+			// Spurious empty read: no progress possible, retry within deadline.
+			continue
+		}
+		buf = append(buf, tmp[:n]...)
+		// Sanity cap: a single SIP message over 256 KiB is not legitimate
+		// here; drop the buffer rather than growing forever on garbage.
+		if len(buf) > 256*1024 {
+			buf = nil
+			if id := c.identityForConn(conn); id != nil {
+				id.mutex.Lock()
+				id.readBuf = nil
+				id.mutex.Unlock()
+			}
+			return nil, fmt.Errorf("SIP read buffer overflow without a complete message")
 		}
 	}
-
-	// Determine Content-Length to know how much body to consume
-	contentLength := 0
-	if cl, ok := msg.Headers["Content-Length"]; ok {
-		fmt.Sscanf(cl, "%d", &contentLength)
-	} else if cl, ok := msg.Headers["content-length"]; ok {
-		fmt.Sscanf(cl, "%d", &contentLength)
-	}
-
-	// Calculate raw consumed
-	var rawBuilder strings.Builder
-	for i := 0; i < consumedLines && i < len(lines); i++ {
-		rawBuilder.WriteString(lines[i])
-		rawBuilder.WriteString("\r\n")
-	}
-
-	if bodyStart >= 0 && contentLength > 0 && bodyStart < len(lines) {
-		body := strings.Join(lines[bodyStart:], "\r\n")
-		if len(body) > contentLength {
-			body = body[:contentLength]
-		}
-		msg.Body = body
-		rawBuilder.WriteString(body)
-	}
-
-	msg.Raw = rawBuilder.String()
-	return msg
 }
 
 // readSIPMessageFrom reads a single SIP message (for backward compat).
-// If multiple messages arrive, returns the first one.
+// Leftovers stay buffered on the owning identity for the next call.
 func (c *BTicinoSIPClient) readSIPMessageFrom(conn net.Conn, timeout time.Duration) (*SIPMessage, error) {
 	messages, err := c.readSIPMessagesFrom(conn, timeout)
 	if err != nil {
@@ -1502,7 +1578,7 @@ func (c *BTicinoSIPClient) readSIPMessageFrom(conn net.Conn, timeout time.Durati
 		return nil, fmt.Errorf("no SIP messages parsed")
 	}
 	if len(messages) > 1 {
-		c.logger.Warnf("readSIPMessageFrom: got %d messages in one read, returning first", len(messages))
+		c.logger.Debugf("readSIPMessageFrom: %d messages framed, returning first (rest buffered)", len(messages))
 	}
 	return messages[0], nil
 }
