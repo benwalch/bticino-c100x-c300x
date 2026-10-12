@@ -51,19 +51,19 @@
   // led_call_exp/led_autosw/led_wifi. Unknown LEDs fall back to the raw name.
   // Verified on C100X; 300X entries below the verified block are legacy guesses.
   const LED_INFO = {
-    // --- Classe 100X (verified on device) ---
+    // --- Classe 100X ---
     led_call_exp:  { label: 'Muted',           desc: 'Ringer excluded — ON while doorbell sound is muted' },
     led_door_lock: { label: 'Door lock',       desc: 'ON while the door-release key is active' },
     led_star:      { label: 'Staircase light', desc: 'ON while the staircase-light (star) key is active' },
     led_horn_r:    { label: 'Phone red',       desc: 'ON while the red (hangup) phone key is active' },
-    led_horn_g:    { label: 'Phone green',     desc: 'Likely the green (answer) phone key — unconfirmed' },
-    led_p1:        { label: 'Page dot 1',      desc: 'Page/dot indicator 1' },
-    led_p2:        { label: 'Page dot 2',      desc: 'Page/dot indicator 2 — unconfirmed' },
-    led_p3:        { label: 'Page dot 3',      desc: 'Page/dot indicator 3 — unconfirmed' },
-    led_p4:        { label: 'Page dot 4',      desc: 'Page/dot indicator 4 — unconfirmed' },
+    led_horn_g:    { label: 'Phone green',     desc: 'Likely the green (answer) phone key' },
+    led_p1:        { label: 'Programmable Button 1',      desc: 'Programmable Button 1' },
+    led_p2:        { label: 'Programmable Button 2',      desc: 'Programmable Button 2 — unconfirmed' },
+    led_p3:        { label: 'Programmable Button 3',      desc: 'Programmable Button 3 — unconfirmed' },
+    led_p4:        { label: 'Programmable Button 4',      desc: 'Programmable Button 4 — unconfirmed' },
     led_autosw:    { label: 'Autoswitch',      desc: 'Function not identified' },
-    led_wifi:      { label: 'WiFi',            desc: 'Function not identified' },
-    // --- Classe 300X (legacy names) ---
+    led_wifi:      { label: 'WiFi',            desc: 'ON while no WiFi connection' },
+    // --- Classe 300X ---
     led_lock:        { label: 'Door lock',       desc: 'Door open (lock active)' },
     led_vct_green:   { label: 'Video call',      desc: 'Active video communication' },
     led_vct_red:     { label: 'Video call red',  desc: 'Unknown' },

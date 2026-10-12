@@ -23,6 +23,7 @@ import (
 	"syscall"
 	"time"
 
+	"bticino_bridge/pkg/bticino"
 	"bticino_bridge/pkg/openwebnet"
 
 	"github.com/sirupsen/logrus"
@@ -93,9 +94,11 @@ func captureCooperative(own *openwebnet.Client, port, warmupFrames int, timeout 
 	// Margin for udpsrc to bind the port
 	time.Sleep(300 * time.Millisecond)
 
-	// 2) Send A SINGLE *7*300 (ActivateVideoStream no longer retries)
+	// 2) Send A SINGLE *7*300 (ActivateVideoStream no longer retries).
+	// Resolution follows the unit: high-res (type 0) on 300X, low-res
+	// (type 1) on 100X — high-res is ACKed with no RTP behind it there.
 	logger.Infof("cooperative capture: single *7*300 → 127.0.0.1:%d", port)
-	if err := own.ActivateVideoStream("127.0.0.1", port, true); err != nil {
+	if err := own.ActivateVideoStream("127.0.0.1", port, bticino.VideoHighResForVariant(bticino.DeviceVariant)); err != nil {
 		res.ackError = err.Error()
 	} else {
 		res.ack = true

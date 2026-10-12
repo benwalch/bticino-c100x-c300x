@@ -753,10 +753,10 @@ var LEDEntitiesByModel = map[string][]LEDEntity{
 		{ObjectID: "bticino_led_staircase", Name: "LED Staircase Light", Sysfs: "led_star", Icon: "mdi:lightbulb"},
 		{ObjectID: "bticino_led_phone_red", Name: "LED Phone Red", Sysfs: "led_horn_r", Icon: "mdi:phone-hangup"},
 		{ObjectID: "bticino_led_phone_green", Name: "LED Phone Green", Sysfs: "led_horn_g", Icon: "mdi:phone-in-talk"},
-		{ObjectID: "bticino_led_page1", Name: "LED Page 1", Sysfs: "led_p1", Icon: "mdi:numeric-1-circle"},
-		{ObjectID: "bticino_led_page2", Name: "LED Page 2", Sysfs: "led_p2", Icon: "mdi:numeric-2-circle"},
-		{ObjectID: "bticino_led_page3", Name: "LED Page 3", Sysfs: "led_p3", Icon: "mdi:numeric-3-circle"},
-		{ObjectID: "bticino_led_page4", Name: "LED Page 4", Sysfs: "led_p4", Icon: "mdi:numeric-4-circle"},
+		{ObjectID: "bticino_led_p1", Name: "LED Programmable Button 1", Sysfs: "led_p1", Icon: "mdi:numeric-1-circle"},
+		{ObjectID: "bticino_led_p2", Name: "LED Programmable Button 2", Sysfs: "led_p2", Icon: "mdi:numeric-2-circle"},
+		{ObjectID: "bticino_led_p3", Name: "LED Programmable Button 3", Sysfs: "led_p3", Icon: "mdi:numeric-3-circle"},
+		{ObjectID: "bticino_led_p4", Name: "LED Programmable Button 4", Sysfs: "led_p4", Icon: "mdi:numeric-4-circle"},
 		{ObjectID: "bticino_led_autosw", Name: "LED Autoswitch", Sysfs: "led_autosw", Icon: "mdi:swap-horizontal"},
 		{ObjectID: "bticino_led_wifi_100x", Name: "LED WiFi", Sysfs: "led_wifi", Icon: "mdi:wifi"},
 	},
@@ -824,6 +824,14 @@ func SIPUsernameForVariant(variant string) string {
 		return DeviceVariant100X
 	}
 	return DeviceVariant300X
+}
+
+// VideoHighResForVariant reports whether the unit has a high-res video leg
+// (type 0, e.g. lo:5007). The Classe 100X serves low-res only (type 1,
+// e.g. lo:5002): requesting high-res there is ACKed with no RTP behind it
+// (verified 2026-10-11). Unknown variants assume high-res (300X behavior).
+func VideoHighResForVariant(variant string) bool {
+	return variant != DeviceVariant100X
 }
 
 // IsCallHangup reports whether a raw OWN frame ends a call (drives the

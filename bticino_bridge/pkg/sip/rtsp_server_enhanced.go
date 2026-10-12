@@ -814,17 +814,25 @@ a=control:*
 `, localIP, config.Name, localIP)
 
 	if config.VideoEnabled {
-		// Camera: 720x576 interlaced PAL (~7fps actual), H.264 Constrained Baseline Level 3.0
-		// VPU encoder: imxvpuenc_h264, byte-stream format
-		// profile-level-id=42C01E = Constrained Baseline Profile, Level 3.0
+		// 300X: 720x576 interlaced PAL (~7fps), H.264 Constrained Baseline
+		// Level 3.0 (VPU encoder imxvpuenc_h264, byte-stream format).
+		profile, framesize, sprop := "42C01E", "720-576", ""
+		if bticino.DeviceVariant == bticino.DeviceVariant100X {
+			// 100X native low-res leg, measured on-device 2026-10-11:
+			// 640x480 Baseline Level 3.0. The stream repeats SPS/PPS
+			// in-band, but serving them in the SDP too lets clients
+			// decode from the first packet.
+			profile, framesize = "42401E", "640-480"
+			sprop = ";sprop-parameter-sets=Z0JAHqaAoD2Q,aM48gA=="
+		}
 		sdp += fmt.Sprintf(`m=video 0 RTP/AVP 96
 b=AS:1500
 a=rtpmap:96 H264/90000
-a=fmtp:96 profile-level-id=42C01E;packetization-mode=1
+a=fmtp:96 profile-level-id=%s;packetization-mode=1%s
 a=control:trackID=video
-a=framesize:96 720-576
+a=framesize:96 %s
 a=framerate:7
-`)
+`, profile, sprop, framesize)
 	}
 
 	if config.AudioEnabled {
@@ -956,6 +964,10 @@ func (r *EnhancedRTSPServer) SetCallActive(active bool) {
 	r.mutex.Lock()
 	r.callActive = active
 	r.externalCall = active
+	if active {
+		// New native period: allow one cooperative *7*300 for it.
+		r.coopActivated = false
+	}
 	r.mutex.Unlock()
 	if active {
 		r.logger.Info("RTSP: callActive=true (self-INVITE skipped; native session in progress)")
@@ -994,14 +1006,32 @@ func (r *EnhancedRTSPServer) releaseSelfCallIfIdle(reason string) {
 }
 
 func (r *EnhancedRTSPServer) ensureSIPCallActive() error {
-	// If a native call is already in progress (marked by LiveVideoOnCall), NO
-	// self-INVITE is needed: the video session already exists. This is checked BEFORE
-	// the videoActivation gate so as not to block the flow or pollute logs when
-	// go2rtc connects during a call.
+	// If a call is already active, NO self-INVITE is needed. But an eye
+	// preview (native feed up) duplicates nothing to our relay until asked:
+	// send ONE cooperative *7*300 per active period so eye+RTSP works. The
+	// firmware ignores it during a real native call (Phase-0 proven), and
+	// the flag keeps reconnect storms to a single send. Gated by
+	// videoActivation like everything else that touches the bus.
+	// This check comes BEFORE the videoActivation gate for the pure skip
+	// decision so as not to pollute logs when go2rtc connects during a call.
 	r.mutex.Lock()
 	if r.callActive {
+		needCoop := r.videoActivation && !r.coopActivated
+		if needCoop {
+			r.coopActivated = true
+		}
 		r.mutex.Unlock()
-		r.logger.Debug("SIP call already active (native call in progress), skipping self-INVITE")
+		if needCoop {
+			if r.ownClient != nil {
+				r.logger.Debug("Call active: single cooperative *7*300 for eye-preview (ignored mid-call)")
+				go r.activateVia7300("127.0.0.1",
+					DefaultGStreamerConfig().VideoPort, DefaultGStreamerConfig().AudioPort)
+			} else {
+				r.logger.Debug("SIP call already active (native call in progress), skipping self-INVITE")
+			}
+		} else {
+			r.logger.Debug("SIP call already active (native call in progress), skipping self-INVITE")
+		}
 		return nil
 	}
 	r.mutex.Unlock()
@@ -1067,8 +1097,8 @@ func (r *EnhancedRTSPServer) ensureSIPCallActive() error {
 	r.logger.Info("=== ENSURESIP: Initiating SIP call for RTSP streaming ===")
 
 	// Per slyoldfox: INVITE target is the intercom's SIP identity
-	// (c300x/c100x per DeviceVariant), NOT the domain. buildInviteRequest
-	// will format it as <user>@domain.
+	// (explicit sip_target override, else answerer per DeviceVariant),
+	// NOT the domain. buildInviteRequest will format it as <user>@domain.
 	target := r.sipClient.config.SIPTarget
 	if target == "" {
 		target = bticino.SIPUsernameForVariant(bticino.DeviceVariant)
@@ -1080,6 +1110,9 @@ func (r *EnhancedRTSPServer) ensureSIPCallActive() error {
 
 	r.mutex.Lock()
 	r.callActive = true
+	// New self-call period: allow one cooperative *7*300 if a later
+	// session finds media missing (eye case).
+	r.coopActivated = false
 	r.mutex.Unlock()
 
 	r.eventBus.PublishWithSource("sip.call.started", map[string]interface{}{
@@ -1287,9 +1320,10 @@ func (r *EnhancedRTSPServer) waitVideoFlow(timeout time.Duration) bool {
 // This only works when bt_av_media already has a pipeline running (started internally
 // by bt_answering_machine via SIP), which redirects the RTP stream to our ports.
 func (r *EnhancedRTSPServer) activateVia7300(localIP string, videoPort, audioPort int) {
-	// Activate video first (high-res)
+	// Activate video first (high-res on 300X, low-res on 100X — requesting
+	// high-res there is ACKed with no RTP behind it).
 	r.logger.Infof("=== Fallback: Activating video stream via *7*300 to %s:%d ===", localIP, videoPort)
-	if err := r.ownClient.ActivateVideoStream(localIP, videoPort, true); err != nil {
+	if err := r.ownClient.ActivateVideoStream(localIP, videoPort, bticino.VideoHighResForVariant(bticino.DeviceVariant)); err != nil {
 		r.logger.WithError(err).Error("Failed to activate video stream via OpenWebNet")
 		return
 	}
