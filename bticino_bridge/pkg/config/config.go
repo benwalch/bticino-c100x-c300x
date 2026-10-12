@@ -58,7 +58,7 @@ type SIPConfig struct {
 	DevAddr     string `yaml:"dev_addr"`
 	UseHA1      bool   `yaml:"use_ha1"`
 	InsecureTLS bool   `yaml:"insecure_tls"`
-	SIPTarget   string `yaml:"sip_target"` // INVITE target user (default: "c300x")
+	SIPTarget   string `yaml:"sip_target"` // INVITE target user override (default: answerer per DeviceVariant)
 }
 
 type MQTTConfig struct {

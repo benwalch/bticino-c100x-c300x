@@ -37,7 +37,8 @@ sip:
   dev_addr: "20"
   use_ha1: true
   insecure_tls: true
-  sip_target: "c100x"         # INVITE target: c100x@domain (the intercom; c300x on Classe 300X)
+  # sip_target: optional INVITE/BYE target override (defaults to the answerer
+  # identity per bticino.DeviceVariant: c100x here, c300x on Classe 300X).
 
 # ==================== MQTT ====================
 mqtt:

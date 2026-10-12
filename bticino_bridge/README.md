@@ -161,8 +161,7 @@ sip:
   enabled: true
   server_host: "127.0.0.1"   # local Flexisip
   transport: "tcp"
-  username: "webrtc"          # self-INVITE: webrtc@domain → c300x@domain
-  sip_target: "c300x"
+  username: "webrtc"          # self-INVITE: webrtc@domain → answerer@domain (per DeviceVariant; optional sip_target overrides)
 
 mqtt:
   enabled: true

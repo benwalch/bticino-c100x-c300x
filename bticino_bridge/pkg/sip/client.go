@@ -72,7 +72,7 @@ type SIPConfig struct {
 	UseHA1        bool            `yaml:"use_ha1"`
 	InsecureTLS   bool            `yaml:"insecure_tls"` // Skip TLS certificate verification
 	Transport     string          `yaml:"transport"`    // "tcp", "udp", or "tls" (default: tls)
-	SIPTarget     string          `yaml:"sip_target"`   // INVITE target user (default: per DeviceVariant)
+	SIPTarget     string          `yaml:"sip_target"`   // INVITE target user override (default: answerer per DeviceVariant)
 }
 
 type MediaPortConfig struct {
@@ -1269,6 +1269,8 @@ func (c *BTicinoSIPClient) Hangup() error {
 }
 
 func (c *BTicinoSIPClient) buildByeRequest() string {
+	// BYE goes to the intercom itself: explicit sip_target override,
+	// else the answerer identity per DeviceVariant.
 	target := c.config.SIPTarget
 	if target == "" {
 		target = bticino.SIPUsernameForVariant(bticino.DeviceVariant)
