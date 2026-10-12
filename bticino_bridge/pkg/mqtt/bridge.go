@@ -99,8 +99,22 @@ func (b *MQTTBridge) captureDoorbellPhoto(reason string) {
 		}
 		defer b.cameraMu.Unlock()
 
-		b.logger.Infof("Camera: capturing doorbell snapshot (reason: %s)", reason)
-		jpeg, err := capture()
+		// The native video session may come up delayed (~1-2s after the ring, so a
+		// capture fired immediately is most likely NACKed. Retry gently in 1.5s gaps.
+		var jpeg []byte
+		var err error
+		for attempt := 1; attempt <= 5; attempt++ {
+			time.Sleep(1500 * time.Millisecond)
+			b.logger.Infof("Camera: capturing doorbell snapshot (reason: %s, attempt %d/5)", reason, attempt)
+			jpeg, err = capture()
+			if err == nil {
+				break
+			}
+			if !strings.Contains(err.Error(), "NACK") {
+				break // not a timing issue — retrying won't help
+			}
+			b.logger.WithError(err).Infof("Camera: snapshot NACKed (attempt %d/5)", attempt)
+		}
 		if err != nil {
 			b.logger.WithError(err).Warn("Camera: could not capture doorbell snapshot")
 			return

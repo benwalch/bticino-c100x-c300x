@@ -72,8 +72,10 @@ func (v *VideoStreamManager) Start() error {
 	// Start RTP packet handler
 	go v.handleRTPPackets()
 
-	// Subscribe to doorbell events to start video streaming
-	v.eventBus.Subscribe("doorbell.pressed", v.onDoorbellPressed)
+	// NOTE: no auto-start on doorbell press. The legacy *7*32 activation
+	// rode the shared 20000 EVENT socket (Connect/Disconnect cycle) and tore
+	// down the monitor session at exactly the ring moment; live video is
+	// covered by the passive live_on_call tap and stills by the *7*300 path.
 	v.eventBus.Subscribe("door.unlocked", v.onDoorUnlocked)
 
 	v.running = true

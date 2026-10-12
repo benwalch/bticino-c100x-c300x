@@ -70,7 +70,7 @@ func captureCooperative(own *openwebnet.Client, port, warmupFrames int, timeout 
 		"!", "rtph264depay",
 		"!", "h264parse",
 		"!", "imxvpudec",
-		"!", "jpegenc", "quality=90",
+		"!", "jpegenc", "quality=95",
 		"!", "filesink", fmt.Sprintf("location=%s", tmp), "buffer-mode=2",
 	)
 	stderrBuf := &bytes.Buffer{}
@@ -102,6 +102,13 @@ func captureCooperative(own *openwebnet.Client, port, warmupFrames int, timeout 
 		res.ackError = err.Error()
 	} else {
 		res.ack = true
+	}
+
+	// NACK means bt_av_media has no session to duplicate, so no RTP will
+	// ever arrive: skip the poll and fail fast instead of burning the full
+	// timeout. The caller may retry later once the session is up.
+	if !res.ack {
+		return res, nil
 	}
 
 	// 3) Poll the file looking for complete JPEG frames
