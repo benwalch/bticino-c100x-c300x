@@ -528,7 +528,7 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- 13. Binary Sensor: Doorbell ---
 	b.discovery("binary_sensor", "bticino_doorbell", map[string]interface{}{
-		"name":         "Doorbell",
+		"name":         "Entrance Doorbell",
 		"unique_id":    "bticino_intercom_doorbell",
 		"object_id":    "bticino_doorbell",
 		"state_topic":  dp + "/doorbell/state",
@@ -822,7 +822,7 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Binary Sensor: Landing doorbell (floor doorbell) ---
 	b.discovery("binary_sensor", "bticino_doorbell_floor", map[string]interface{}{
-		"name":         "Landing Doorbell",
+		"name":         "Floor Doorbell",
 		"unique_id":    "bticino_intercom_doorbell_floor",
 		"object_id":    "bticino_doorbell_floor",
 		"state_topic":  dp + "/doorbell_floor/state",
@@ -837,7 +837,7 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Event: Doorbell (entrance panel) ---
 	b.discovery("event", "bticino_event_doorbell", map[string]interface{}{
-		"name":         "Doorbell (Event)",
+		"name":         "Entrance Doorbell (Event)",
 		"unique_id":    "bticino_intercom_event_doorbell",
 		"object_id":    "bticino_event_doorbell",
 		"state_topic":  dp + "/event/doorbell",
@@ -851,7 +851,7 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Event: Landing doorbell ---
 	b.discovery("event", "bticino_event_doorbell_floor", map[string]interface{}{
-		"name":         "Landing Doorbell (Event)",
+		"name":         "Floor Doorbell (Event)",
 		"unique_id":    "bticino_intercom_event_doorbell_floor",
 		"object_id":    "bticino_event_doorbell_floor",
 		"state_topic":  dp + "/event/doorbell_floor",
