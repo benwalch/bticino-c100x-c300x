@@ -615,3 +615,8 @@ make deploy
 **Testing**: ✅ Successful deploy on real device (192.168.1.38)  
 **Documentation**: ✅ Complete
 
+- Answering machine is now 300X-only (`bticino.AnsweringMachineAvailable()`):
+  voicemail switch, message sensors, mark-all-read button, answering status
+  entities and voicemail bus queries are skipped on Classe 100X (no UI,
+  daemon never runs, memo dirs unused). Delete the stale entities in HA
+  manually.

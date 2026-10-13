@@ -826,6 +826,13 @@ func SIPUsernameForVariant(variant string) string {
 	return DeviceVariant300X
 }
 
+// AnsweringMachineAvailable reports whether the unit has a working
+// answering machine. The Classe 100X ships the binaries but exposes no UI
+// for it (no AnsweringPage.qml, process never runs, memo dirs unused).
+func AnsweringMachineAvailable() bool {
+	return DeviceVariant != DeviceVariant100X
+}
+
 // VideoHighResForVariant reports whether the unit has a high-res video leg
 // (type 0, e.g. lo:5007). The Classe 100X serves low-res only (type 1,
 // e.g. lo:5002): requesting high-res there is ACKed with no RTP behind it

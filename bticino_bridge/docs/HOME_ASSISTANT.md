@@ -25,12 +25,12 @@ device-config mirror; **Configuration** holds the optional restart buttons.
 | Entity | Domain | State topic | Command topic | Notes |
 |---|---|---|---|---|
 | Door | `lock` | `bticino/lock/state` | `bticino/lock/set` | `LOCK`/`UNLOCK`; opens the main door |
-| Answering machine | `switch` | `bticino/voicemail/state` | `bticino/voicemail/set` | `ON`/`OFF` |
+| Answering machine *(300X only)* | `switch` | `bticino/voicemail/state` | `bticino/voicemail/set` | `ON`/`OFF` |
 | Doorbell sound | `switch` | `bticino/doorbellsound/state` | `bticino/doorbellsound/set` | Ringer mute/unmute |
 | Display | `switch` | `bticino/display/state` | `bticino/display/set` | Screen on/off |
 | Staircase light | `button` | — | `bticino/light/set` | Momentary (press+release) |
 | Door open | `button` | — | `bticino/door/open` | Momentary door pulse |
-| Mark all as read | `button` | — | `bticino/messages/markallread/set` | Marks every message read |
+| Mark all as read *(300X only)* | `button` | — | `bticino/messages/markallread/set` | Marks every message read |
 | Additional locks | `lock` | `bticino/lock/<id>/state` | `bticino/lock/<id>/set` | Only if configured (secondary gates) |
 
 ## Sensors (read-only)
@@ -38,9 +38,9 @@ device-config mirror; **Configuration** holds the optional restart buttons.
 | Entity | Domain | State topic | Notes |
 |---|---|---|---|
 | Temperature | `sensor` | `bticino/sensor/temperature` | °C, device internal |
-| New messages | `sensor` | `bticino/sensor/new_messages` | Unread answering-machine messages |
-| Total messages | `sensor` | `bticino/sensor/total_messages` | |
-| Storage used | `sensor` | `bticino/sensor/storage_used` | % used |
+| New messages *(300X only)* | `sensor` | `bticino/sensor/new_messages` | Unread answering-machine messages |
+| Total messages *(300X only)* | `sensor` | `bticino/sensor/total_messages` | |
+| Storage used *(300X only)* | `sensor` | `bticino/sensor/storage_used` | % used |
 | Keypad | `sensor` | `bticino/sensor/keypad` | Last physical button pressed |
 | System diagnostics | `sensor` | `bticino/sensor/system_diag` | |
 | Activity log | `sensor` | `bticino/sensor/activity_log` | + `.../attributes` for history |
@@ -58,8 +58,8 @@ device-config mirror; **Configuration** holds the optional restart buttons.
 
 | Entity | State topic |
 |---|---|
-| Answering machine status | `bticino/answering/state` |
-| Answering machine memory | `bticino/answering/state` |
+| Answering machine status *(300X only)* | `bticino/answering/state` |
+| Answering machine memory *(300X only)* | `bticino/answering/state` |
 | S0 ringtone (entrance panel) | `bticino/audio/ringtone/s0` |
 | S0 volume | `bticino/audio/volume/s0` |
 | Door volume | `bticino/audio/volume/door` |

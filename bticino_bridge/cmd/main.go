@@ -681,7 +681,9 @@ func main() {
 			mqttBridge.QueryBellStatus()
 			time.Sleep(bticino.CommandRetryDelay)
 
-			mqttBridge.QueryVoicemailStatus()
+			if bticino.AnsweringMachineAvailable() {
+				mqttBridge.QueryVoicemailStatus()
+			}
 			time.Sleep(bticino.CommandRetryDelay)
 
 			mqttBridge.QuerySystemInfo()
@@ -1112,7 +1114,9 @@ func main() {
 					go func() {
 						mqttBridge.QueryBellStatus()
 						time.Sleep(bticino.CommandRetryDelay)
-						mqttBridge.QueryVoicemailStatus()
+						if bticino.AnsweringMachineAvailable() {
+							mqttBridge.QueryVoicemailStatus()
+						}
 					}()
 				}
 

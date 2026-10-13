@@ -387,22 +387,24 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 2. Switch: Answering Machine ---
-	b.discovery("switch", "bticino_voicemail", map[string]interface{}{
-		"name":          "Answering Machine",
-		"unique_id":     "bticino_intercom_voicemail",
-		"object_id":     "bticino_voicemail",
-		"command_topic": dp + "/voicemail/set",
-		"state_topic":   dp + "/voicemail/state",
-		"payload_on":    "ON",
-		"payload_off":   "OFF",
-		"state_on":      "ON",
-		"state_off":     "OFF",
-		"icon":          "mdi:voicemail",
-		"device":        device,
-		"availability":  avail,
-	})
-	entityCount++
+	// --- 2. Switch: Answering Machine (300X only; the 100X has no UI for it) ---
+	if bticino.AnsweringMachineAvailable() {
+		b.discovery("switch", "bticino_voicemail", map[string]interface{}{
+			"name":          "Answering Machine",
+			"unique_id":     "bticino_intercom_voicemail",
+			"object_id":     "bticino_voicemail",
+			"command_topic": dp + "/voicemail/set",
+			"state_topic":   dp + "/voicemail/state",
+			"payload_on":    "ON",
+			"payload_off":   "OFF",
+			"state_on":      "ON",
+			"state_off":     "OFF",
+			"icon":          "mdi:voicemail",
+			"device":        device,
+			"availability":  avail,
+		})
+		entityCount++
+	}
 
 	// --- 3. Switch: Doorbell Sound ---
 	b.discovery("switch", "bticino_doorbell_sound", map[string]interface{}{
@@ -484,42 +486,42 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 9. Sensor: New Messages ---
-	b.discovery("sensor", "bticino_new_messages", map[string]interface{}{
-		"name":         "New Messages",
-		"unique_id":    "bticino_intercom_new_messages",
-		"object_id":    "bticino_new_messages",
-		"state_topic":  dp + "/sensor/new_messages",
-		"icon":         "mdi:message-badge",
-		"device":       device,
-		"availability": avail,
-	})
-	entityCount++
+	// --- 9-11. Message sensors (300X only; no answering machine on 100X) ---
+	if bticino.AnsweringMachineAvailable() {
+		b.discovery("sensor", "bticino_new_messages", map[string]interface{}{
+			"name":         "New Messages",
+			"unique_id":    "bticino_intercom_new_messages",
+			"object_id":    "bticino_new_messages",
+			"state_topic":  dp + "/sensor/new_messages",
+			"icon":         "mdi:message-badge",
+			"device":       device,
+			"availability": avail,
+		})
+		entityCount++
 
-	// --- 10. Sensor: Total Messages ---
-	b.discovery("sensor", "bticino_total_messages", map[string]interface{}{
-		"name":         "Total Messages",
-		"unique_id":    "bticino_intercom_total_messages",
-		"object_id":    "bticino_total_messages",
-		"state_topic":  dp + "/sensor/total_messages",
-		"icon":         "mdi:message-text-clock",
-		"device":       device,
-		"availability": avail,
-	})
-	entityCount++
+		b.discovery("sensor", "bticino_total_messages", map[string]interface{}{
+			"name":         "Total Messages",
+			"unique_id":    "bticino_intercom_total_messages",
+			"object_id":    "bticino_total_messages",
+			"state_topic":  dp + "/sensor/total_messages",
+			"icon":         "mdi:message-text-clock",
+			"device":       device,
+			"availability": avail,
+		})
+		entityCount++
 
-	// --- 11. Sensor: Storage Used ---
-	b.discovery("sensor", "bticino_storage", map[string]interface{}{
-		"name":                "Answering Machine Storage",
-		"unique_id":           "bticino_intercom_storage",
-		"object_id":           "bticino_storage",
-		"state_topic":         dp + "/sensor/storage_used",
-		"unit_of_measurement": "%",
-		"icon":                "mdi:harddisk",
-		"device":              device,
-		"availability":        avail,
-	})
-	entityCount++
+		b.discovery("sensor", "bticino_storage", map[string]interface{}{
+			"name":                "Answering Machine Storage",
+			"unique_id":           "bticino_intercom_storage",
+			"object_id":           "bticino_storage",
+			"state_topic":         dp + "/sensor/storage_used",
+			"unit_of_measurement": "%",
+			"icon":                "mdi:harddisk",
+			"device":              device,
+			"availability":        avail,
+		})
+		entityCount++
+	}
 
 	// --- 12. Sensor: Keypad (last button pressed) ---
 	b.discovery("sensor", "bticino_keypad", map[string]interface{}{
@@ -678,31 +680,32 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// ==================== DEVICE CONFIG ENTITIES (Phase 4) ====================
 
-	// --- Sensor: Answering Machine Status ---
-	b.discovery("sensor", "bticino_answering_status", map[string]interface{}{
-		"name":           "Answering Machine Status",
-		"unique_id":      "bticino_intercom_answering_status",
-		"object_id":      "bticino_answering_status",
-		"state_topic":    dp + "/answering/state",
-		"value_template": "{{ value_json.activated }}",
-		"icon":           "mdi:voicemail",
-		"device":         device,
-		"availability":   avail,
-	})
-	entityCount++
+	// --- Sensors: Answering Machine Status + Memory (300X only) ---
+	if bticino.AnsweringMachineAvailable() {
+		b.discovery("sensor", "bticino_answering_status", map[string]interface{}{
+			"name":           "Answering Machine Status",
+			"unique_id":      "bticino_intercom_answering_status",
+			"object_id":      "bticino_answering_status",
+			"state_topic":    dp + "/answering/state",
+			"value_template": "{{ value_json.activated }}",
+			"icon":           "mdi:voicemail",
+			"device":         device,
+			"availability":   avail,
+		})
+		entityCount++
 
-	// --- Sensor: Answering Memory ---
-	b.discovery("sensor", "bticino_answering_memory", map[string]interface{}{
-		"name":           "Answering Machine Memory",
-		"unique_id":      "bticino_intercom_answering_memory",
-		"object_id":      "bticino_answering_memory",
-		"state_topic":    dp + "/answering/state",
-		"value_template": "{{ value_json.memory_used }}",
-		"icon":           "mdi:memory",
-		"device":         device,
-		"availability":   avail,
-	})
-	entityCount++
+		b.discovery("sensor", "bticino_answering_memory", map[string]interface{}{
+			"name":           "Answering Machine Memory",
+			"unique_id":      "bticino_intercom_answering_memory",
+			"object_id":      "bticino_answering_memory",
+			"state_topic":    dp + "/answering/state",
+			"value_template": "{{ value_json.memory_used }}",
+			"icon":           "mdi:memory",
+			"device":         device,
+			"availability":   avail,
+		})
+		entityCount++
+	}
 
 	// --- Sensor: Ringtone S0 (entrance panel) ---
 	b.discovery("sensor", "bticino_ringtone_s0", map[string]interface{}{
@@ -908,18 +911,20 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- Button: Mark all messages as read ---
-	b.discovery("button", "bticino_mark_all_read", map[string]interface{}{
-		"name":          "Mark All as Read",
-		"unique_id":     "bticino_intercom_mark_all_read",
-		"object_id":     "bticino_mark_all_read",
-		"command_topic": dp + "/messages/markallread/set",
-		"payload_press": "PRESS",
-		"icon":          "mdi:email-open-multiple",
-		"device":        device,
-		"availability":  avail,
-	})
-	entityCount++
+	// --- Button: Mark all messages as read (300X only) ---
+	if bticino.AnsweringMachineAvailable() {
+		b.discovery("button", "bticino_mark_all_read", map[string]interface{}{
+			"name":          "Mark All as Read",
+			"unique_id":     "bticino_intercom_mark_all_read",
+			"object_id":     "bticino_mark_all_read",
+			"command_topic": dp + "/messages/markallread/set",
+			"payload_press": "PRESS",
+			"icon":          "mdi:email-open-multiple",
+			"device":        device,
+			"availability":  avail,
+		})
+		entityCount++
+	}
 
 	// --- Buttons: system restart (Configuration) — only if enabled ---
 	if b.config.MQTT.EnableSystemButtons {
@@ -1037,13 +1042,17 @@ func (b *MQTTBridge) subscribeToCommands() {
 
 	sub(dp+"/lock/set", b.handleDoorCommand)
 	sub(dp+"/door/open", b.handleDoorOpenButton)
-	sub(dp+"/voicemail/set", b.handleVoicemailCommand)
+	if bticino.AnsweringMachineAvailable() {
+		sub(dp+"/voicemail/set", b.handleVoicemailCommand)
+	}
 	sub(dp+"/doorbellsound/set", b.handleDoorbellSoundCommand)
 	sub(dp+"/display/set", b.handleDisplayCommand)
 	sub(dp+"/mute/set", b.handleMuteCommand)
 	sub(dp+"/light/set", b.handleLightCommand)
 	sub(dp+"/command/send", b.handleRawCommand)
-	sub(dp+"/messages/markallread/set", b.handleMarkAllReadCommand)
+	if bticino.AnsweringMachineAvailable() {
+		sub(dp+"/messages/markallread/set", b.handleMarkAllReadCommand)
+	}
 
 	// System restart buttons (only if enabled)
 	if b.config.MQTT.EnableSystemButtons {
