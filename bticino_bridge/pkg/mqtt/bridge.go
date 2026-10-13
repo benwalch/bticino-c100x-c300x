@@ -1764,8 +1764,8 @@ func (b *MQTTBridge) QuerySystemInfo() {
 	// Static bridge info, alongside the firmware facts above.
 	info["bridge_version"] = version.GetVersion()
 
-	// Keep the facts for the periodic network refresh (IP/netmask can
-	// change under DHCP while everything else here is reboot-static).
+	// Keep the facts for the periodic network refresh (IP can change under
+	// DHCP while everything else here is reboot-static).
 	b.mu.Lock()
 	b.systemInfo = info
 	b.mu.Unlock()
