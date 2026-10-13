@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### MQTT topics v2 (breaking)
+
+All data topics renamed to `bticino/<domain>/<object>` (bare noun = state;
+`…/set` commands; `…/event` triggers; `…/attributes` structured data;
+`…/image` snapshot) and every `object_id`/`unique_id` now mirrors its topic.
+Migration: after upgrading, delete all stale v1 entities and discovery
+topics once — retained v1 configs stay on the broker until removed, and HA
+shows both generations side by side until then. Automations/dashboards must
+move to the new entity IDs (see `docs/HOME_ASSISTANT.md`).
+
 ### Removed datetime MQTT topic; device info boot-only
 
 - Removed `sensor.bticino_datetime` (`bticino/system/datetime`: a 60s clock

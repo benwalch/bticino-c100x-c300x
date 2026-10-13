@@ -112,10 +112,9 @@ func (p *DeviceMQTTPublisher) publishSystemConfig(cfg *Config) {
 	// connected tick after boot.
 	if !p.staticInfoPublished {
 		p.publishJSON(prefix+"/system/device", map[string]interface{}{
-			"model":     cfg.DeviceInfo.Model,
-			"ip":        cfg.DeviceInfo.IP,
-			"version":   cfg.DeviceInfo.Version,
-			"timestamp": time.Now().Format(time.RFC3339),
+			"model":   cfg.DeviceInfo.Model,
+			"ip":      cfg.DeviceInfo.IP,
+			"version": cfg.DeviceInfo.Version,
 		}, true)
 		p.staticInfoPublished = true
 	}
@@ -125,76 +124,44 @@ func (p *DeviceMQTTPublisher) publishSystemConfig(cfg *Config) {
 func (p *DeviceMQTTPublisher) publishAnsweringMachine(cfg *Config) {
 	prefix := p.topicPrefix + "/answering"
 
-	p.publishJSON(prefix+"/state", map[string]interface{}{
+	p.publishJSON(prefix, map[string]interface{}{
 		"activated":    cfg.Answering.Activated,
 		"ring_enabled": cfg.Answering.RingEnable,
 		"led_enabled":  cfg.Answering.LedEnable,
 		"memory_used":  cfg.Answering.MemoryUsed,
-		"timestamp":    time.Now().Format(time.RFC3339),
 	}, true)
 }
 
-// publishRingtones publishes the ringtone configuration
+// publishRingtones publishes the ringtone configuration as one facet topic
+// (all slots share one lifecycle: a single settings.xml read).
 func (p *DeviceMQTTPublisher) publishRingtones(cfg *Config) {
 	prefix := p.topicPrefix + "/audio/ringtone"
 
-	p.publishJSON(prefix+"/s0", map[string]interface{}{
-		"value":     cfg.Ringtones.S0,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}, true)
-	p.publishJSON(prefix+"/s1", map[string]interface{}{
-		"value":     cfg.Ringtones.S1,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}, true)
-	p.publishJSON(prefix+"/s2", map[string]interface{}{
-		"value":     cfg.Ringtones.S2,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}, true)
-	p.publishJSON(prefix+"/door", map[string]interface{}{
-		"value":     cfg.Ringtones.Door,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}, true)
-	p.publishJSON(prefix+"/external", map[string]interface{}{
-		"value":     cfg.Ringtones.External,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}, true)
-	p.publishJSON(prefix+"/alarm", map[string]interface{}{
-		"value":     cfg.Ringtones.Alarm,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}, true)
-	p.publishJSON(prefix+"/message", map[string]interface{}{
-		"value":     cfg.Ringtones.Message,
-		"timestamp": time.Now().Format(time.RFC3339),
+	p.publishJSON(prefix, map[string]interface{}{
+		"s0":       cfg.Ringtones.S0,
+		"s1":       cfg.Ringtones.S1,
+		"s2":       cfg.Ringtones.S2,
+		"s3":       cfg.Ringtones.S3,
+		"floor":    cfg.Ringtones.Door,
+		"internal": cfg.Ringtones.Internal,
+		"external": cfg.Ringtones.External,
+		"alarm":    cfg.Ringtones.Alarm,
+		"message":  cfg.Ringtones.Message,
 	}, true)
 }
 
-// publishVolumes publishes the volume configuration
+// publishVolumes publishes the volume configuration as one facet topic
+// (all slots share one lifecycle: a single settings.xml read).
 func (p *DeviceMQTTPublisher) publishVolumes(cfg *Config) {
 	prefix := p.topicPrefix + "/audio/volume"
 
-	p.publishJSON(prefix+"/s0", map[string]interface{}{
-		"value":     cfg.Volumes.S0,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}, true)
-	p.publishJSON(prefix+"/s1", map[string]interface{}{
-		"value":     cfg.Volumes.S1,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}, true)
-	p.publishJSON(prefix+"/s2", map[string]interface{}{
-		"value":     cfg.Volumes.S2,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}, true)
-	p.publishJSON(prefix+"/intercom", map[string]interface{}{
-		"value":     cfg.Volumes.Intercom,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}, true)
-	p.publishJSON(prefix+"/door", map[string]interface{}{
-		"value":     cfg.Volumes.Door,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}, true)
-	p.publishJSON(prefix+"/sip", map[string]interface{}{
-		"value":     cfg.Volumes.SIP,
-		"timestamp": time.Now().Format(time.RFC3339),
+	p.publishJSON(prefix, map[string]interface{}{
+		"s0":       cfg.Volumes.S0,
+		"s1":       cfg.Volumes.S1,
+		"s2":       cfg.Volumes.S2,
+		"intercom": cfg.Volumes.Intercom,
+		"floor":    cfg.Volumes.Door,
+		"sip":      cfg.Volumes.SIP,
 	}, true)
 }
 
@@ -206,7 +173,6 @@ func (p *DeviceMQTTPublisher) publishDisplay(cfg *Config) {
 	p.publishJSON(prefix+"/settings", map[string]interface{}{
 		"brightness": cfg.Display.Brightness,
 		"clean_time": cfg.Display.CleanTime,
-		"timestamp":  time.Now().Format(time.RFC3339),
 	}, true)
 }
 
@@ -223,7 +189,6 @@ func (p *DeviceMQTTPublisher) publishCameras(cfg *Config) {
 			"contrast":   camera.Contrast,
 			"saturation": camera.Saturation,
 			"quality":    camera.Quality,
-			"timestamp":  time.Now().Format(time.RFC3339),
 		}, true)
 	}
 }
@@ -242,22 +207,11 @@ func (p *DeviceMQTTPublisher) publishJSON(topic string, data map[string]interfac
 func (p *DeviceMQTTPublisher) GetAllTopics() []string {
 	return []string{
 		p.topicPrefix + "/system/device",
-		p.topicPrefix + "/answering/state",
-		p.topicPrefix + "/audio/ringtone/s0",
-		p.topicPrefix + "/audio/ringtone/s1",
-		p.topicPrefix + "/audio/ringtone/s2",
-		p.topicPrefix + "/audio/ringtone/door",
-		p.topicPrefix + "/audio/ringtone/external",
-		p.topicPrefix + "/audio/ringtone/alarm",
-		p.topicPrefix + "/audio/ringtone/message",
-		p.topicPrefix + "/audio/volume/s0",
-		p.topicPrefix + "/audio/volume/s1",
-		p.topicPrefix + "/audio/volume/s2",
-		p.topicPrefix + "/audio/volume/intercom",
-		p.topicPrefix + "/audio/volume/door",
-		p.topicPrefix + "/audio/volume/sip",
+		p.topicPrefix + "/answering",
+		p.topicPrefix + "/audio/ringtone",
+		p.topicPrefix + "/audio/volume",
 		p.topicPrefix + "/display/settings",
-		// Dynamic cameras
+		// Dynamic cameras: <prefix>/camera/<id>/settings
 	}
 }
 
@@ -265,11 +219,11 @@ func (p *DeviceMQTTPublisher) GetAllTopics() []string {
 func VerifyTopicos() {
 	fmt.Println("Device Config MQTT Topics:")
 	fmt.Println("- bticino/system/device")
-	fmt.Println("- bticino/answering/state")
-	fmt.Println("- bticino/audio/ringtone/s0")
-	fmt.Println("- bticino/audio/volume/s0")
+	fmt.Println("- bticino/answering")
+	fmt.Println("- bticino/audio/ringtone")
+	fmt.Println("- bticino/audio/volume")
 	fmt.Println("- bticino/display/settings")
-	fmt.Println("- bticino/camera/<id>/config")
+	fmt.Println("- bticino/camera/<id>/settings")
 }
 
 // Ensure we implement the interface

@@ -149,7 +149,6 @@ func (w *FileWatcher) publishConfigChange() {
 	}
 
 	// Publish immediately (no retain for change events)
-	w.publishSystemChange(cfg)
 	w.publishAnsweringChange(cfg)
 	w.publishAudioChange(cfg)
 	w.publishDisplayChange(cfg)
@@ -160,26 +159,19 @@ func (w *FileWatcher) publishConfigChange() {
 	w.logger.Info("Config change published successfully")
 }
 
-func (w *FileWatcher) publishSystemChange(cfg *Config) {
-	prefix := w.topicPrefix + "/system"
-	w.publisher.Publish(prefix+"/language", fmt.Sprintf(`{"language":"%s","change":"file_watcher"}`, cfg.Language), false)
-	w.publisher.Publish(prefix+"/timezone", fmt.Sprintf(`{"timezone":"%s","change":"file_watcher"}`, cfg.Timezone), false)
-}
-
 func (w *FileWatcher) publishAnsweringChange(cfg *Config) {
 	prefix := w.topicPrefix + "/answering"
 	activated := "false"
 	if cfg.Answering.Activated {
 		activated = "true"
 	}
-	w.publisher.Publish(prefix+"/state", fmt.Sprintf(`{"activated":%s,"change":"file_watcher"}`, activated), false)
+	w.publisher.Publish(prefix, fmt.Sprintf(`{"activated":%s,"change":"file_watcher"}`, activated), false)
 }
 
 func (w *FileWatcher) publishAudioChange(cfg *Config) {
 	prefix := w.topicPrefix + "/audio"
-	w.publisher.Publish(prefix+"/ringtone/s0", fmt.Sprintf(`{"value":%d,"change":"file_watcher"}`, cfg.Ringtones.S0), false)
-	w.publisher.Publish(prefix+"/volume/s0", fmt.Sprintf(`{"value":%d,"change":"file_watcher"}`, cfg.Volumes.S0), false)
-	w.publisher.Publish(prefix+"/volume/door", fmt.Sprintf(`{"value":%d,"change":"file_watcher"}`, cfg.Volumes.Door), false)
+	w.publisher.Publish(prefix+"/ringtone", fmt.Sprintf(`{"s0":%d,"floor":%d,"s1":%d,"change":"file_watcher"}`, cfg.Ringtones.S0, cfg.Ringtones.Door, cfg.Ringtones.S1), false)
+	w.publisher.Publish(prefix+"/volume", fmt.Sprintf(`{"s0":%d,"floor":%d,"s1":%d,"change":"file_watcher"}`, cfg.Volumes.S0, cfg.Volumes.Door, cfg.Volumes.S1), false)
 }
 
 func (w *FileWatcher) publishDisplayChange(cfg *Config) {
