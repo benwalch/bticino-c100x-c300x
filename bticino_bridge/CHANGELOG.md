@@ -19,6 +19,8 @@
   the first occurrence of any frame still publishes.
 - `bticino/system/device` (model/IP/version, static until reboot) is now
   published once at boot instead of every 60s.
+- `sensor.bticino_system_info` IP refreshes on DHCP change (local interface
+  read on the WiFi tick, zero bus traffic); all other facts stay boot-only.
 - Camera brightness discovery follows configured TVCC IDs instead of
   hardcoded camera 20.
 - Removed `sensor.bticino_multicast` (listener datagram counter, no

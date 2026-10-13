@@ -65,6 +65,9 @@ type MQTTBridge struct {
 	cameraCapture func() ([]byte, error)
 	cameraMu      sync.Mutex // serializes captures (avoids doorbell+call overlap)
 
+	// systemInfo caches the last published WHO=13 facts for refreshNetworkInfo.
+	systemInfo map[string]string
+
 	wifiOnce sync.Once // starts the WiFi monitor only once
 
 	// lastBusEventRaw / lastActivityRaw suppress back-to-back duplicate OWN
@@ -1276,7 +1279,41 @@ func (b *MQTTBridge) wifiMonitorLoop(interval time.Duration) {
 			continue
 		}
 		b.publishWiFiSignal()
+		b.refreshNetworkInfo()
 	}
+}
+
+// refreshNetworkInfo re-reads the local IP (DHCP can change it while
+// running) and republishes system_info on actual change. Local read,
+// zero bus traffic.
+func (b *MQTTBridge) refreshNetworkInfo() {
+	ip := bticino.LocalOutboundIP()
+	if ip == "" || ip == "127.0.0.1" {
+		return
+	}
+
+	b.mu.RLock()
+	if b.systemInfo == nil || b.systemInfo["ip_address"] == ip {
+		b.mu.RUnlock()
+		return
+	}
+	b.mu.RUnlock()
+
+	b.mu.Lock()
+	b.systemInfo["ip_address"] = ip
+	jsonData, err := json.Marshal(b.systemInfo)
+	summary := b.systemInfo["firmware_version"]
+	b.mu.Unlock()
+	if err != nil {
+		return
+	}
+	if summary == "" {
+		summary = "unknown"
+	}
+	dp := b.dataPrefix()
+	b.publish(dp+"/sensor/system_info", summary, true)
+	b.publish(dp+"/sensor/system_info/attributes", string(jsonData), true)
+	b.logger.WithField("ip", ip).Info("IP changed, system_info republished")
 }
 
 // handleRestartBridgeCommand restarts the bticino_bridge process itself: launches a
@@ -1705,6 +1742,12 @@ func (b *MQTTBridge) QuerySystemInfo() {
 
 	// Static bridge info, alongside the firmware facts above.
 	info["bridge_version"] = version.GetVersion()
+
+	// Keep the facts for the periodic network refresh (IP can change under
+	// DHCP while everything else here is reboot-static).
+	b.mu.Lock()
+	b.systemInfo = info
+	b.mu.Unlock()
 
 	// Publish as JSON on the sensor
 	jsonData, err := json.Marshal(info)
