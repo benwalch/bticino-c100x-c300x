@@ -601,18 +601,6 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 24. Sensor: Multicast ---
-	b.discovery("sensor", "bticino_multicast", map[string]interface{}{
-		"name":         "Multicast Messages",
-		"unique_id":    "bticino_intercom_multicast",
-		"object_id":    "bticino_multicast",
-		"state_topic":  dp + "/sensor/multicast_count",
-		"icon":         "mdi:access-point-network",
-		"device":       device,
-		"availability": avail,
-	})
-	entityCount++
-
 	// --- GPIO individual sensors (model-specific pin list) ---
 	gpioPins := bticino.GPIOPinsForVariant(bticino.DeviceVariant)
 	b.logger.Infof("MQTT discovery: advertising %d GPIO entities for variant %s",
@@ -1554,10 +1542,9 @@ func (b *MQTTBridge) publishAllStates() {
 	go b.publishWiFiSignal()
 	b.wifiOnce.Do(func() { go b.wifiMonitorLoop(60 * time.Second) })
 
-	// New entities: SIP status, system diagnostics, multicast
+	// New entities: SIP status, system diagnostics
 	b.publish(dp+"/sensor/sip_status", boolState(sip), true)
 	b.publish(dp+"/sensor/system_diag", "starting", true)
-	b.publish(dp+"/sensor/multicast_count", "0", true)
 
 	// GPIO pins initial state (all OFF until first read)
 	gpioPins := []int{12, 13, 47, 49, 52, 54, 56, 58, 60, 154, 155, 176, 180}
@@ -1826,11 +1813,6 @@ func (b *MQTTBridge) PublishSIPStatus(registered bool) {
 // PublishSystemDiagnostics publishes system diagnostic info to MQTT
 func (b *MQTTBridge) PublishSystemDiagnostics(status string) {
 	b.publish(b.dataPrefix()+"/sensor/system_diag", status, true)
-}
-
-// PublishMulticastStats publishes multicast listener message count to MQTT
-func (b *MQTTBridge) PublishMulticastStats(totalMessages int64) {
-	b.publish(b.dataPrefix()+"/sensor/multicast_count", fmt.Sprintf("%d", totalMessages), true)
 }
 
 // PublishGPIOStates publishes individual GPIO pin states to MQTT

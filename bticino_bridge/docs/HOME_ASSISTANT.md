@@ -44,7 +44,6 @@ device-config mirror; **Configuration** holds the optional restart buttons.
 | Keypad | `sensor` | `bticino/sensor/keypad` | Last physical button pressed |
 | OWN bus event | `sensor` | `bticino/sensor/bus_event` | Last raw OWN frame seen |
 | System diagnostics | `sensor` | `bticino/sensor/system_diag` | |
-| Multicast | `sensor` | `bticino/sensor/multicast_count` | Multicast messages seen |
 | Activity log | `sensor` | `bticino/sensor/activity_log` | + `.../attributes` for history |
 | System information | `sensor` | `bticino/sensor/system_info` | WHO=13 (IP/MAC/firmware…) in attributes |
 

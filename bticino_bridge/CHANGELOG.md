@@ -14,6 +14,9 @@
   published once at boot instead of every 60s.
 - Camera brightness discovery follows configured TVCC IDs instead of
   hardcoded camera 20.
+- Removed `sensor.bticino_multicast` (listener datagram counter, no
+  consumers; the multicast listener itself is untouched — floor/entrance
+  detection depends on it). Delete the stale entity in HA manually.
 
 ### Home Assistant unique_ids renamed to model-neutral prefix (breaking)
 

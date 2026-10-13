@@ -1109,13 +1109,6 @@ func main() {
 					}
 				}
 
-				// Publish multicast stats
-				if mqttBridge != nil && multicastListener != nil {
-					stats := multicastListener.GetStats()
-					mqttBridge.PublishMulticastStats(stats.TotalMessages)
-
-				}
-
 				// Query device state every 5 minutes (every 10 ticks of 30s)
 				if mqttBridge != nil && tickCount%10 == 0 {
 					go func() {
