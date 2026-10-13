@@ -406,39 +406,43 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 		entityCount++
 	}
 
-	// --- 3. Switch: Doorbell Sound ---
-	b.discovery("switch", "bticino_doorbell_sound", map[string]interface{}{
-		"name":          "Ringtone",
-		"unique_id":     "bticino_intercom_doorbell_sound",
-		"object_id":     "bticino_doorbell_sound",
-		"command_topic": dp + "/doorbellsound/set",
-		"state_topic":   dp + "/doorbellsound/state",
-		"payload_on":    "ON",
-		"payload_off":   "OFF",
-		"state_on":      "ON",
-		"state_off":     "OFF",
-		"icon":          "mdi:bell",
-		"device":        device,
-		"availability":  avail,
-	})
-	entityCount++
+	// --- 3. Switch: Doorbell Sound (300X only; SET ignored on 100X) ---
+	if bticino.RemoteSetCommandsWork() {
+		b.discovery("switch", "bticino_doorbell_sound", map[string]interface{}{
+			"name":          "Ringtone",
+			"unique_id":     "bticino_intercom_doorbell_sound",
+			"object_id":     "bticino_doorbell_sound",
+			"command_topic": dp + "/doorbellsound/set",
+			"state_topic":   dp + "/doorbellsound/state",
+			"payload_on":    "ON",
+			"payload_off":   "OFF",
+			"state_on":      "ON",
+			"state_off":     "OFF",
+			"icon":          "mdi:bell",
+			"device":        device,
+			"availability":  avail,
+		})
+		entityCount++
+	}
 
-	// --- 4. Switch: Display ---
-	b.discovery("switch", "bticino_display", map[string]interface{}{
-		"name":          "Display",
-		"unique_id":     "bticino_intercom_display",
-		"object_id":     "bticino_display",
-		"command_topic": dp + "/display/set",
-		"state_topic":   dp + "/display/state",
-		"payload_on":    "ON",
-		"payload_off":   "OFF",
-		"state_on":      "ON",
-		"state_off":     "OFF",
-		"icon":          "mdi:tablet",
-		"device":        device,
-		"availability":  avail,
-	})
-	entityCount++
+	// --- 4. Switch: Display (300X only; SET ignored on 100X) ---
+	if bticino.RemoteSetCommandsWork() {
+		b.discovery("switch", "bticino_display", map[string]interface{}{
+			"name":          "Display",
+			"unique_id":     "bticino_intercom_display",
+			"object_id":     "bticino_display",
+			"command_topic": dp + "/display/set",
+			"state_topic":   dp + "/display/state",
+			"payload_on":    "ON",
+			"payload_off":   "OFF",
+			"state_on":      "ON",
+			"state_off":     "OFF",
+			"icon":          "mdi:tablet",
+			"device":        device,
+			"availability":  avail,
+		})
+		entityCount++
+	}
 
 	// --- 5. Switch: Mute (REMOVED - merged into doorbell_sound) ---
 	// Speaker mute control is already integrated into doorbell_sound
@@ -1045,9 +1049,11 @@ func (b *MQTTBridge) subscribeToCommands() {
 	if bticino.AnsweringMachineAvailable() {
 		sub(dp+"/voicemail/set", b.handleVoicemailCommand)
 	}
-	sub(dp+"/doorbellsound/set", b.handleDoorbellSoundCommand)
-	sub(dp+"/display/set", b.handleDisplayCommand)
-	sub(dp+"/mute/set", b.handleMuteCommand)
+	if bticino.RemoteSetCommandsWork() {
+		sub(dp+"/doorbellsound/set", b.handleDoorbellSoundCommand)
+		sub(dp+"/display/set", b.handleDisplayCommand)
+		sub(dp+"/mute/set", b.handleMuteCommand)
+	}
 	sub(dp+"/light/set", b.handleLightCommand)
 	sub(dp+"/command/send", b.handleRawCommand)
 	if bticino.AnsweringMachineAvailable() {
@@ -1752,8 +1758,8 @@ func (b *MQTTBridge) QuerySystemInfo() {
 	// Static bridge info, alongside the firmware facts above.
 	info["bridge_version"] = version.GetVersion()
 
-	// Keep the facts for the periodic network refresh (IP can change under
-	// DHCP while everything else here is reboot-static).
+	// Keep the facts for the periodic network refresh (IP/netmask can
+	// change under DHCP while everything else here is reboot-static).
 	b.mu.Lock()
 	b.systemInfo = info
 	b.mu.Unlock()

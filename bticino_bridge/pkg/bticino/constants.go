@@ -826,6 +826,14 @@ func SIPUsernameForVariant(variant string) string {
 	return DeviceVariant300X
 }
 
+// RemoteSetCommandsWork reports whether dimension SET commands take effect.
+// Verified ignored (ACKed but no state change) on Classe 100X, tested
+// 2026-10-13: ringer mute (3 frame variants) and display power. Door lock,
+// staircase light and raw commands are unaffected (separate paths).
+func RemoteSetCommandsWork() bool {
+	return DeviceVariant != DeviceVariant100X
+}
+
 // AnsweringMachineAvailable reports whether the unit has a working
 // answering machine. The Classe 100X ships the binaries but exposes no UI
 // for it (no AnsweringPage.qml, process never runs, memo dirs unused).
