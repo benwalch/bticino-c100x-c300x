@@ -66,6 +66,12 @@ type MQTTBridge struct {
 	cameraMu      sync.Mutex // serializes captures (avoids doorbell+call overlap)
 
 	wifiOnce sync.Once // starts the WiFi monitor only once
+
+	// lastBusEventRaw / lastActivityRaw suppress back-to-back duplicate OWN
+	// frames (e.g. the 5-minute bell-state keepalive) on event-style topics.
+	// Separate baselines per output: a new frame must still reach both.
+	lastBusEventRaw string
+	lastActivityRaw string
 }
 
 // SetCameraCapture enables the doorbell camera entity and registers the
@@ -562,18 +568,6 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 		entityCount++
 	}
 
-	// --- 21. Sensor: OpenWebNet Bus Event (last raw event) ---
-	b.discovery("sensor", "bticino_bus_event", map[string]interface{}{
-		"name":         "OWN Bus Event",
-		"unique_id":    "bticino_intercom_bus_event",
-		"object_id":    "bticino_bus_event",
-		"state_topic":  dp + "/sensor/bus_event",
-		"icon":         "mdi:bus-electric",
-		"device":       device,
-		"availability": avail,
-	})
-	entityCount++
-
 	// --- 22. Binary Sensor: SIP Status ---
 	b.discovery("binary_sensor", "bticino_sip_status", map[string]interface{}{
 		"name":         "SIP Status",
@@ -980,7 +974,7 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 // and operational sensors like messages/doorbell/call) stays in Controls/Sensors.
 var diagnosticEntities = map[string]bool{
 	"bticino_temperature": true, "bticino_storage": true, "bticino_keypad": true,
-	"bticino_bus_event": true, "bticino_system_diag": true, "bticino_multicast": true,
+	"bticino_system_diag":  true,
 	"bticino_activity_log": true, "bticino_system_info": true, "bticino_sip_status": true,
 	"bticino_answering_status": true, "bticino_answering_memory": true,
 	"bticino_ringtone_s0": true, "bticino_volume_s0": true, "bticino_volume_door": true,
@@ -1431,8 +1425,7 @@ func (b *MQTTBridge) setupEventSubscriptions() {
 	b.eventBus.Subscribe("openwebnet.event", func(event *events.Event) {
 		if data, ok := event.Data.(map[string]interface{}); ok {
 			raw, _ := data["raw"].(string)
-			if raw != "" {
-				b.publish(dp+"/sensor/bus_event", raw, false)
+			if raw != "" && !b.isRepeatBusRaw(&b.lastBusEventRaw, raw) {
 				b.publishEvent("bus_own", "frame", map[string]interface{}{"raw": raw})
 			}
 		}
@@ -1776,14 +1769,6 @@ func (b *MQTTBridge) PublishDoorbellEvent(source, rawCommand string) {
 	b.incEvents()
 }
 
-// PublishOpenWebNetEvent publishes a bus event
-func (b *MQTTBridge) PublishOpenWebNetEvent(rawCommand, who, what, where string) {
-	if rawCommand != "" {
-		b.publish(b.dataPrefix()+"/sensor/bus_event", rawCommand, false)
-	}
-	b.incEvents()
-}
-
 // PublishMessageStats publishes answering machine message stats
 func (b *MQTTBridge) PublishMessageStats() {
 	if b.messageParser == nil {
@@ -1815,6 +1800,19 @@ func (b *MQTTBridge) PublishSystemDiagnostics(status string) {
 	b.publish(b.dataPrefix()+"/sensor/system_diag", status, true)
 }
 
+// isRepeatBusRaw reports whether raw repeats the previous OWN frame for one
+// event-style output (separate baselines per output so a new frame still
+// reaches every topic). Back-to-back duplicates carry no information.
+func (b *MQTTBridge) isRepeatBusRaw(baseline *string, raw string) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if raw != "" && raw == *baseline {
+		return true
+	}
+	*baseline = raw
+	return false
+}
+
 // PublishGPIOStates publishes individual GPIO pin states to MQTT
 func (b *MQTTBridge) PublishGPIOStates(states map[int]bool) {
 	dp := b.dataPrefix()
@@ -1828,6 +1826,10 @@ func (b *MQTTBridge) PublishGPIOStates(states map[int]bool) {
 // eventType: machine type (e.g. "doorbell_ring", "door_open", "camera_activated")
 // rawCommand: original OWN command (e.g. "*8*1#1#4#21*16##")
 func (b *MQTTBridge) PublishActivityLog(description, eventType, rawCommand string) {
+	// Skip back-to-back duplicates of the same frame (idle keepalive noise).
+	if rawCommand != "" && b.isRepeatBusRaw(&b.lastActivityRaw, rawCommand) {
+		return
+	}
 	dp := b.dataPrefix()
 
 	// Publish main state (readable text, not retained so it acts as an event)

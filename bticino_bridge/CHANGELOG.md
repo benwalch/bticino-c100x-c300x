@@ -10,6 +10,13 @@
   `sensor.bticino_ntp` (static config mirror, republished every 60s).
 - `sensor.bticino_system_info` attributes now also carry `bridge_version`
   (bridge binary version, static until redeploy).
+- Removed `sensor.bticino_bus_event`: it duplicated `event.bticino_event_bus_own`
+  (same frame, and was even published twice per frame). Raw bus frames are
+  available on `bticino/event/bus_own` only now. Delete the stale entity in
+  HA manually.
+- Back-to-back duplicate OWN frames (e.g. the 5-minute bell-state keepalive)
+  no longer republish `event.bticino_event_bus_own` or the activity log;
+  the first occurrence of any frame still publishes.
 - `bticino/system/device` (model/IP/version, static until reboot) is now
   published once at boot instead of every 60s.
 - Camera brightness discovery follows configured TVCC IDs instead of

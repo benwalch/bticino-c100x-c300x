@@ -916,8 +916,6 @@ func main() {
 
 			// Forward all events to MQTT
 			if mqttBridge != nil {
-				mqttBridge.PublishOpenWebNetEvent(cmd.Raw, cmd.WHO, cmd.WHAT, cmd.WHERE)
-
 				// OWN pattern recognition -> activity_log sensor
 				if desc, ok := bticino.OWNEventDescriptions[cmd.Raw]; ok {
 					eventType := "unknown"
