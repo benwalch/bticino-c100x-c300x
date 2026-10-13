@@ -60,8 +60,10 @@ device-config mirror; **Configuration** holds the optional restart buttons.
 | Answering machine status *(300X only)* | `bticino/answering/state` |
 | Answering machine memory *(300X only)* | `bticino/answering/state` |
 | S0 ringtone (entrance panel) | `bticino/audio/ringtone/s0` |
+| Secondary doorbell ringtone | `bticino/audio/ringtone/s1` |
 | Floor door ringtone | `bticino/audio/ringtone/door` |
 | Entrance doorbell volume | `bticino/audio/volume/s0` |
+| Secondary doorbell volume | `bticino/audio/volume/s1` |
 | Floor doorbell volume | `bticino/audio/volume/door` |
 | Display brightness | `bticino/display/settings` | `value_json.brightness`; also `clean_time` |
 | Camera brightness (<id> per TVCC config) | `bticino/camera/<id>/settings` |

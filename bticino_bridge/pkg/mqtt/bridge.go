@@ -724,12 +724,38 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
+	// --- Sensor: Ringtone S1 (secondary entrance station) ---
+	b.discovery("sensor", "bticino_ringtone_s1", map[string]interface{}{
+		"name":           "Secondary Doorbell Ringtone",
+		"unique_id":      "bticino_intercom_ringtone_s1",
+		"object_id":      "bticino_ringtone_s1",
+		"state_topic":    dp + "/audio/ringtone/s1",
+		"value_template": "Ringtone #{{ value_json.value }}",
+		"icon":           "mdi:bell",
+		"device":         device,
+		"availability":   avail,
+	})
+	entityCount++
+
 	// --- Sensor: Volume S0 ---
 	b.discovery("sensor", "bticino_volume_s0", map[string]interface{}{
 		"name":           "Entrance Doorbell Volume",
 		"unique_id":      "bticino_intercom_volume_s0",
 		"object_id":      "bticino_volume_s0",
 		"state_topic":    dp + "/audio/volume/s0",
+		"value_template": "{{ value_json.value }}",
+		"icon":           "mdi:volume-high",
+		"device":         device,
+		"availability":   avail,
+	})
+	entityCount++
+
+	// --- Sensor: Volume S1 (secondary entrance station) ---
+	b.discovery("sensor", "bticino_volume_s1", map[string]interface{}{
+		"name":           "Secondary Doorbell Volume",
+		"unique_id":      "bticino_intercom_volume_s1",
+		"object_id":      "bticino_volume_s1",
+		"state_topic":    dp + "/audio/volume/s1",
 		"value_template": "{{ value_json.value }}",
 		"icon":           "mdi:volume-high",
 		"device":         device,
@@ -1002,7 +1028,7 @@ var diagnosticEntities = map[string]bool{
 	"bticino_system_diag":  true,
 	"bticino_activity_log": true, "bticino_system_info": true, "bticino_sip_status": true,
 	"bticino_answering_status": true, "bticino_answering_memory": true,
-	"bticino_ringtone_s0": true, "bticino_ringtone_door": true, "bticino_volume_s0": true, "bticino_volume_door": true,
+	"bticino_ringtone_s0": true, "bticino_ringtone_door": true, "bticino_ringtone_s1": true, "bticino_volume_s0": true, "bticino_volume_s1": true, "bticino_volume_door": true,
 	"bticino_display_brightness": true,
 	"bticino_ip_address":         true, "bticino_mac_address": true, "bticino_wifi_signal": true,
 }

@@ -46,6 +46,8 @@
   added `sensor.bticino_ringtone_door` ("Floor Doorbell Ringtone",
   `Ringtone #…` templates); volume labels aligned ("Entrance/Floor Doorbell
   Volume").
+- Added `sensor.bticino_ringtone_s1` and `sensor.bticino_volume_s1`
+  ("Secondary Doorbell ...", secondary entrance station).
 - Display names aligned to the Entrance/Floor doorbell scheme (topics and
   IDs unchanged).
 
