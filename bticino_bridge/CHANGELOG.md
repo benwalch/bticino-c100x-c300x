@@ -23,9 +23,31 @@
   read on the WiFi tick, zero bus traffic); all other facts stay boot-only.
 - Camera brightness discovery follows configured TVCC IDs instead of
   hardcoded camera 20.
+- `display/brightness` + `display/clean_time` merged into one `display/settings`
+  facet topic (brightness + clean_time); `camera/<id>/config` moved to
+  `camera/<id>/settings` with the native `TVCC ` ID prefix stripped (the old
+  topic never received data — the publisher sent `camera/TVCC <id>/config`).
 - Removed `sensor.bticino_multicast` (listener datagram counter, no
   consumers; the multicast listener itself is untouched — floor/entrance
   detection depends on it). Delete the stale entity in HA manually.
+- Answering machine is now 300X-only (`bticino.AnsweringMachineAvailable()`):
+  voicemail switch, message sensors, mark-all-read button, answering status
+  entities and voicemail bus queries are skipped on Classe 100X (no UI,
+  daemon never runs, memo dirs unused). Delete the stale entities in HA
+  manually.
+- Ringer, display and mute SET commands are now 300X-only
+  (`bticino.RemoteSetCommandsWork()`): verified ACKed-but-ignored on Classe
+  100X (ringer 3 variants, display power, 2026-10-13). Entities, command
+  subscriptions and state queries for them are skipped on 100X.
+- Removed `button.bticino_door_open` ("Door Opener"): identical bus sequence
+  to `lock.bticino_door`, which stays as the single door control. Delete the
+  stale entity in HA manually.
+- Fixed ringtone parsing on 100X (`id_ringtone` lives on `<obj>`, not `<ist>`);
+  added `sensor.bticino_ringtone_door` ("Floor Doorbell Ringtone",
+  `Ringtone #…` templates); volume labels aligned ("Entrance/Floor Doorbell
+  Volume").
+- Display names aligned to the Entrance/Floor doorbell scheme (topics and
+  IDs unchanged).
 
 ### Home Assistant unique_ids renamed to model-neutral prefix (breaking)
 
@@ -614,9 +636,3 @@ make deploy
 **Estado**: ✅ **PRODUCTION READY**  
 **Testing**: ✅ Successful deploy on real device (192.168.1.38)  
 **Documentation**: ✅ Complete
-
-- Answering machine is now 300X-only (`bticino.AnsweringMachineAvailable()`):
-  voicemail switch, message sensors, mark-all-read button, answering status
-  entities and voicemail bus queries are skipped on Classe 100X (no UI,
-  daemon never runs, memo dirs unused). Delete the stale entities in HA
-  manually.

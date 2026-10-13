@@ -26,8 +26,8 @@ device-config mirror; **Configuration** holds the optional restart buttons.
 |---|---|---|---|---|
 | Door | `lock` | `bticino/lock/state` | `bticino/lock/set` | `LOCK`/`UNLOCK`; opens the main door |
 | Answering machine *(300X only)* | `switch` | `bticino/voicemail/state` | `bticino/voicemail/set` | `ON`/`OFF` |
-| Doorbell sound | `switch` | `bticino/doorbellsound/state` | `bticino/doorbellsound/set` | Ringer mute/unmute |
-| Display | `switch` | `bticino/display/state` | `bticino/display/set` | Screen on/off |
+| Doorbell sound *(300X only)* | `switch` | `bticino/doorbellsound/state` | `bticino/doorbellsound/set` | Ringer mute/unmute |
+| Display *(300X only)* | `switch` | `bticino/display/state` | `bticino/display/set` | Screen on/off |
 | Staircase light | `button` | — | `bticino/light/set` | Momentary (press+release) |
 | Mark all as read *(300X only)* | `button` | — | `bticino/messages/markallread/set` | Marks every message read |
 | Additional locks | `lock` | `bticino/lock/<id>/state` | `bticino/lock/<id>/set` | Only if configured (secondary gates) |
@@ -60,17 +60,19 @@ device-config mirror; **Configuration** holds the optional restart buttons.
 | Answering machine status *(300X only)* | `bticino/answering/state` |
 | Answering machine memory *(300X only)* | `bticino/answering/state` |
 | S0 ringtone (entrance panel) | `bticino/audio/ringtone/s0` |
-| S0 volume | `bticino/audio/volume/s0` |
-| Door volume | `bticino/audio/volume/door` |
-| Display brightness | `bticino/display/brightness` |
-| Camera brightness (<id> per TVCC config) | `bticino/camera/<id>/config` |
+| Floor door ringtone | `bticino/audio/ringtone/door` |
+| Entrance doorbell volume | `bticino/audio/volume/s0` |
+| Floor doorbell volume | `bticino/audio/volume/door` |
+| Display brightness | `bticino/display/settings` | `value_json.brightness`; also `clean_time` |
+| Camera brightness (<id> per TVCC config) | `bticino/camera/<id>/settings` |
+| Camera contrast (<id> per TVCC config) | `bticino/camera/<id>/settings` | `value_json.contrast` |
 
 ## Binary sensors
 
 | Entity | Domain | State topic | Notes |
 |---|---|---|---|
-| Doorbell | `binary_sensor` | `bticino/doorbell/state` | Entrance-panel ring |
-| Landing doorbell (floor) | `binary_sensor` | `bticino/doorbell_floor/state` | Landing/floor button (`*7*59#`), `device_class: occupancy` |
+| Entrance doorbell | `binary_sensor` | `bticino/doorbell/state` | Entrance-panel ring |
+| Floor doorbell | `binary_sensor` | `bticino/doorbell_floor/state` | Flat door button (`*7*59#`), `device_class: occupancy` |
 | SIP status | `binary_sensor` | `bticino/sensor/sip_status` | SIP registration up/down |
 | LEDs (300X ×7: memo, wifi, answering, lock, missed call, green/red call; 100X ×11: muted, door lock, staircase, phone green/red, page 1–4, autosw, wifi) | `binary_sensor` | `bticino/led/<name>/state` | Sysfs names differ per model (`led_exc_call` vs `led_call_exp`, …); `mmc*` skipped |
 | GPIO (13 on 300X, 12 on 100X) | `binary_sensor` | `bticino/gpio/<pin>/state` | Pin list follows `DeviceVariant`; names carry the verified function |
@@ -82,8 +84,8 @@ Each fires with a timestamp and an `event_type`; the payload is JSON on the topi
 
 | Entity | Topic | event_types |
 |---|---|---|
-| Doorbell (event) | `bticino/event/doorbell` | `pressed` |
-| Landing doorbell (event) | `bticino/event/doorbell_floor` | `pressed` |
+| Entrance doorbell (event) | `bticino/event/doorbell` | `pressed` |
+| Floor doorbell (event) | `bticino/event/doorbell_floor` | `pressed` |
 | Call (event) | `bticino/event/call` | `incoming`, `connected`, `ended` (incoming carries `caller`) |
 
 These complement the `binary_sensor`/`sensor` versions: the binary sensors show
