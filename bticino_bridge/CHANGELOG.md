@@ -12,6 +12,8 @@
   (bridge binary version, static until redeploy).
 - `bticino/system/device` (model/IP/version, static until reboot) is now
   published once at boot instead of every 60s.
+- Camera brightness discovery follows configured TVCC IDs instead of
+  hardcoded camera 20.
 
 ### Home Assistant unique_ids renamed to model-neutral prefix (breaking)
 
