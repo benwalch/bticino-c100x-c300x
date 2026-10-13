@@ -98,10 +98,15 @@ func ReadSettingsXML(path string) (*SettingsXML, error) {
 	// Process each object
 	for _, obj := range raw.Objects {
 		// Determine type based on attributes
-		// For ringtones, id_ringtone is in <ist>, not in <obj>
-		if obj.Ist.IDRingtone != "" {
+		// For ringtones, id_ringtone is in <ist> on 300X but a plain <obj>
+		// attribute on 100X — accept both, ist first.
+		ringtoneAttr := obj.Ist.IDRingtone
+		if ringtoneAttr == "" {
+			ringtoneAttr = obj.IDRingtone
+		}
+		if ringtoneAttr != "" {
 			// It is a ringtone
-			ringtoneID, _ := strconv.Atoi(obj.Ist.IDRingtone)
+			ringtoneID, _ := strconv.Atoi(ringtoneAttr)
 			if obj.Ist.UII != "" {
 				uii, _ := strconv.Atoi(obj.Ist.UII)
 

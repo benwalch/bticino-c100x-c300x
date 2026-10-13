@@ -700,11 +700,24 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Sensor: Ringtone S0 (entrance panel) ---
 	b.discovery("sensor", "bticino_ringtone_s0", map[string]interface{}{
-		"name":           "Entrance Doorbell",
+		"name":           "Entrance Doorbell Ringtone",
 		"unique_id":      "bticino_intercom_ringtone_s0",
 		"object_id":      "bticino_ringtone_s0",
 		"state_topic":    dp + "/audio/ringtone/s0",
-		"value_template": "{{ value_json.value }}",
+		"value_template": "Ringtone #{{ value_json.value }}",
+		"icon":           "mdi:bell",
+		"device":         device,
+		"availability":   avail,
+	})
+	entityCount++
+
+	// --- Sensor: Ringtone Door (flat/floor door) ---
+	b.discovery("sensor", "bticino_ringtone_door", map[string]interface{}{
+		"name":           "Floor Doorbell Ringtone",
+		"unique_id":      "bticino_intercom_ringtone_door",
+		"object_id":      "bticino_ringtone_door",
+		"state_topic":    dp + "/audio/ringtone/door",
+		"value_template": "Ringtone #{{ value_json.value }}",
 		"icon":           "mdi:bell",
 		"device":         device,
 		"availability":   avail,
@@ -713,7 +726,7 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Sensor: Volume S0 ---
 	b.discovery("sensor", "bticino_volume_s0", map[string]interface{}{
-		"name":           "S0 Volume",
+		"name":           "Entrance Doorbell Volume",
 		"unique_id":      "bticino_intercom_volume_s0",
 		"object_id":      "bticino_volume_s0",
 		"state_topic":    dp + "/audio/volume/s0",
@@ -726,7 +739,7 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Sensor: Volume Door ---
 	b.discovery("sensor", "bticino_volume_door", map[string]interface{}{
-		"name":           "Door Volume",
+		"name":           "Floor Doorbell Volume",
 		"unique_id":      "bticino_intercom_volume_door",
 		"object_id":      "bticino_volume_door",
 		"state_topic":    dp + "/audio/volume/door",
@@ -976,9 +989,9 @@ var diagnosticEntities = map[string]bool{
 	"bticino_system_diag":  true,
 	"bticino_activity_log": true, "bticino_system_info": true, "bticino_sip_status": true,
 	"bticino_answering_status": true, "bticino_answering_memory": true,
-	"bticino_ringtone_s0": true, "bticino_volume_s0": true, "bticino_volume_door": true,
+	"bticino_ringtone_s0": true, "bticino_ringtone_door": true, "bticino_volume_s0": true, "bticino_volume_door": true,
 	"bticino_display_brightness": true,
-	"bticino_ip_address": true, "bticino_mac_address": true, "bticino_wifi_signal": true,
+	"bticino_ip_address":         true, "bticino_mac_address": true, "bticino_wifi_signal": true,
 }
 
 // entityCategory decides the HA entity_category from the object_id. The
