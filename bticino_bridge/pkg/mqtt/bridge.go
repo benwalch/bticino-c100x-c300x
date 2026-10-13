@@ -462,19 +462,6 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 7. Button: Open Door ---
-	b.discovery("button", "bticino_door_open", map[string]interface{}{
-		"name":          "Door Opener",
-		"unique_id":     "bticino_intercom_door_open",
-		"object_id":     "bticino_door_open",
-		"command_topic": dp + "/door/open",
-		"payload_press": "PRESS",
-		"icon":          "mdi:door-open",
-		"device":        device,
-		"availability":  avail,
-	})
-	entityCount++
-
 	// --- 8. Sensor: Temperature ---
 	b.discovery("sensor", "bticino_temperature", map[string]interface{}{
 		"name":                "Device Temperature",
@@ -1045,7 +1032,6 @@ func (b *MQTTBridge) subscribeToCommands() {
 	}
 
 	sub(dp+"/lock/set", b.handleDoorCommand)
-	sub(dp+"/door/open", b.handleDoorOpenButton)
 	if bticino.AnsweringMachineAvailable() {
 		sub(dp+"/voicemail/set", b.handleVoicemailCommand)
 	}
@@ -1088,12 +1074,6 @@ func (b *MQTTBridge) handleDoorCommand(client pahomqtt.Client, msg pahomqtt.Mess
 	if payload == "UNLOCK" || payload == "OPEN" {
 		b.executeDoorUnlock()
 	}
-}
-
-func (b *MQTTBridge) handleDoorOpenButton(client pahomqtt.Client, msg pahomqtt.Message) {
-	b.logger.Info("MQTT: Door open button pressed")
-	b.incCommands()
-	b.executeDoorUnlock()
 }
 
 func (b *MQTTBridge) executeDoorUnlock() {

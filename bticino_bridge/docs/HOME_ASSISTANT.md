@@ -29,7 +29,6 @@ device-config mirror; **Configuration** holds the optional restart buttons.
 | Doorbell sound | `switch` | `bticino/doorbellsound/state` | `bticino/doorbellsound/set` | Ringer mute/unmute |
 | Display | `switch` | `bticino/display/state` | `bticino/display/set` | Screen on/off |
 | Staircase light | `button` | — | `bticino/light/set` | Momentary (press+release) |
-| Door open | `button` | — | `bticino/door/open` | Momentary door pulse |
 | Mark all as read *(300X only)* | `button` | — | `bticino/messages/markallread/set` | Marks every message read |
 | Additional locks | `lock` | `bticino/lock/<id>/state` | `bticino/lock/<id>/set` | Only if configured (secondary gates) |
 
