@@ -339,7 +339,7 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	dp := b.dataPrefix()
 
 	device := map[string]interface{}{
-		"identifiers":  []string{"bticino_classe100x"},
+		"identifiers":  []string{"bticlasse100x"},
 		"name":         "BTicino Classe 100X",
 		"model":        bticino.DeviceModel,
 		"manufacturer": bticino.DeviceManufacturer,
@@ -693,58 +693,6 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// ==================== DEVICE CONFIG ENTITIES (Phase 4) ====================
 
-	// --- Sensor: Language ---
-	b.discovery("sensor", "bticino_language", map[string]interface{}{
-		"name":           "System Language",
-		"unique_id":      "bticino_intercom_language",
-		"object_id":      "bticino_language",
-		"state_topic":    dp + "/system/language",
-		"value_template": "{{ value_json.language }}",
-		"icon":           "mdi:translate",
-		"device":         device,
-		"availability":   avail,
-	})
-	entityCount++
-
-	// --- Sensor: Timezone ---
-	b.discovery("sensor", "bticino_timezone", map[string]interface{}{
-		"name":           "Time Zone",
-		"unique_id":      "bticino_intercom_timezone",
-		"object_id":      "bticino_timezone",
-		"state_topic":    dp + "/system/timezone",
-		"value_template": "{{ value_json.timezone }}",
-		"icon":           "mdi:clock-outline",
-		"device":         device,
-		"availability":   avail,
-	})
-	entityCount++
-
-	// --- Sensor: NTP Server ---
-	b.discovery("sensor", "bticino_ntp", map[string]interface{}{
-		"name":           "NTP Server",
-		"unique_id":      "bticino_intercom_ntp",
-		"object_id":      "bticino_ntp",
-		"state_topic":    dp + "/system/timezone",
-		"value_template": "{{ value_json.ntp_server }}",
-		"icon":           "mdi:server-network",
-		"device":         device,
-		"availability":   avail,
-	})
-	entityCount++
-
-	// --- Sensor: Datetime ---
-	b.discovery("sensor", "bticino_datetime", map[string]interface{}{
-		"name":           "System Date and Time",
-		"unique_id":      "bticino_intercom_datetime",
-		"object_id":      "bticino_datetime",
-		"state_topic":    dp + "/system/datetime",
-		"value_template": "{{ value_json.datetime }}",
-		"icon":           "mdi:calendar-clock",
-		"device":         device,
-		"availability":   avail,
-	})
-	entityCount++
-
 	// --- Sensor: Answering Machine Status ---
 	b.discovery("sensor", "bticino_answering_status", map[string]interface{}{
 		"name":           "Answering Machine Status",
@@ -823,18 +771,25 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- Sensor: Camera 20 Brightness ---
-	b.discovery("sensor", "bticino_camera_20_brightness", map[string]interface{}{
-		"name":           "Camera Brightness",
-		"unique_id":      "bticino_intercom_camera_20_brightness",
-		"object_id":      "bticino_camera_20_brightness",
-		"state_topic":    dp + "/camera/20/config",
-		"value_template": "{{ value_json.brightness }}",
-		"icon":           "mdi:cctv",
-		"device":         device,
-		"availability":   avail,
-	})
-	entityCount++
+	// --- Sensors: Camera Brightness (one per configured TVCC camera ID) ---
+	camIDs, err := deviceconfig.GetAllCameraIDs("/home/bticino/cfg/extra/47/tvcc_settings.ini")
+	if err != nil {
+		b.logger.WithError(err).Warn("Camera discovery: cannot read TVCC IDs, skipping camera entities")
+	}
+	for _, camID := range camIDs {
+		objID := fmt.Sprintf("bticino_camera_%s_brightness", camID)
+		b.discovery("sensor", objID, map[string]interface{}{
+			"name":           fmt.Sprintf("Camera %s Brightness", camID),
+			"unique_id":      fmt.Sprintf("bticino_intercom_camera_%s_brightness", camID),
+			"object_id":      objID,
+			"state_topic":    dp + "/camera/" + camID + "/config",
+			"value_template": "{{ value_json.brightness }}",
+			"icon":           "mdi:cctv",
+			"device":         device,
+			"availability":   avail,
+		})
+		entityCount++
+	}
 
 	// --- Sensor: Call state (INCOMING/CONNECTED/IDLE) ---
 	b.discovery("sensor", "bticino_call_state", map[string]interface{}{
@@ -1039,10 +994,9 @@ var diagnosticEntities = map[string]bool{
 	"bticino_temperature": true, "bticino_storage": true, "bticino_keypad": true,
 	"bticino_bus_event": true, "bticino_system_diag": true, "bticino_multicast": true,
 	"bticino_activity_log": true, "bticino_system_info": true, "bticino_sip_status": true,
-	"bticino_language": true, "bticino_timezone": true, "bticino_ntp": true,
-	"bticino_datetime": true, "bticino_answering_status": true, "bticino_answering_memory": true,
+	"bticino_answering_status": true, "bticino_answering_memory": true,
 	"bticino_ringtone_s0": true, "bticino_volume_s0": true, "bticino_volume_door": true,
-	"bticino_display_brightness": true, "bticino_camera_20_brightness": true,
+	"bticino_display_brightness": true,
 	"bticino_ip_address": true, "bticino_mac_address": true, "bticino_wifi_signal": true,
 }
 
@@ -1051,7 +1005,8 @@ var diagnosticEntities = map[string]bool{
 func entityCategory(objectID string) string {
 	if diagnosticEntities[objectID] ||
 		strings.HasPrefix(objectID, "bticino_led_") ||
-		strings.HasPrefix(objectID, "bticino_gpio_") {
+		strings.HasPrefix(objectID, "bticino_gpio_") ||
+		strings.HasPrefix(objectID, "bticino_camera_") {
 		return "diagnostic"
 	}
 	return ""
@@ -1768,10 +1723,8 @@ func (b *MQTTBridge) QuerySystemInfo() {
 		time.Sleep(bticino.CommandRetryDelay)
 	}
 
-	if len(info) == 0 {
-		b.logger.Warn("No system information obtained (WHO=13)")
-		return
-	}
+	// Static bridge info, alongside the firmware facts above.
+	info["bridge_version"] = version.GetVersion()
 
 	// Publish as JSON on the sensor
 	jsonData, err := json.Marshal(info)

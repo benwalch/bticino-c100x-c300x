@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Removed datetime MQTT topic; device info boot-only
+
+- Removed `sensor.bticino_datetime` (`bticino/system/datetime`: a 60s clock
+  feed nothing consumed). Delete the stale entity in HA manually.
+- Removed `sensor.bticino_language`, `sensor.bticino_timezone` and
+  `sensor.bticino_ntp` (static config mirror, republished every 60s).
+- `sensor.bticino_system_info` attributes now also carry `bridge_version`
+  (bridge binary version, static until redeploy).
+- `bticino/system/device` (model/IP/version, static until reboot) is now
+  published once at boot instead of every 60s.
+
 ### Home Assistant unique_ids renamed to model-neutral prefix (breaking)
 
 All HA discovery `unique_id`s changed from `bticino_c300x_*` to

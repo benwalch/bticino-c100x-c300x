@@ -60,17 +60,13 @@ device-config mirror; **Configuration** holds the optional restart buttons.
 
 | Entity | State topic |
 |---|---|
-| Language | `bticino/system/language` |
-| Time zone | `bticino/system/timezone` |
-| NTP server | `bticino/system/timezone` *(currently shares the timezone topic)* |
-| Date/time | `bticino/system/datetime` |
 | Answering machine status | `bticino/answering/state` |
 | Answering machine memory | `bticino/answering/state` |
 | S0 ringtone (entrance panel) | `bticino/audio/ringtone/s0` |
 | S0 volume | `bticino/audio/volume/s0` |
 | Door volume | `bticino/audio/volume/door` |
 | Display brightness | `bticino/display/brightness` |
-| Camera 20 brightness | `bticino/camera/20/config` |
+| Camera brightness (<id> per TVCC config) | `bticino/camera/<id>/config` |
 
 ## Binary sensors
 

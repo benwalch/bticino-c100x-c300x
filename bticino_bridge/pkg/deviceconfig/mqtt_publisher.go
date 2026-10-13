@@ -22,6 +22,8 @@ type DeviceMQTTPublisher struct {
 	topicPrefix string
 	ticker      *time.Ticker
 	stopCh      chan bool
+	// staticInfoPublished makes system/device publish-once-at-boot: static until reboot.
+	staticInfoPublished bool
 }
 
 // NewDeviceMQTTPublisher creates a new device config publisher
@@ -105,33 +107,17 @@ func (p *DeviceMQTTPublisher) publishAll() {
 func (p *DeviceMQTTPublisher) publishSystemConfig(cfg *Config) {
 	prefix := p.topicPrefix
 
-	// Language
-	p.publishJSON(prefix+"/system/language", map[string]interface{}{
-		"language":  cfg.Language,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}, true)
-
-	// Timezone
-	p.publishJSON(prefix+"/system/timezone", map[string]interface{}{
-		"timezone":   cfg.Timezone,
-		"ntp_server": cfg.NTPServer,
-		"ntp_algo":   cfg.NTPAlgo,
-		"timestamp":  time.Now().Format(time.RFC3339),
-	}, true)
-
-	// Datetime
-	p.publishJSON(prefix+"/system/datetime", map[string]interface{}{
-		"datetime":  cfg.DateTime.Format(time.RFC3339),
-		"timestamp": time.Now().Format(time.RFC3339),
-	}, true)
-
-	// Device info
-	p.publishJSON(prefix+"/system/device", map[string]interface{}{
-		"model":     cfg.DeviceInfo.Model,
-		"ip":        cfg.DeviceInfo.IP,
-		"version":   cfg.DeviceInfo.Version,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}, true)
+	// Device info (static until reboot): publish once, on the first
+	// connected tick after boot.
+	if !p.staticInfoPublished {
+		p.publishJSON(prefix+"/system/device", map[string]interface{}{
+			"model":     cfg.DeviceInfo.Model,
+			"ip":        cfg.DeviceInfo.IP,
+			"version":   cfg.DeviceInfo.Version,
+			"timestamp": time.Now().Format(time.RFC3339),
+		}, true)
+		p.staticInfoPublished = true
+	}
 }
 
 // publishAnsweringMachine publishes the answering machine state
@@ -253,9 +239,6 @@ func (p *DeviceMQTTPublisher) publishJSON(topic string, data map[string]interfac
 // GetAllTopics returns all published topics
 func (p *DeviceMQTTPublisher) GetAllTopics() []string {
 	return []string{
-		p.topicPrefix + "/system/language",
-		p.topicPrefix + "/system/timezone",
-		p.topicPrefix + "/system/datetime",
 		p.topicPrefix + "/system/device",
 		p.topicPrefix + "/answering/state",
 		p.topicPrefix + "/audio/ringtone/s0",
@@ -280,15 +263,12 @@ func (p *DeviceMQTTPublisher) GetAllTopics() []string {
 // VerifyTopicos verifies that topics are being published (for testing)
 func VerifyTopicos() {
 	fmt.Println("Device Config MQTT Topics:")
-	fmt.Println("- bticino/system/language")
-	fmt.Println("- bticino/system/timezone")
-	fmt.Println("- bticino/system/datetime")
 	fmt.Println("- bticino/system/device")
 	fmt.Println("- bticino/answering/state")
 	fmt.Println("- bticino/audio/ringtone/s0")
 	fmt.Println("- bticino/audio/volume/s0")
 	fmt.Println("- bticino/display/brightness")
-	fmt.Println("- bticino/camera/20/config")
+	fmt.Println("- bticino/camera/<id>/config")
 }
 
 // Ensure we implement the interface
