@@ -184,7 +184,7 @@ func (w *FileWatcher) publishAudioChange(cfg *Config) {
 
 func (w *FileWatcher) publishDisplayChange(cfg *Config) {
 	prefix := w.topicPrefix + "/display"
-	w.publisher.Publish(prefix+"/brightness", fmt.Sprintf(`{"value":%d,"change":"file_watcher"}`, cfg.Display.Brightness), false)
+	w.publisher.Publish(prefix+"/settings", fmt.Sprintf(`{"brightness":%d,"clean_time":%d}`, cfg.Display.Brightness, cfg.Display.CleanTime), false)
 }
 
 // GetWatchedFiles returns the files being watched

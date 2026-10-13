@@ -755,8 +755,8 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 		"name":           "Display Brightness",
 		"unique_id":      "bticino_intercom_display_brightness",
 		"object_id":      "bticino_display_brightness",
-		"state_topic":    dp + "/display/brightness",
-		"value_template": "{{ value_json.value }}",
+		"state_topic":    dp + "/display/settings",
+		"value_template": "{{ value_json.brightness }}",
 		"icon":           "mdi:brightness-6",
 		"device":         device,
 		"availability":   avail,
@@ -774,9 +774,22 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 			"name":           fmt.Sprintf("Camera %s Brightness", camID),
 			"unique_id":      fmt.Sprintf("bticino_intercom_camera_%s_brightness", camID),
 			"object_id":      objID,
-			"state_topic":    dp + "/camera/" + camID + "/config",
+			"state_topic":    dp + "/camera/" + camID + "/settings",
 			"value_template": "{{ value_json.brightness }}",
 			"icon":           "mdi:cctv",
+			"device":         device,
+			"availability":   avail,
+		})
+		entityCount++
+
+		objID = fmt.Sprintf("bticino_camera_%s_contrast", camID)
+		b.discovery("sensor", objID, map[string]interface{}{
+			"name":           fmt.Sprintf("Camera %s Contrast", camID),
+			"unique_id":      fmt.Sprintf("bticino_intercom_camera_%s_contrast", camID),
+			"object_id":      objID,
+			"state_topic":    dp + "/camera/" + camID + "/settings",
+			"value_template": "{{ value_json.contrast }}",
+			"icon":           "mdi:contrast",
 			"device":         device,
 			"availability":   avail,
 		})

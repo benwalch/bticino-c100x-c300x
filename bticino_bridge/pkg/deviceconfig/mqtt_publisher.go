@@ -4,6 +4,7 @@ package deviceconfig
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -197,26 +198,27 @@ func (p *DeviceMQTTPublisher) publishVolumes(cfg *Config) {
 	}, true)
 }
 
-// publishDisplay publishes the display configuration
+// publishDisplay publishes the display configuration as one facet topic
+// (brightness + clean time share one lifecycle: a single settings.xml read).
 func (p *DeviceMQTTPublisher) publishDisplay(cfg *Config) {
 	prefix := p.topicPrefix + "/display"
 
-	p.publishJSON(prefix+"/brightness", map[string]interface{}{
-		"value":     cfg.Display.Brightness,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}, true)
-	p.publishJSON(prefix+"/clean_time", map[string]interface{}{
-		"value":     cfg.Display.CleanTime,
-		"timestamp": time.Now().Format(time.RFC3339),
+	p.publishJSON(prefix+"/settings", map[string]interface{}{
+		"brightness": cfg.Display.Brightness,
+		"clean_time": cfg.Display.CleanTime,
+		"timestamp":  time.Now().Format(time.RFC3339),
 	}, true)
 }
 
-// publishCameras publishes the camera configuration
+// publishCameras publishes the camera configuration. Native map keys look
+// like "TVCC 20" (TVCC = Italian CCTV); topics use the bare numeric ID so
+// publisher and discovery agree.
 func (p *DeviceMQTTPublisher) publishCameras(cfg *Config) {
 	prefix := p.topicPrefix + "/camera"
 
 	for id, camera := range cfg.Cameras {
-		p.publishJSON(prefix+"/"+id+"/config", map[string]interface{}{
+		id = strings.TrimPrefix(id, "TVCC ")
+		p.publishJSON(prefix+"/"+id+"/settings", map[string]interface{}{
 			"brightness": camera.Brightness,
 			"contrast":   camera.Contrast,
 			"saturation": camera.Saturation,
@@ -254,8 +256,7 @@ func (p *DeviceMQTTPublisher) GetAllTopics() []string {
 		p.topicPrefix + "/audio/volume/intercom",
 		p.topicPrefix + "/audio/volume/door",
 		p.topicPrefix + "/audio/volume/sip",
-		p.topicPrefix + "/display/brightness",
-		p.topicPrefix + "/display/clean_time",
+		p.topicPrefix + "/display/settings",
 		// Dynamic cameras
 	}
 }
@@ -267,7 +268,7 @@ func VerifyTopicos() {
 	fmt.Println("- bticino/answering/state")
 	fmt.Println("- bticino/audio/ringtone/s0")
 	fmt.Println("- bticino/audio/volume/s0")
-	fmt.Println("- bticino/display/brightness")
+	fmt.Println("- bticino/display/settings")
 	fmt.Println("- bticino/camera/<id>/config")
 }
 
