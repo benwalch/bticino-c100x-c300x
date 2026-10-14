@@ -183,6 +183,7 @@ func (r *EnhancedRTSPServer) Start() error {
 
 	r.listener = listener
 	r.running = true
+	r.stopCh = make(chan struct{})
 
 	// Start the RTP relay listeners (receive from GStreamer, forward to RTSP clients)
 	if err := r.rtpRelay.Start(); err != nil {
@@ -680,6 +681,19 @@ func (r *EnhancedRTSPServer) unregisterRTPConsumer(sessionID string) {
 	r.rtpRelay.Audio.RemoveConsumer(sessionID + "-audio")
 }
 
+func (r *EnhancedRTSPServer) stopMediaWhenIdle(reason string) {
+	go func() {
+		if r.gstPipeline != nil && r.gstPipeline.IsRunning() {
+			r.gstPipeline.Stop()
+			r.eventBus.PublishWithSource("video.streams.stopped", map[string]interface{}{
+				"reason": reason,
+			}, "gstreamer")
+		}
+		time.Sleep(5 * time.Second)
+		r.releaseSelfCallIfIdle(reason)
+	}()
+}
+
 // cleanupConnectionSessions removes all sessions that used a specific TCP connection.
 // Called when the TCP connection is closed (e.g. client disconnects without TEARDOWN).
 func (r *EnhancedRTSPServer) cleanupConnectionSessions(conn net.Conn) {
@@ -710,16 +724,7 @@ func (r *EnhancedRTSPServer) cleanupConnectionSessions(conn net.Conn) {
 	// If no more clients, stop pipelines and end SIP call
 	if len(toRemove) > 0 && remaining == 0 && callWasActive {
 		r.logger.Info("All RTSP clients disconnected, stopping GStreamer and SIP")
-		go func() {
-			if r.gstPipeline != nil && r.gstPipeline.IsRunning() {
-				r.gstPipeline.Stop()
-				r.eventBus.PublishWithSource("video.streams.stopped", map[string]interface{}{
-					"reason": "connection_closed",
-				}, "gstreamer")
-			}
-			time.Sleep(5 * time.Second)
-			r.releaseSelfCallIfIdle("connection_closed")
-		}()
+		r.stopMediaWhenIdle("connection_closed")
 	}
 }
 
@@ -775,18 +780,7 @@ func (r *EnhancedRTSPServer) handleTeardown(request *RTSPRequest) string {
 	// End the SIP call and GStreamer pipelines if there are no more clients
 	if r.activeClients == 0 && r.callActive {
 		r.logger.Info("No more RTSP clients, stopping GStreamer pipelines and ending SIP call")
-		go func() {
-			// Stop GStreamer pipelines immediately
-			if r.gstPipeline != nil && r.gstPipeline.IsRunning() {
-				r.gstPipeline.Stop()
-				r.eventBus.PublishWithSource("video.streams.stopped", map[string]interface{}{
-					"reason": "no_rtsp_clients",
-				}, "gstreamer")
-			}
-
-			time.Sleep(5 * time.Second)
-			r.releaseSelfCallIfIdle("no_rtsp_clients")
-		}()
+		r.stopMediaWhenIdle("no_rtsp_clients")
 	}
 
 	return r.buildResponse(200, "OK", request.CSeq, map[string]string{})
@@ -938,6 +932,7 @@ func (r *EnhancedRTSPServer) sessionCleanup() {
 			return
 		case <-ticker.C:
 			r.mutex.Lock()
+			var expired []string
 			now := time.Now()
 			for sessionID, session := range r.sessions {
 				if now.Sub(session.LastActivity) > 10*time.Minute {
@@ -946,10 +941,20 @@ func (r *EnhancedRTSPServer) sessionCleanup() {
 					if r.activeClients < 0 {
 						r.activeClients = 0
 					}
-					r.logger.Infof("Cleaned up inactive RTSP session: %s", sessionID)
+					expired = append(expired, sessionID)
 				}
 			}
+			remaining := r.activeClients
+			callWasActive := r.callActive
 			r.mutex.Unlock()
+			for _, id := range expired {
+				r.unregisterRTPConsumer(id)
+				r.logger.Infof("Cleaned up inactive RTSP session: %s", id)
+			}
+			if len(expired) > 0 && remaining == 0 && callWasActive {
+				r.logger.Info("All RTSP clients expired, stopping GStreamer and SIP")
+				r.stopMediaWhenIdle("sessions_expired")
+			}
 		}
 	}
 }

@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Relay ingress bound to loopback (`127.0.0.1:10002/10000`); LAN RTP injection no longer possible, local tap/GStreamer/`*7*300` unaffected.
+- RTSP idle-session reaper now releases relay consumers, GStreamer and self-call like the other teardown paths; server restart recreates its stop channel.
 
 ### MQTT topics v2 (breaking)
 
