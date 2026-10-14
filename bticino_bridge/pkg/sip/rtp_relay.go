@@ -83,7 +83,7 @@ func (r *RTPRelay) Start() error {
 		return fmt.Errorf("RTP relay %s already running", r.name)
 	}
 
-	addr := &net.UDPAddr{IP: net.IPv4(0, 0, 0, 0), Port: r.port}
+	addr := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: r.port}
 	conn, err := net.ListenUDP("udp4", addr)
 	if err != nil {
 		atomic.StoreInt32(&r.running, 0)
@@ -107,7 +107,7 @@ func (r *RTPRelay) Start() error {
 
 	go r.readLoop()
 
-	r.logger.Infof("RTP relay '%s' started on UDP :%d", r.name, r.port)
+	r.logger.Infof("RTP relay '%s' started on UDP 127.0.0.1:%d", r.name, r.port)
 	return nil
 }
 

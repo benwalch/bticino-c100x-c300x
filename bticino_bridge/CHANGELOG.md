@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Relay ingress bound to loopback (`127.0.0.1:10002/10000`); LAN RTP injection no longer possible, local tap/GStreamer/`*7*300` unaffected.
+
 ### MQTT topics v2 (breaking)
 
 All data topics renamed to `bticino/<domain>/<object>` (bare noun = state;
