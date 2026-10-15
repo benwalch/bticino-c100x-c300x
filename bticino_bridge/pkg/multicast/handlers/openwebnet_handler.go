@@ -40,7 +40,11 @@ var (
 	// Doorbell press: *8*1#1#4# (based on slyoldfox observations)
 	doorbellPattern = regexp.MustCompile(`\*8\*1#1#4#`)
 
-	// Floor/landing doorbell (landing doorbell): *7*59#...
+	// Floor/landing doorbell: *7*59#... EXCEPT *7*59#8#0#0, which is native
+	// video-status chatter during entrance rings (verified on captures:
+	// 8#0#0 only ever beside doorbell activity, 14#0#0 only on real
+	// floor presses). Go regexp has no lookahead, so the 8# exclusion
+	// lives in parseOpenWebNetCommand below.
 	floorRingPattern = regexp.MustCompile(`\*7\*59#`)
 
 	// Video stream events: *7*300#127#0#0#1#5002#1*##
@@ -172,8 +176,9 @@ func (h *OpenWebNetHandler) parseOpenWebNetCommand(command string) *OpenWebNetEv
 		return event
 	}
 
-	// Check for floor/landing doorbell (before the generic *7*... pattern)
-	if floorRingPattern.MatchString(command) {
+	// Check for floor/landing doorbell (before the generic *7*... pattern).
+	// *7*59#8... is excluded: native video-status chatter, not a button.
+	if floorRingPattern.MatchString(command) && !strings.HasPrefix(command, "*7*59#8") {
 		event.EventType = "doorbell.floor"
 		event.Who = "7"
 		event.What = "59"
