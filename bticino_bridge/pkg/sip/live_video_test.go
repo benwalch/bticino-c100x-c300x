@@ -113,6 +113,25 @@ func TestStopWithoutStartIsNoop(t *testing.T) {
 	}
 }
 
+func TestStartTapOnlySkipsMarker(t *testing.T) {
+	tap := &mockTap{}
+	mk := &mockMarker{}
+	l := NewLiveVideoOnCall(tap, mk, logrus.New())
+	l.StartTapOnly("own-session")
+	if !l.IsActive() {
+		t.Fatal("expected IsActive()=true after StartTapOnly")
+	}
+	if starts, _ := tap.counts(); starts != 1 {
+		t.Fatalf("expected 1 tap start, got %d", starts)
+	}
+	mk.mu.Lock()
+	n := len(mk.states)
+	mk.mu.Unlock()
+	if n != 0 {
+		t.Fatalf("marker must stay untouched, got %d calls", n)
+	}
+}
+
 func TestTapErrorIsNonFatal(t *testing.T) {
 	// A failure opening the tap (e.g. no permission) degrades without video, but the
 	// call stays marked as active (to inhibit the RTSP self-INVITE).

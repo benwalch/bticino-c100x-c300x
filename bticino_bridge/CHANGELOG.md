@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Camera session switch (`switch.bticino_video_session`, opt-in via
+  `streaming.camera_session`): bridge-initiated headless video over a
+  loopback self-call the native unit answers (display stays off). Manual
+  starts hold for `camera_session_duration`, RTSP-driven ones follow viewer
+  presence (1h leak backstop), then auto-hang-up. Zero bus commands.
+  RTSP demand prefers it over the legacy self-INVITE path when enabled;
+  otherwise legacy behavior is unchanged. The session end publishes a fresh
+  still to the doorbell camera entity.
 - Relay ingress bound to loopback (`127.0.0.1:10002/10000`); LAN RTP injection no longer possible, local tap/GStreamer/`*7*300` unaffected.
 - RTSP idle-session reaper now releases relay consumers, GStreamer and self-call like the other teardown paths; server restart recreates its stop channel.
 

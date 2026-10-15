@@ -499,6 +499,12 @@ func main() {
 		// but never fires commands toward the native firmware.
 		rtspServer.SetVideoActivation(cfg.Streaming.VideoOnDemand)
 
+		// Headless camera sessions take precedence over the legacy path
+		// when enabled (see flags). Presence-driven stop is primary; the
+		// hour hold only backstops leaked sessions (a 60s cap would blip
+		// persistent viewers every minute).
+		rtspServer.SetCameraSession(cfg.Streaming.CameraSession, time.Hour)
+
 		// Live video during an incoming call to our unit, via a PASSIVE
 		// mirror (AF_PACKET tap of the native video leg on lo:<native-port>
 		// → relay 10002; 5007 high-res on c300x, 5002 low-res on c100x, see
@@ -525,13 +531,18 @@ func main() {
 				liveVideo.Start("doorbell.pressed")
 			})
 			eventBus.Subscribe("call.hangup", func(_ *events.Event) {
+				// Our headless session ends via sip.call.ended; the bus
+				// heuristic also matches its setup frames - ignore those.
+				if sipClient != nil && sipClient.CameraSessionActive() {
+					return
+				}
 				liveVideo.Stop()
 			})
 			eventBus.Subscribe("sip.call.incoming", func(_ *events.Event) {
 				liveVideo.Start("sip.call.incoming")
 			})
 			eventBus.Subscribe("sip.call.connected", func(_ *events.Event) {
-				liveVideo.Start("sip.call.connected")
+				liveVideo.StartTapOnly("sip.call.connected")
 			})
 			eventBus.Subscribe("sip.call.ended", func(_ *events.Event) {
 				liveVideo.Stop()
@@ -626,6 +637,21 @@ func main() {
 			} else {
 				logger.Info("✅ Video: Stream manager started successfully")
 			}
+		}
+
+		// Camera session switch (bridge-initiated headless video, off by default).
+		if mqttBridge != nil && sipStarted && sipClient != nil && cfg.Streaming.CameraSession {
+			mqttBridge.SetVideoSession(func(d time.Duration) error {
+				return sipClient.StartCameraSession(d, "mqtt")
+			}, sipClient.StopCameraSession)
+			logger.Info("MQTT: camera session switch wired (native answers loopback self-call)")
+		}
+
+		// End-of-session stills come from the live relay flow. 8s matches the
+		// proven cooperative timeout: the decoder must launch and sync to
+		// an IDR before frames are clean.
+		if sipStarted && sipClient != nil && rtspServer != nil {
+			sipClient.SetFrameGrabber(func() []byte { return rtspServer.SnapshotRelayFrame(8 * time.Second) })
 		}
 	} else {
 		logger.Info("Video/SIP system disabled in configuration")

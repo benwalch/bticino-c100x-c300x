@@ -54,10 +54,21 @@ func NewLiveVideoOnCall(tap VideoTap, marker CallActiveMarker, logger *logrus.Lo
 	return &LiveVideoOnCall{tap: tap, marker: marker, logger: logger}
 }
 
-// Start arms the mirror. Idempotent: if already active, it does nothing.
+// Start arms the mirror and marks a native call. Idempotent: if already
+// active, it does nothing.
 // A tap failure (e.g. no permission for AF_PACKET) degrades without video but
 // keeps the call marked as active (inhibits the RTSP self-INVITE).
 func (l *LiveVideoOnCall) Start(reason string) {
+	l.start(reason, true)
+}
+
+// StartTapOnly arms the mirror without marking a native call, for our own
+// headless sessions: the reaper must keep seeing them as ours to stop them.
+func (l *LiveVideoOnCall) StartTapOnly(reason string) {
+	l.start(reason, false)
+}
+
+func (l *LiveVideoOnCall) start(reason string, mark bool) {
 	l.mu.Lock()
 	if l.active {
 		l.mu.Unlock()
@@ -72,7 +83,7 @@ func (l *LiveVideoOnCall) Start(reason string) {
 	}
 	l.mu.Unlock()
 
-	if l.marker != nil {
+	if mark && l.marker != nil {
 		l.marker.SetCallActive(true)
 	}
 	l.logger.Infof("live-video: arming passive mirror (reason=%s)", reason)

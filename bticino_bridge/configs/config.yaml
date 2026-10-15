@@ -113,6 +113,11 @@ streaming:
   # bticino.DeviceVariant in the code — rebuild after changing it). Sends
   # no commands to the bus; independent of video_on_demand.
   live_on_call: true
+  # camera_session: bridge-initiated headless video (loopback self-INVITE
+  # answered natively, display stays off) as HA switch
+  # bticino/video/session/set. Off by default; duration in seconds.
+  camera_session: false
+  camera_session_duration: 30
 
 # ==================== NETWORK ====================
 network:

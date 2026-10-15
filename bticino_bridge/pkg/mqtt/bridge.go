@@ -65,6 +65,11 @@ type MQTTBridge struct {
 	cameraCapture func() ([]byte, error)
 	cameraMu      sync.Mutex // serializes captures (avoids doorbell+call overlap)
 
+	// videoSessionStart/Stop drive the bridge-initiated camera session
+	// switch (native answers a loopback self-call, display stays off).
+	videoSessionStart func(time.Duration) error
+	videoSessionStop  func()
+
 	// systemInfo caches the last published WHO=13 facts for refreshNetworkInfo.
 	systemInfo map[string]string
 
@@ -75,6 +80,15 @@ type MQTTBridge struct {
 	// Separate baselines per output: a new frame must still reach both.
 	lastBusEventRaw string
 	lastActivityRaw string
+}
+
+// SetVideoSession wires the camera session switch. Must be called BEFORE
+// Start() so the entity is included in discovery.
+func (b *MQTTBridge) SetVideoSession(start func(time.Duration) error, stop func()) {
+	b.mu.Lock()
+	b.videoSessionStart = start
+	b.videoSessionStop = stop
+	b.mu.Unlock()
 }
 
 // SetCameraCapture enables the doorbell camera entity and registers the
@@ -438,6 +452,26 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 			"state_on":      "ON",
 			"state_off":     "OFF",
 			"icon":          "mdi:tablet",
+			"device":        device,
+			"availability":  avail,
+		})
+		entityCount++
+	}
+
+	// --- Switch: Camera Session (bridge-initiated headless video) ---
+	if b.config.Streaming.CameraSession {
+		b.discovery("switch", "bticino_video_session", map[string]interface{}{
+			"name":          "Camera Session",
+			"unique_id":     "bticino_intercom_video_session",
+			"object_id":     "bticino_video_session",
+			"command_topic": dp + "/video/session/set",
+			"state_topic":   dp + "/video/session",
+			"payload_on":    "ON",
+			"payload_off":   "OFF",
+			"state_on":      "ON",
+			"state_off":     "OFF",
+			"optimistic":    false,
+			"icon":          "mdi:video",
 			"device":        device,
 			"availability":  avail,
 		})
@@ -1016,7 +1050,6 @@ var diagnosticEntities = map[string]bool{
 	"bticino_answering":   true,
 	"bticino_ringtone_s0": true, "bticino_ringtone_floor": true, "bticino_ringtone_s1": true, "bticino_volume_s0": true, "bticino_volume_s1": true, "bticino_volume_floor": true,
 	"bticino_display_brightness":     true,
-	"bticino_camera_doorbell":        true,
 	"bticino_system_network_address": true, "bticino_system_network_mac": true, "bticino_network_wifi": true,
 }
 
@@ -1082,6 +1115,9 @@ func (b *MQTTBridge) subscribeToCommands() {
 	}
 	sub(dp+"/light/staircase/set", b.handleLightCommand)
 	sub(dp+"/command/send", b.handleRawCommand)
+	if b.config.Streaming.CameraSession {
+		sub(dp+"/video/session/set", b.handleVideoSessionCommand)
+	}
 	if bticino.AnsweringMachineAvailable() {
 		sub(dp+"/messages/mark_read/set", b.handleMarkAllReadCommand)
 	}
@@ -1260,6 +1296,30 @@ func (b *MQTTBridge) handleLightCommand(client pahomqtt.Client, msg pahomqtt.Mes
 			b.logger.WithError(err).Error("Failed staircase light release")
 		}
 	}()
+}
+
+func (b *MQTTBridge) handleVideoSessionCommand(client pahomqtt.Client, msg pahomqtt.Message) {
+	payload := string(msg.Payload())
+	b.logger.WithField("payload", payload).Info("MQTT: Camera session command")
+	b.incCommands()
+
+	b.mu.RLock()
+	start := b.videoSessionStart
+	stop := b.videoSessionStop
+	b.mu.RUnlock()
+	if start == nil || stop == nil {
+		b.logger.Warn("Camera session not wired, ignoring command")
+		return
+	}
+	switch payload {
+	case "ON", "1":
+		dur := time.Duration(b.config.Streaming.CameraSessionDuration) * time.Second
+		if err := start(dur); err != nil {
+			b.logger.WithError(err).Warn("Camera session start rejected")
+		}
+	case "OFF", "0":
+		stop()
+	}
 }
 
 // publishWiFiSignal reads the WiFi signal strength via connmanctl and publishes
@@ -1522,6 +1582,24 @@ func (b *MQTTBridge) setupEventSubscriptions() {
 		b.incEvents()
 	})
 
+	// Camera session state (bridge-initiated headless video)
+	b.eventBus.Subscribe("video.session.started", func(event *events.Event) {
+		b.publish(dp+"/video/session", "ON", true)
+		b.incEvents()
+	})
+	b.eventBus.Subscribe("video.session.stopped", func(event *events.Event) {
+		b.publish(dp+"/video/session", "OFF", true)
+		b.incEvents()
+	})
+	b.eventBus.Subscribe("video.session.frame", func(event *events.Event) {
+		if data, ok := event.Data.(map[string]interface{}); ok {
+			if jpeg, ok := data["jpeg"].([]byte); ok && len(jpeg) > 0 {
+				b.publish(dp+"/camera/doorbell/image", base64.StdEncoding.EncodeToString(jpeg), true)
+			}
+		}
+		b.incEvents()
+	})
+
 	// Floor/landing doorbell (landing doorbell), distinct from the entrance panel
 	b.eventBus.Subscribe("doorbell.floor.pressed", func(event *events.Event) {
 		b.publish(dp+"/doorbell/floor", "ON", false)
@@ -1607,6 +1685,9 @@ func (b *MQTTBridge) publishAllStates() {
 	// immediately instead of "unknown" until the first event)
 	b.publish(dp+"/call", "IDLE", true)
 	b.publish(dp+"/doorbell/floor", "OFF", true)
+	if b.config.Streaming.CameraSession {
+		b.publish(dp+"/video/session", "OFF", true)
+	}
 
 	// WiFi signal: initial publish + start the periodic monitor once
 	go b.publishWiFiSignal()

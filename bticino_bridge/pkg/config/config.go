@@ -184,6 +184,11 @@ type StreamingConfig struct {
 	// c100x, selected via bticino.DeviceVariant). ZERO commands to the bus: even safer than the cooperative
 	// snapshot. Independent of VideoOnDemand.
 	LiveOnCall bool `yaml:"live_on_call"`
+	// CameraSession exposes a bridge-initiated headless video session
+	// (loopback self-INVITE answered natively, display stays off) as an
+	// HA switch. Off by default; duration in seconds.
+	CameraSession         bool `yaml:"camera_session"`
+	CameraSessionDuration int  `yaml:"camera_session_duration"`
 }
 
 // Supported video backends
@@ -196,14 +201,16 @@ const (
 // GetStreamingConfig returns default streaming config
 func GetStreamingConfig() StreamingConfig {
 	return StreamingConfig{
-		Enabled:              true,
-		RTSPPort:             6554,
-		WebRTCEnabled:        false,
-		WebRCTPPort:          8889,
-		MaxDuration:          60,
-		AutoStopOnLastClient: true,
-		VideoBackend:         VideoBackendAVMedia,
-		LiveOnCall:           true,
+		Enabled:               true,
+		RTSPPort:              6554,
+		WebRTCEnabled:         false,
+		WebRCTPPort:           8889,
+		MaxDuration:           60,
+		AutoStopOnLastClient:  true,
+		VideoBackend:          VideoBackendAVMedia,
+		LiveOnCall:            true,
+		CameraSession:         false,
+		CameraSessionDuration: 30,
 	}
 }
 

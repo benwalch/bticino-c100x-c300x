@@ -42,6 +42,74 @@ type captureResult struct {
 	jpeg     []byte // best frame (the last complete one), nil if none
 }
 
+// jpegDecoder is a running H264→JPEG pipeline on one UDP port.
+type jpegDecoder struct {
+	cmd    *exec.Cmd
+	tmp    string
+	stderr *bytes.Buffer
+}
+
+// startJPEGDecoder binds the pipeline port and starts decoding into tmp.
+func startJPEGDecoder(port int, logger *logrus.Logger) (*jpegDecoder, error) {
+	tmp := filepath.Join(os.TempDir(), fmt.Sprintf("bticino_cap_%d.jpg.partial", port))
+	_ = os.Remove(tmp)
+
+	cmd := exec.Command("gst-launch-1.0",
+		"udpsrc", fmt.Sprintf("port=%d", port),
+		"caps=application/x-rtp,media=(string)video,clock-rate=(int)90000,encoding-name=(string)H264,payload=(int)96",
+		"!", "rtph264depay",
+		"!", "h264parse",
+		"!", "imxvpudec",
+		"!", "jpegenc", "quality=95",
+		"!", "filesink", fmt.Sprintf("location=%s", tmp), "buffer-mode=2",
+	)
+	stderrBuf := &bytes.Buffer{}
+	cmd.Stderr = stderrBuf
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to launch capture pipeline: %w", err)
+	}
+	// Margin for udpsrc to bind the port
+	time.Sleep(300 * time.Millisecond)
+	return &jpegDecoder{cmd: cmd, tmp: tmp, stderr: stderrBuf}, nil
+}
+
+func (d *jpegDecoder) stop() {
+	_ = d.cmd.Process.Signal(syscall.SIGTERM)
+	done := make(chan struct{})
+	go func() { _ = d.cmd.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		_ = d.cmd.Process.Kill()
+		<-done
+	}
+	_ = os.Remove(d.tmp)
+}
+
+// pollJPEGFile collects complete JPEG frames until warmup or timeout.
+func pollJPEGFile(tmp string, warmupFrames int, timeout time.Duration, logger *logrus.Logger) (frames int, last []byte) {
+	if warmupFrames <= 0 {
+		warmupFrames = 12
+	}
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		time.Sleep(150 * time.Millisecond)
+		data, err := os.ReadFile(tmp)
+		if err != nil || len(data) < 4 {
+			continue
+		}
+		n, complete := scanJPEGFrames(data)
+		frames = n
+		if complete != nil {
+			last = complete
+		}
+		if n >= warmupFrames && last != nil {
+			break // the decoder has already passed a clean IDR
+		}
+	}
+	return frames, last
+}
+
 // captureCooperative decodes a frame by asking bt_av_media to duplicate
 // its video RTP to the given UDP port (a single *7*300, no retries and no
 // self-INVITE). warmupFrames is how many frames to accumulate before keeping
@@ -64,35 +132,11 @@ func captureCooperative(own *openwebnet.Client, port, warmupFrames int, timeout 
 
 	// 1) Start the decoding pipeline FIRST (udpsrc must have the
 	//    port bound before bt_av_media starts sending).
-	cmd := exec.Command("gst-launch-1.0",
-		"udpsrc", fmt.Sprintf("port=%d", port),
-		"caps=application/x-rtp,media=(string)video,clock-rate=(int)90000,encoding-name=(string)H264,payload=(int)96",
-		"!", "rtph264depay",
-		"!", "h264parse",
-		"!", "imxvpudec",
-		"!", "jpegenc", "quality=95",
-		"!", "filesink", fmt.Sprintf("location=%s", tmp), "buffer-mode=2",
-	)
-	stderrBuf := &bytes.Buffer{}
-	cmd.Stderr = stderrBuf
-	if err := cmd.Start(); err != nil {
-		return res, fmt.Errorf("failed to launch capture pipeline: %w", err)
+	dec, err := startJPEGDecoder(port, logger)
+	if err != nil {
+		return res, err
 	}
-	defer func() {
-		_ = cmd.Process.Signal(syscall.SIGTERM)
-		done := make(chan struct{})
-		go func() { _ = cmd.Wait(); close(done) }()
-		select {
-		case <-done:
-		case <-time.After(2 * time.Second):
-			_ = cmd.Process.Kill()
-			<-done
-		}
-		_ = os.Remove(tmp)
-	}()
-
-	// Margin for udpsrc to bind the port
-	time.Sleep(300 * time.Millisecond)
+	defer dec.stop()
 
 	// 2) Send A SINGLE *7*300 (ActivateVideoStream no longer retries).
 	// Resolution follows the unit: high-res (type 0) on 300X, low-res
@@ -112,27 +156,10 @@ func captureCooperative(own *openwebnet.Client, port, warmupFrames int, timeout 
 	}
 
 	// 3) Poll the file looking for complete JPEG frames
-	deadline := time.Now().Add(timeout)
-	var lastComplete []byte
-	for time.Now().Before(deadline) {
-		time.Sleep(150 * time.Millisecond)
-		data, err := os.ReadFile(tmp)
-		if err != nil || len(data) < 4 {
-			continue
-		}
-		n, last := scanJPEGFrames(data)
-		res.frames = n
-		if last != nil {
-			lastComplete = last
-		}
-		if n >= warmupFrames && lastComplete != nil {
-			break // the decoder has already passed a clean IDR
-		}
-	}
-	res.jpeg = lastComplete
+	res.frames, res.jpeg = pollJPEGFile(tmp, warmupFrames, timeout, logger)
 
-	if res.frames == 0 && stderrBuf.Len() > 0 {
-		logger.Warnf("cooperative capture: pipeline stderr: %s", stderrBuf.String())
+	if res.frames == 0 && dec.stderr.Len() > 0 {
+		logger.Warnf("cooperative capture: pipeline stderr: %s", dec.stderr.String())
 	}
 	return res, nil
 }

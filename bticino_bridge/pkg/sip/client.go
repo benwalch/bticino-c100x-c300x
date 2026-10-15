@@ -135,6 +135,17 @@ type BTicinoSIPClient struct {
 	// answerUser is the intercom's SIP identity (INVITE target / answerer),
 	// derived from bticino.DeviceVariant ("c300x" or "c100x").
 	answerUser string
+	// cameraSessionActive guards single-flight bridge-initiated sessions.
+	cameraSessionActive bool
+	cameraSessionStop   chan struct{}
+	cameraSessionSource string
+	// frameGrabber decodes one JPEG from the live flow before teardown.
+	frameGrabber func() []byte
+	// resolveNativeFunc/establishDialogFunc/terminateDialogFunc isolate
+	// network I/O for tests (nil = real implementation).
+	resolveNativeFunc   func() (string, error)
+	establishDialogFunc func(uri, sdp string) (*cameraDialog, error)
+	terminateDialogFunc func(*cameraDialog)
 }
 
 type VideoStreamInfo struct {
@@ -605,6 +616,17 @@ func (c *BTicinoSIPClient) handleIncomingInvite(invite *SIPMessage) {
 	// ACK will be received by the localListener loop
 }
 
+// responseCallID reads the Call-ID header regardless of its casing.
+func responseCallID(response *SIPMessage) string {
+	if id := response.Headers["Call-ID"]; id != "" {
+		return id
+	}
+	if id := response.Headers["Call-Id"]; id != "" {
+		return id
+	}
+	return response.Headers["call-id"]
+}
+
 // extractSIPUser pulls the user part out of a From/To header value, e.g.
 // `"Doorbell" <sip:c100x@domain>;tag=abc` -> "c100x" (c300x on Classe 300X).
 // Falls back to the raw header if no SIP URI is found.
@@ -845,6 +867,13 @@ func (c *BTicinoSIPClient) MakeCall(target string) error {
 
 			// Handle 200 OK — send ACK
 			if response.StatusCode == "200" {
+				c.mutex.RLock()
+				mine := responseCallID(response) == c.callID
+				c.mutex.RUnlock()
+				if !mine {
+					c.logger.Debug("=== MAKECALL: ignoring 200 for another dialog ===")
+					continue
+				}
 				c.logger.Info("=== MAKECALL: Got 200 OK! Sending ACK ===")
 
 				// Extract To tag from response
@@ -893,7 +922,10 @@ func (c *BTicinoSIPClient) MakeCall(target string) error {
 			}
 
 			// Handle errors
-			if response.StatusCode >= "400" {
+			c.mutex.RLock()
+			mineErr := responseCallID(response) == c.callID
+			c.mutex.RUnlock()
+			if response.StatusCode >= "400" && mineErr {
 				return fmt.Errorf("INVITE rejected: %s %s", response.StatusCode, response.Raw[:min(200, len(response.Raw))])
 			}
 		}
@@ -1626,6 +1658,20 @@ func (c *BTicinoSIPClient) IsSessionActive() bool {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	return c.sessionActive
+}
+
+// CameraSessionActive reports a running bridge-initiated session.
+func (c *BTicinoSIPClient) CameraSessionActive() bool {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	return c.cameraSessionActive
+}
+
+// CameraSessionSource names the session owner ("mqtt", "rtsp").
+func (c *BTicinoSIPClient) CameraSessionSource() string {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	return c.cameraSessionSource
 }
 
 // Helper methods

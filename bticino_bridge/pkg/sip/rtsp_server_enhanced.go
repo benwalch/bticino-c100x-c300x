@@ -55,6 +55,17 @@ type EnhancedRTSPServer struct {
 	// current active period was already sent (see ensureSIPCallActive).
 	// Reset whenever a new active period starts or the call ends.
 	coopActivated bool
+	// cameraSession, when true, serves RTSP demand with bridge-initiated
+	// headless sessions instead of the legacy self-INVITE path. Takes
+	// precedence over videoActivation; both false rejects all demand.
+	cameraSession     bool
+	cameraSessionHold time.Duration
+	// lastAttempt/awaitingSession pace async dials: a fresh dial needs
+	// quiet time after the previous attempt, and only a confirmed start
+	// clears the in-flight marker. Without this, viewer churn redials
+	// through teardown races and live calls every few seconds.
+	lastAttempt     time.Time
+	awaitingSession bool
 }
 
 // Self-INVITE storm protection: after this many consecutive no-media dials,
@@ -144,6 +155,38 @@ func NewEnhancedRTSPServer(port int, sipClient *BTicinoSIPClient, eventBus event
 			AudioEnabled: true,
 			Recordable:   false,
 		},
+	}
+
+	// Camera sessions report themselves: callActive follows the live
+	// session, never the dial attempt (an early flag once stalled all
+	// demand with viewers present).
+	if eventBus != nil {
+		eventBus.Subscribe("video.session.started", func(_ *events.Event) {
+			server.mutex.Lock()
+			server.callActive = true
+			server.awaitingSession = false
+			server.selfCallGen++
+			gen := server.selfCallGen
+			server.selfCallFailures = 0
+			server.mutex.Unlock()
+			server.eventBus.PublishWithSource("sip.call.started", map[string]interface{}{
+				"reason": "rtsp_client_connected",
+			}, "sip")
+			go server.trackSelfCallOutcome(gen)
+		})
+		eventBus.Subscribe("video.session.stopped", func(_ *events.Event) {
+			server.mutex.Lock()
+			if server.awaitingSession {
+				server.awaitingSession = false
+				server.selfCallFailures++
+				if server.selfCallFailures >= maxSelfCallFailures {
+					server.selfCallCooldownUntil = time.Now().Add(selfCallCooldown)
+				}
+			}
+			server.callActive = false
+			server.selfCallGen++
+			server.mutex.Unlock()
+		})
 	}
 
 	return server
@@ -993,7 +1036,14 @@ func (r *EnhancedRTSPServer) releaseSelfCallIfIdle(reason string) {
 	if !idle {
 		return
 	}
-	if r.sipClient != nil {
+	// Only reap sessions the RTSP side owns: an MQTT-started session with
+	// no viewers must keep running (an earlier version killed those here).
+	if r.sipClient != nil && r.sipClient.CameraSessionActive() {
+		if r.sipClient.CameraSessionSource() != "rtsp" {
+			return
+		}
+		r.sipClient.StopCameraSession()
+	} else if r.sipClient != nil {
 		r.sipClient.Hangup()
 	}
 	r.mutex.Lock()
@@ -1040,6 +1090,11 @@ func (r *EnhancedRTSPServer) ensureSIPCallActive() error {
 		return nil
 	}
 	r.mutex.Unlock()
+
+	// Camera sessions take precedence over the legacy self-INVITE path.
+	if r.cameraSession {
+		return r.ensureCameraSession()
+	}
 
 	// SAFETY: if on-demand video activation is disabled,
 	// we fire NOTHING at the native device (neither self-INVITE nor *7*300).
@@ -1136,6 +1191,90 @@ func (r *EnhancedRTSPServer) ensureSIPCallActive() error {
 
 	r.logger.Infof("=== SIP call initiated to %s for RTSP streaming ===", target)
 	return nil
+}
+
+// minDialInterval separates fresh dial attempts: transitional 486/481s
+// (teardown races, live calls) back off briefly without tripping the
+// breaker, which stays for persistent failures.
+const minDialInterval = 15 * time.Second
+
+// ensureCameraSession serves RTSP demand with a bridge-initiated headless
+// session. An in-flight dial or running session joins ("already active").
+// Sync failures feed the shared breaker; async dial outcomes arrive via
+// the session events below.
+func (r *EnhancedRTSPServer) ensureCameraSession() error {
+	if r.sipClient == nil {
+		return fmt.Errorf("SIP client not available (not registered)")
+	}
+	r.mutex.Lock()
+	if time.Now().Before(r.selfCallCooldownUntil) {
+		r.mutex.Unlock()
+		return fmt.Errorf("camera session cooling down after repeated no-media attempts")
+	}
+	if r.sipClient.CameraSessionActive() {
+		r.mutex.Unlock()
+		return nil
+	}
+	if r.awaitingSession {
+		r.mutex.Unlock()
+		return nil
+	}
+	if time.Since(r.lastAttempt) < minDialInterval {
+		r.mutex.Unlock()
+		return fmt.Errorf("camera session dialed too recently")
+	}
+	r.mutex.Unlock()
+
+	if err := r.sipClient.StartCameraSession(r.cameraSessionHold, "rtsp"); err != nil {
+		if strings.Contains(err.Error(), "already active") {
+			return nil
+		}
+		r.mutex.Lock()
+		r.lastAttempt = time.Now()
+		r.selfCallFailures++
+		if r.selfCallFailures >= maxSelfCallFailures {
+			r.selfCallCooldownUntil = time.Now().Add(selfCallCooldown)
+		}
+		r.mutex.Unlock()
+		return fmt.Errorf("failed to start camera session: %v", err)
+	}
+
+	r.mutex.Lock()
+	r.lastAttempt = time.Now()
+	r.awaitingSession = true
+	r.mutex.Unlock()
+	return nil
+}
+
+// SetCameraSession selects headless sessions for RTSP demand instead of the
+// legacy self-INVITE path. hold backstops presence-driven stops.
+func (r *EnhancedRTSPServer) SetCameraSession(enabled bool, hold time.Duration) {
+	r.mutex.Lock()
+	r.cameraSession = enabled
+	r.cameraSessionHold = hold
+	r.mutex.Unlock()
+}
+
+// snapshotRelayPort carries relay video to the end-of-session JPEG decoder.
+const snapshotRelayPort = 10010
+
+// SnapshotRelayFrame decodes one JPEG from the live relay flow. Best
+// effort: nil when nothing flows.
+func (r *EnhancedRTSPServer) SnapshotRelayFrame(timeout time.Duration) []byte {
+	if r.rtpRelay == nil {
+		return nil
+	}
+	dec, err := startJPEGDecoder(snapshotRelayPort, r.logger)
+	if err != nil {
+		return nil
+	}
+	defer dec.stop()
+	if err := r.rtpRelay.Video.AddUDPConsumer("snapshot", "127.0.0.1", snapshotRelayPort); err != nil {
+		return nil
+	}
+	defer r.rtpRelay.Video.RemoveConsumer("snapshot")
+	_, last := pollJPEGFile(dec.tmp, 12, timeout, r.logger)
+	return last
 }
 
 // trackSelfCallOutcome implements the circuit breaker: if no RTP reaches
