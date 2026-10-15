@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -15,6 +16,10 @@ import (
 	"bticino_bridge/pkg/bticino"
 	"bticino_bridge/pkg/events"
 )
+
+// ErrNativeBusy marks a dial refused while the unit is occupied (486 after
+// provisionals), as opposed to a policy rejection of the offer itself.
+var ErrNativeBusy = errors.New("native busy")
 
 type CallState int
 
@@ -73,6 +78,11 @@ type SIPConfig struct {
 	InsecureTLS   bool            `yaml:"insecure_tls"` // Skip TLS certificate verification
 	Transport     string          `yaml:"transport"`    // "tcp", "udp", or "tls" (default: tls)
 	SIPTarget     string          `yaml:"sip_target"`   // INVITE target user override (default: answerer per DeviceVariant)
+	// NativeDevAddr is the unit UUID offered in session SDP (a=DEVADDR).
+	// Unrelated to DevAddr above (the numeric WHO address). Verified per
+	// unit: a wrong value gets an instant 486. Empty falls back to the
+	// unit it was validated on; find yours by capturing one app call.
+	NativeDevAddr string `yaml:"native_dev_addr"`
 }
 
 type MediaPortConfig struct {
@@ -231,7 +241,7 @@ func (c *BTicinoSIPClient) Start() error {
 	}
 
 	c.logger.Infof("Starting BTicino SIP client (dual-role: webrtc + %s)", c.answerUser)
-	c.logger.Infof("SIP Config: server=%s, domain=%s, username=%s, devaddr=%s",
+	c.logger.Infof("SIP Config: server=%s, domain=%s, username=%s, dev_addr=%s",
 		c.config.ServerAddr, c.config.Domain, c.config.Username, c.config.DevAddr)
 
 	// Compute HA1 for the answerer identity: MD5(<user>:<domain>:<user>)
@@ -808,7 +818,7 @@ func (c *BTicinoSIPClient) MakeCall(target string) error {
 	}
 	c.mutex.Unlock()
 
-	c.logger.Infof("=== MAKECALL: Initiating call to %s with DEVADDR:%s ===", target, c.config.DevAddr)
+	c.logger.Infof("=== MAKECALL: Initiating call to %s with dev_addr:%s ===", target, c.config.DevAddr)
 
 	// Generate new call identifiers
 	c.mutex.Lock()
@@ -924,8 +934,8 @@ func (c *BTicinoSIPClient) MakeCall(target string) error {
 				}
 
 				c.eventBus.PublishWithSource("sip.call.connected", map[string]interface{}{
-					"target":  target,
-					"devaddr": c.config.DevAddr,
+					"target":   target,
+					"dev_addr": c.config.DevAddr,
 				}, "sip")
 
 				break
@@ -965,7 +975,7 @@ func (c *BTicinoSIPClient) MakeCall(target string) error {
 
 	c.eventBus.PublishWithSource("sip.call.initiated", map[string]interface{}{
 		"target":    target,
-		"devaddr":   c.config.DevAddr,
+		"dev_addr":  c.config.DevAddr,
 		"connected": gotOK || c.GetCallState() == Connected,
 	}, "sip")
 

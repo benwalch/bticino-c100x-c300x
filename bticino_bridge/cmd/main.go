@@ -429,7 +429,7 @@ func main() {
 			devAddr = "20"
 		}
 
-		logger.Infof("SIP Config: server=%s, domain=%s, username=%s, devaddr=%s",
+		logger.Infof("SIP Config: server=%s, domain=%s, username=%s, dev_addr=%s",
 			serverAddr, domain, username, devAddr)
 
 		sipConfig := &sip.SIPConfig{
@@ -440,6 +440,7 @@ func main() {
 			LocalIP:       localIP,
 			LocalPort:     cfg.SIP.LocalPort,
 			DevAddr:       devAddr,
+			NativeDevAddr: cfg.SIP.NativeDevAddr,
 			ExpirySeconds: 300,
 			RTSPPort:      6554,
 			UseHA1:        cfg.SIP.UseHA1,
@@ -479,6 +480,10 @@ func main() {
 			if webServer != nil {
 				webServer.SetCallController(sipClient)
 				logger.Info("   Call control: GET /api/call, POST /api/controls/call/hangup")
+				webServer.SetNativeDevAddrSniffer(sip.NewNativeDevAddrDiscoverer(logger))
+				webServer.SetNativeDevAddrVerifyFunc(sipClient.VerifyNativeDevAddr)
+				webServer.SetNativeDevAddrSessionLive(sipClient.CameraSessionActive)
+				logger.Info("   Native dev addr: GET /api/sip/native-dev-addr (+discover/verify)")
 			}
 		}
 

@@ -39,6 +39,10 @@ sip:
   insecure_tls: true
   # sip_target: optional INVITE/BYE target override (defaults to the answerer
   # identity per bticino.DeviceVariant: c100x here, c300x on Classe 300X).
+  # native_dev_addr: unit UUID offered in session SDP (a=DEVADDR). Verified
+  # per unit (wrong values get an instant 486); empty falls back to the
+  # validated one. Find yours via the settings wizard. Unrelated to the
+  # numeric dev_addr above.
 
 # ==================== MQTT ====================
 mqtt:

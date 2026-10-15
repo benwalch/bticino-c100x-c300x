@@ -44,21 +44,24 @@ type OpenWebNetConfig struct {
 }
 
 type SIPConfig struct {
-	Enabled     bool   `yaml:"enabled"`
-	LocalHost   string `yaml:"local_host"`
-	LocalPort   int    `yaml:"local_port"`
-	ServerHost  string `yaml:"server_host"`
-	ServerPort  int    `yaml:"server_port"`
-	Transport   string `yaml:"transport"`
-	Domain      string `yaml:"domain"`
-	AuthFile    string `yaml:"auth_file"`
-	CertFile    string `yaml:"cert_file"`
-	Username    string `yaml:"username"`
-	Password    string `yaml:"password"`
-	DevAddr     string `yaml:"dev_addr"`
-	UseHA1      bool   `yaml:"use_ha1"`
-	InsecureTLS bool   `yaml:"insecure_tls"`
-	SIPTarget   string `yaml:"sip_target"` // INVITE target user override (default: answerer per DeviceVariant)
+	Enabled    bool   `yaml:"enabled"`
+	LocalHost  string `yaml:"local_host"`
+	LocalPort  int    `yaml:"local_port"`
+	ServerHost string `yaml:"server_host"`
+	ServerPort int    `yaml:"server_port"`
+	Transport  string `yaml:"transport"`
+	Domain     string `yaml:"domain"`
+	AuthFile   string `yaml:"auth_file"`
+	CertFile   string `yaml:"cert_file"`
+	Username   string `yaml:"username"`
+	Password   string `yaml:"password"`
+	DevAddr    string `yaml:"dev_addr"`
+	// NativeDevAddr is the unit address in session SDP (a=DEVADDR,
+	// distinct from DevAddr below, the numeric WHO address).
+	NativeDevAddr string `yaml:"native_dev_addr"`
+	UseHA1        bool   `yaml:"use_ha1"`
+	InsecureTLS   bool   `yaml:"insecure_tls"`
+	SIPTarget     string `yaml:"sip_target"` // INVITE target user override (default: answerer per DeviceVariant)
 }
 
 type MQTTConfig struct {

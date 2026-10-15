@@ -121,7 +121,7 @@ func TestCameraSessionStopIdleSilent(t *testing.T) {
 func TestBuildCameraSDPKeys(t *testing.T) {
 	seen := map[string]bool{}
 	for i := 0; i < 3; i++ {
-		sdp, err := buildCameraSDP()
+		sdp, err := buildCameraSDP("test-devaddr")
 		if err != nil {
 			t.Fatalf("buildCameraSDP: %v", err)
 		}
@@ -185,5 +185,31 @@ func TestIsBenignReadError(t *testing.T) {
 	}
 	if isBenignReadError(errors.New("EOF")) {
 		t.Fatal("EOF must not be benign")
+	}
+}
+
+// Empty config falls back to the validated address; a set value wins.
+func TestSessionNativeDevAddrFallback(t *testing.T) {
+	c := &BTicinoSIPClient{config: &SIPConfig{}}
+	if got := c.sessionNativeDevAddr(); got != defaultNativeDevAddr {
+		t.Fatalf("fallback = %q", got)
+	}
+	c.config.NativeDevAddr = "custom-devaddr"
+	if got := c.sessionNativeDevAddr(); got != "custom-devaddr" {
+		t.Fatalf("override = %q", got)
+	}
+}
+
+// A 486 after provisionals means busy; a bare one means the offer itself
+// was rejected.
+func TestClassifyReject(t *testing.T) {
+	if err := classifyReject("486", true); !errors.Is(err, ErrNativeBusy) {
+		t.Fatalf("provisional 486 must be busy, got %v", err)
+	}
+	if err := classifyReject("486", false); errors.Is(err, ErrNativeBusy) {
+		t.Fatalf("bare 486 must not be busy, got %v", err)
+	}
+	if err := classifyReject("606", false); errors.Is(err, ErrNativeBusy) {
+		t.Fatalf("bare 606 must not be busy, got %v", err)
 	}
 }

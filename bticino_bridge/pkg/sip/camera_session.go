@@ -12,9 +12,10 @@ import (
 	"bticino_bridge/pkg/bticino"
 )
 
-// cameraDEVADDR is the unit address the native stack accepted in the
-// verified loopback dialog; its exact origin is still open.
-const cameraDEVADDR = "00000000-0000-4000-8000-000000000001"
+// DefaultNativeDevAddr is the fallback offer address (validated unit).
+func DefaultNativeDevAddr() string { return defaultNativeDevAddr }
+
+const defaultNativeDevAddr = "00000000-0000-4000-8000-000000000001"
 
 // cameraDialog is a confirmed loopback dialog with the native unit.
 type cameraDialog struct {
@@ -94,7 +95,7 @@ func (c *BTicinoSIPClient) runCameraSession(duration time.Duration) {
 		c.logger.WithError(err).Warn("Camera session: no native contact")
 		return
 	}
-	sdp, err := buildCameraSDP()
+	sdp, err := buildCameraSDP(c.sessionNativeDevAddr())
 	if err != nil {
 		c.logger.WithError(err).Warn("Camera session: no media offer")
 		return
@@ -113,8 +114,8 @@ func (c *BTicinoSIPClient) runCameraSession(duration time.Duration) {
 	stop := c.cameraSessionStop
 	c.mutex.Unlock()
 	c.eventBus.PublishWithSource("sip.call.connected", map[string]interface{}{
-		"target":  c.answerUser,
-		"devaddr": c.config.DevAddr,
+		"target":   c.answerUser,
+		"dev_addr": c.config.DevAddr,
 	}, "sip")
 	c.logger.Info("Camera session connected, holding media window")
 	c.eventBus.PublishWithSource("video.session.started", map[string]interface{}{}, "sip")
@@ -213,9 +214,18 @@ func parseProcNetTCP(data string, ownPorts map[int]bool, user string) (string, e
 	return "", fmt.Errorf("unreachable")
 }
 
+// sessionNativeDevAddr resolves the offer address: configured per unit,
+// fallback to the validated one.
+func (c *BTicinoSIPClient) sessionNativeDevAddr() string {
+	if c.config != nil && c.config.NativeDevAddr != "" {
+		return c.config.NativeDevAddr
+	}
+	return defaultNativeDevAddr
+}
+
 // buildCameraSDP offers speex audio + H264 video with fresh crypto keys,
 // mirroring the verified app-shaped dialog.
-func buildCameraSDP() (string, error) {
+func buildCameraSDP(nativeDevAddr string) (string, error) {
 	key := func() (string, error) {
 		raw := make([]byte, 30)
 		if _, err := rand.Read(raw); err != nil {
@@ -249,7 +259,7 @@ func buildCameraSDP() (string, error) {
 		"a=rtpmap:97 H264/90000\r\n"+
 		"a=fmtp:97 profile-level-id=42801F\r\n"+
 		"a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:%s\r\n",
-		cameraDEVADDR, k1, k2), nil
+		nativeDevAddr, k1, k2), nil
 }
 
 func buildCameraInvite(config *SIPConfig, uri, callID, fromTag string, cseq int, sdp string) string {
@@ -409,6 +419,7 @@ func (c *BTicinoSIPClient) establishCameraDialog(uri, sdp string) (*cameraDialog
 		return nil, fmt.Errorf("send INVITE: %w", err)
 	}
 	deadline := time.Now().Add(12 * time.Second)
+	provisional := false
 	for time.Now().Before(deadline) {
 		msgs, err := c.readSIPMessagesFrom(conn, time.Until(deadline))
 		if err != nil {
@@ -417,6 +428,7 @@ func (c *BTicinoSIPClient) establishCameraDialog(uri, sdp string) (*cameraDialog
 		for _, response := range msgs {
 			switch response.StatusCode {
 			case "100", "180", "183":
+				provisional = true
 				continue
 			case "200":
 				if responseCallID(response) != callID {
@@ -445,11 +457,48 @@ func (c *BTicinoSIPClient) establishCameraDialog(uri, sdp string) (*cameraDialog
 				return &cameraDialog{callID: callID, fromTag: fromTag, toTag: toTag, contact: contact, cseq: cseq, offer: sdp}, nil
 			}
 			if response.StatusCode >= "400" && responseCallID(response) == callID {
-				return nil, fmt.Errorf("INVITE rejected: %s", response.StatusCode)
+				return nil, classifyReject(response.StatusCode, provisional)
 			}
 		}
 	}
 	return nil, fmt.Errorf("no 200 OK within 12s")
+}
+
+// VerifyNativeDevAddr test-dials with the candidate address: 180/200 accepts
+// it, an instant 486 rejects it. Tears the dialog down immediately.
+func (c *BTicinoSIPClient) VerifyNativeDevAddr(candidate string) error {
+	if candidate == "" {
+		return fmt.Errorf("empty candidate")
+	}
+	c.mutex.RLock()
+	busy := c.callState != Registered || c.sessionActive || c.cameraSessionActive
+	c.mutex.RUnlock()
+	if busy {
+		return fmt.Errorf("busy, try when idle")
+	}
+	uri, err := c.resolveNative()
+	if err != nil {
+		return err
+	}
+	sdp, err := buildCameraSDP(candidate)
+	if err != nil {
+		return err
+	}
+	dlg, err := c.establish(uri, sdp)
+	if err != nil {
+		return err
+	}
+	c.terminate(dlg)
+	return nil
+}
+
+// classifyReject separates a busy unit (provisionals first) from a policy
+// rejection of the offer itself (bare final response).
+func classifyReject(statusCode string, provisional bool) error {
+	if provisional {
+		return fmt.Errorf("%w: INVITE rejected: %s", ErrNativeBusy, statusCode)
+	}
+	return fmt.Errorf("INVITE rejected: %s", statusCode)
 }
 
 // terminateCameraDialog sends an in-dialog BYE to the native contact.

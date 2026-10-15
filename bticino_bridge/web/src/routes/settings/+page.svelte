@@ -66,6 +66,111 @@
   function hasChanges() {
     return config && config.config
   }
+
+  // native dev addr discovery wizard state
+  let showWizard = false
+  let wizardStep = 1
+  let wizardReady = false
+  let wizardBusy = false
+  let wizardError = null
+  let discoverValue = ''
+  let verifyResult = null
+  let pollTimer = null
+
+  function openWizard() {
+    showWizard = true
+    wizardStep = 1
+    wizardReady = false
+    wizardBusy = false
+    wizardError = null
+    discoverValue = ''
+    verifyResult = null
+  }
+
+  function closeWizard() {
+    cancelDiscover()
+    showWizard = false
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+  }
+
+  async function startDiscover() {
+    try {
+      wizardBusy = true
+      wizardError = null
+      const response = await fetch('/api/sip/native-dev-addr/discover?confirm=yes', { method: 'POST' })
+      const result = await response.json()
+      if (result.state === 'busy') throw new Error(result.message || 'session running')
+      if (result.state !== 'waiting') throw new Error(result.error || 'discover rejected')
+      wizardStep = 2
+      pollTimer = setInterval(pollDiscover, 2000)
+    } catch (e) {
+      wizardError = e.message
+    } finally {
+      wizardBusy = false
+    }
+  }
+
+  async function pollDiscover() {
+    try {
+      const response = await fetch('/api/sip/native-dev-addr/discover/status')
+      const result = await response.json()
+      if (result.state === 'found' && result.value) {
+        clearInterval(pollTimer); pollTimer = null
+        discoverValue = result.value
+        wizardStep = 3
+        await verifyValue()
+      } else if (result.state === 'idle') {
+        clearInterval(pollTimer); pollTimer = null
+        wizardError = 'No app call seen within 30s — try again while starting a camera view.'
+        wizardStep = 1
+      }
+    } catch (e) {
+      wizardError = e.message
+    }
+  }
+
+  async function cancelDiscover() {
+    try {
+      await fetch('/api/sip/native-dev-addr/discover/cancel', { method: 'POST' })
+    } catch (e) { /* best effort */ }
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+  }
+
+  async function verifyValue() {
+    try {
+      wizardBusy = true
+      const response = await fetch('/api/sip/native-dev-addr/verify?confirm=yes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: discoverValue })
+      })
+      verifyResult = await response.json()
+    } catch (e) {
+      verifyResult = { valid: false, error: e.message }
+    } finally {
+      wizardBusy = false
+    }
+  }
+
+  async function applyValue() {
+    config.config.SIP.NativeDevAddr = discoverValue
+    await saveConfig()
+    closeWizard()
+  }
+
+  async function discoverDomain() {
+    try {
+      error = null
+      const response = await fetch('/api/sip/domain/discover')
+      const result = await response.json()
+      if (!result.value) throw new Error(result.error || 'no domain found')
+      config.config.SIP.Domain = result.value
+      success = '✅ Domain filled from ' + (result.source || 'Flexisip') + ' — press Save.'
+      setTimeout(() => success = null, 5000)
+    } catch (e) {
+      error = e.message
+    }
+  }
 </script>
 
 <div class="settings-page">
@@ -206,7 +311,10 @@
             </div>
             <div class="form-group">
               <label for="sip_domain">Domain</label>
-              <input type="text" id="sip_domain" bind:value={config.config.SIP.Domain} />
+              <div class="input-row">
+                <input type="text" id="sip_domain" bind:value={config.config.SIP.Domain} />
+                <button class="btn btn-secondary btn-icon" title="Discover domain from Flexisip" on:click={discoverDomain}>🔍</button>
+              </div>
             </div>
             <div class="form-group">
               <label for="sip_username">Username</label>
@@ -221,6 +329,13 @@
                 <input type="checkbox" bind:checked={config.config.SIP.InsecureTLS} />
                 Insecure TLS
               </label>
+            </div>
+            <div class="form-group">
+              <label for="sip_native_dev_addr">Native Dev Addr</label>
+              <div class="input-row">
+                <input type="text" id="sip_native_dev_addr" bind:value={config.config.SIP.NativeDevAddr} placeholder="auto (validated default)" />
+                <button class="btn btn-secondary btn-icon" title="Discover native dev addr" on:click={openWizard}>🔍</button>
+              </div>
             </div>
           </div>
         </div>
@@ -506,6 +621,53 @@
       </div>
     {/if}
   </div>
+
+  {#if showWizard}
+  <div class="modal-overlay">
+    <div class="modal">
+      <h2>🔍 Discover Unit Address</h2>
+      {#if wizardStep === 1}
+        <p>The bridge listens passively for your next app call and reads its unit address. Nothing is sent until verification.</p>
+        <p><strong>Requirements</strong></p>
+        <ul>
+          <li>Door Entry app connected with your device</li>
+          <li>Camera session working from the app</li>
+        </ul>
+        <label>
+          <input type="checkbox" bind:checked={wizardReady} />
+          I have the app open, ready to start a camera view
+        </label>
+        {#if wizardError}<div class="error-banner">{wizardError}</div>{/if}
+        <div class="modal-actions">
+          <button class="btn btn-secondary" on:click={closeWizard}>Cancel</button>
+          <button class="btn btn-primary" on:click={startDiscover} disabled={!wizardReady || wizardBusy}>
+            {#if wizardBusy}⏳ Arming...{:else}Start discovery{/if}
+          </button>
+        </div>
+      {:else if wizardStep === 2}
+        <p>🎧 Listening… <strong>start a camera view in your app now</strong> (30s window).</p>
+        {#if wizardError}<div class="error-banner">{wizardError}</div>{/if}
+        <div class="modal-actions">
+          <button class="btn btn-secondary" on:click={closeWizard}>Cancel</button>
+        </div>
+      {:else}
+        <p>Found unit address:</p>
+        <code>{discoverValue}</code>
+        {#if verifyResult && verifyResult.valid}
+          <div class="success-banner">✅ Verified — the unit answers this address</div>
+        {:else if verifyResult && verifyResult.busy}
+          <div class="error-banner">⏳ Unit busy — retry when no session is running</div>
+        {:else if verifyResult}
+          <div class="error-banner">⚠️ Unverified ({verifyResult.error || 'rejected'}) — you can still apply it manually</div>
+        {/if}
+        <div class="modal-actions">
+          <button class="btn btn-secondary" on:click={closeWizard}>Keep current</button>
+          <button class="btn btn-primary" on:click={applyValue} disabled={saving}>Use this value</button>
+        </div>
+      {/if}
+    </div>
+  </div>
+  {/if}
 </div>
 
 <style>
@@ -535,6 +697,69 @@
     background: #4CAF50;
     padding: 0.5rem 1rem;
     border-radius: 4px;
+  }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .modal {
+    background: white;
+    padding: 1.5rem 2rem;
+    border-radius: 8px;
+    max-width: 520px;
+    width: 90%;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  }
+
+  .modal h2 {
+    margin-top: 0;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+  }
+
+  .modal code {
+    display: block;
+    background: #f5f5f5;
+    padding: 0.5rem;
+    border-radius: 4px;
+    word-break: break-all;
+    margin: 0.5rem 0;
+  }
+
+  .error-banner {
+    background: #ffebee;
+    color: #c62828;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .input-row input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .input-row .btn-icon {
+    flex: 0 0 auto;
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
   }
   
   .container {

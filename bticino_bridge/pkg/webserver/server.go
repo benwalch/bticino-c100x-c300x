@@ -170,6 +170,9 @@ type WebServer struct {
 	callController     CallController       // Optional SIP call control
 	videoProbeFunc     VideoProbeFunc       // Optional one-shot cooperative video probe
 	audioProbeFunc     AudioProbeFunc       // Optional one-shot cooperative audio probe
+	nativeDevAddrSniffer     *sip.NativeDevAddrDiscoverer // Optional passive native-dev-addr discoverer
+	nativeDevAddrVerify      NativeDevAddrVerifyFunc // Optional candidate verification dial
+	nativeDevAddrSessionLive func() bool            // Reports a running camera session, if known
 	logBuffer          *LogBuffer           // Ring buffer for web log viewer
 	startTime          time.Time            // Track when server started for real uptime
 	configManager      *ConfigManager       // Configuration manager for web-based config
@@ -277,6 +280,12 @@ func (ws *WebServer) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/controls/call/hangup", ws.handleCallHangup)
 	mux.HandleFunc("/api/video/probe", ws.handleVideoProbe)
 	mux.HandleFunc("/api/audio/probe", ws.handleAudioProbe)
+	mux.HandleFunc("/api/sip/native-dev-addr", ws.handleAPINativeDevAddr)
+	mux.HandleFunc("/api/sip/domain/discover", ws.handleAPISIPDomainDiscover)
+	mux.HandleFunc("/api/sip/native-dev-addr/discover", ws.handleAPINativeDevAddrDiscover)
+	mux.HandleFunc("/api/sip/native-dev-addr/discover/status", ws.handleAPINativeDevAddrDiscoverStatus)
+	mux.HandleFunc("/api/sip/native-dev-addr/discover/cancel", ws.handleAPINativeDevAddrDiscoverCancel)
+	mux.HandleFunc("/api/sip/native-dev-addr/verify", ws.handleAPINativeDevAddrVerify)
 	mux.HandleFunc("/api/messages", ws.handleAPIMessages)
 	mux.HandleFunc("/api/system", ws.handleAPISystem)
 	mux.HandleFunc("/api/system/restart-bridge", ws.handleAPISystemRestartBridge)

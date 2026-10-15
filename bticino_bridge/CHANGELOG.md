@@ -12,6 +12,19 @@
   RTSP demand prefers it over the legacy self-INVITE path when enabled;
   otherwise legacy behavior is unchanged. The session end publishes a fresh
   still to the doorbell camera entity.
+- Unit address for the session SDP offer: `sip.native_dev_addr`, the unit UUID
+  offered as `a=DEVADDR`. Verified per unit — a wrong value is refused with an
+  instant 486 — and empty falls back to the validated default. The settings SIP
+  tab gains a guided discovery wizard: passive 30s listen on the loopback SIP
+  leg while the user starts a camera view in the app, auto-verify of the found
+  value with one test INVITE (a 486 after provisionals means the unit is busy,
+  not that the value is wrong), apply only on explicit confirmation. The SIP
+  domain is filled from the local Flexisip config
+  (`GET /api/sip/domain/discover`).
+  Migration: config key `sip.devaddr` → `sip.native_dev_addr` (the old key is
+  ignored) and API paths `/api/sip/devaddr/...` → `/api/sip/native-dev-addr/...`.
+  The numeric `sip.dev_addr` is unrelated and unchanged; `sip.*` events now
+  report it as `dev_addr`.
 - Relay ingress bound to loopback (`127.0.0.1:10002/10000`); LAN RTP injection no longer possible, local tap/GStreamer/`*7*300` unaffected.
 - RTSP idle-session reaper now releases relay consumers, GStreamer and self-call like the other teardown paths; server restart recreates its stop channel.
 
