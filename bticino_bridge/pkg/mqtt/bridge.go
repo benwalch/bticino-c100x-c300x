@@ -48,6 +48,7 @@ type MQTTBridge struct {
 	displayOn          bool
 	sipRegistered      bool
 	lastDoorbellTime   time.Time
+	lastIncomingCall   time.Time
 	lastButtonPress    time.Time
 	lastButtonKey      string
 	eventsPublished    int64
@@ -1313,6 +1314,10 @@ func (b *MQTTBridge) handleVideoSessionCommand(client pahomqtt.Client, msg pahom
 	}
 	switch payload {
 	case "ON", "1":
+		if time.Since(b.lastDoorbellTime) < time.Minute || time.Since(b.lastIncomingCall) < time.Minute {
+			b.logger.Warn("Camera session blocked: native call activity within the last minute")
+			return
+		}
 		dur := time.Duration(b.config.Streaming.CameraSessionDuration) * time.Second
 		if err := start(dur); err != nil {
 			b.logger.WithError(err).Warn("Camera session start rejected")
@@ -1613,6 +1618,7 @@ func (b *MQTTBridge) setupEventSubscriptions() {
 
 	// Real incoming SIP call (someone is calling the unit)
 	b.eventBus.Subscribe("sip.call.incoming", func(event *events.Event) {
+		b.lastIncomingCall = time.Now()
 		caller := ""
 		if data, ok := event.Data.(map[string]interface{}); ok {
 			caller, _ = data["caller"].(string)
