@@ -296,6 +296,18 @@ func randHex(n int) string {
 	return string(out)
 }
 
+// isBenignReadError reports routine read timeouts (a quiet hold), as
+// opposed to connection failures that deserve tearing the session down.
+func isBenignReadError(err error) bool {
+	if err == nil {
+		return true
+	}
+	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+		return true
+	}
+	return strings.Contains(err.Error(), "timeout")
+}
+
 // drainCameraDialog holds the dialog for duration, answering mid-dialog
 // re-INVITEs (app calls carry a "Media change" one) and ending early on BYE
 // or stop.
@@ -305,6 +317,7 @@ func (c *BTicinoSIPClient) drainCameraDialog(dlg *cameraDialog, stop <-chan stru
 		return
 	}
 	deadline := time.Now().Add(duration)
+	var errs int
 	for {
 		select {
 		case <-stop:
@@ -320,8 +333,18 @@ func (c *BTicinoSIPClient) drainCameraDialog(dlg *cameraDialog, stop <-chan stru
 		}
 		msgs, err := c.readSIPMessagesFrom(conn, remaining)
 		if err != nil {
+			if isBenignReadError(err) {
+				errs = 0
+				continue
+			}
+			errs++
+			if errs >= 5 {
+				c.logger.WithError(err).Warn("Camera session: dialog connection lost")
+				return
+			}
 			continue
 		}
+		errs = 0
 		for _, m := range msgs {
 			switch {
 			case m.Method == "INVITE":

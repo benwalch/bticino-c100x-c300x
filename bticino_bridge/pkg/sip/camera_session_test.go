@@ -3,6 +3,7 @@ package sip
 import (
 	"encoding/base64"
 	"errors"
+	"net"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -13,6 +14,14 @@ import (
 
 	"github.com/sirupsen/logrus"
 )
+
+type timeoutError string
+
+func (e timeoutError) Error() string   { return string(e) }
+func (e timeoutError) Timeout() bool   { return true }
+func (e timeoutError) Temporary() bool { return true }
+
+var _ net.Error = timeoutError("")
 
 func newSessionTestClient() (*BTicinoSIPClient, *int32, *int32) {
 	bus := events.NewEventBus(1, logrus.New())
@@ -159,5 +168,22 @@ func TestParseProcNetTCP(t *testing.T) {
 	}
 	if _, err := parseProcNetTCP("  sl  local_address rem_address   st\n", map[int]bool{1: true}, bticino.SIPUsernameForVariant(bticino.DeviceVariant)); err == nil {
 		t.Fatal("no contacts must error")
+	}
+}
+
+// Timeouts (quiet hold, both typed and framer plain errors) never count
+// toward the abort; anything else does.
+func TestIsBenignReadError(t *testing.T) {
+	if !isBenignReadError(timeoutError("i/o timeout")) {
+		t.Fatal("net timeout must be benign")
+	}
+	if !isBenignReadError(errors.New("timeout waiting for complete SIP message")) {
+		t.Fatal("framer timeout must be benign")
+	}
+	if isBenignReadError(errors.New("connection reset by peer")) {
+		t.Fatal("reset must not be benign")
+	}
+	if isBenignReadError(errors.New("EOF")) {
+		t.Fatal("EOF must not be benign")
 	}
 }
