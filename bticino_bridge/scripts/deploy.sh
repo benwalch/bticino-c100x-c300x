@@ -220,9 +220,11 @@ else
     log "Skipping docs deploy (--skip-docs)"
 fi
 
-# Restart service
+# Restart service (TERM first so in-dialog sessions get their BYE instead
+# of orphaning the native dialog (grace covers frame grab + BYE), then -9
+# only if it hangs)
 log "Restarting service..."
-ssh "$REMOTE" "cd $REMOTE_DIR && pkill -9 bticino_bridge || true && sleep 2 && nohup ./bticino_bridge -config config.yaml > /var/log/bticino_bridge.log 2>&1 &"
+ssh "$REMOTE" "cd $REMOTE_DIR && (pkill bticino_bridge || true) && sleep 15 && (pkill -9 bticino_bridge || true) && sleep 2 && nohup ./bticino_bridge -config config.yaml > /var/log/bticino_bridge.log 2>&1 &"
 sleep 5
 log_success "Service restarted"
 

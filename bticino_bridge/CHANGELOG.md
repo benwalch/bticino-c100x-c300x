@@ -6,7 +6,9 @@
   `streaming.camera_session`): bridge-initiated headless video over a
   loopback self-call the native unit answers (display stays off). Manual
   starts hold for `camera_session_duration`, RTSP-driven ones follow viewer
-  presence (1h leak backstop), then auto-hang-up. Zero bus commands.
+  presence (10-minute leak backstop), then auto-hang-up. Zero bus commands.
+  Deploy stops the bridge gracefully (TERM first) so in-dialog sessions
+  get their BYE instead of orphaning the native dialog.
   RTSP demand prefers it over the legacy self-INVITE path when enabled;
   otherwise legacy behavior is unchanged. The session end publishes a fresh
   still to the doorbell camera entity.

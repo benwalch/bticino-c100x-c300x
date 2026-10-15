@@ -236,6 +236,10 @@ func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResu
 	if cfg.Streaming.VideoOnDemand {
 		result.Warnings = append(result.Warnings, "video_on_demand competes with the native firmware and may reboot the device — enable only on a validated setup")
 	}
+	if cfg.Streaming.CameraSessionDuration < 0 {
+		result.Errors = append(result.Errors, "Camera session duration must not be negative")
+		result.Valid = false
+	}
 
 	// Validate DNS (must be IPs)
 	for _, s := range cfg.Network.DNS.Servers {

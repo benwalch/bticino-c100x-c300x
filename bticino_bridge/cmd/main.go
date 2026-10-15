@@ -501,9 +501,8 @@ func main() {
 
 		// Headless camera sessions take precedence over the legacy path
 		// when enabled (see flags). Presence-driven stop is primary; the
-		// hour hold only backstops leaked sessions (a 60s cap would blip
-		// persistent viewers every minute).
-		rtspServer.SetCameraSession(cfg.Streaming.CameraSession, time.Hour)
+		// 10-minute hold only backstops leaked sessions.
+		rtspServer.SetCameraSession(cfg.Streaming.CameraSession, 10*time.Minute)
 
 		// Live video during an incoming call to our unit, via a PASSIVE
 		// mirror (AF_PACKET tap of the native video leg on lo:<native-port>

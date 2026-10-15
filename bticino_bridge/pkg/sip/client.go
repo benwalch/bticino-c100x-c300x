@@ -306,6 +306,16 @@ func (c *BTicinoSIPClient) Stop() error {
 
 	c.logger.Info("Stopping BTicino SIP client")
 
+	// End a camera session first so the native side gets its BYE: a killed
+	// bridge otherwise orphans the dialog, blocking later dials. The wait
+	// covers the end-of-session frame grab plus the BYE round-trip.
+	if c.CameraSessionActive() {
+		c.StopCameraSession()
+		for i := 0; i < 120 && c.CameraSessionActive(); i++ {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
 	if c.registerTick != nil {
 		c.registerTick.Stop()
 	}

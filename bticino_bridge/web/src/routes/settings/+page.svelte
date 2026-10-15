@@ -352,6 +352,16 @@
               </label>
             </div>
             <div class="form-group">
+              <label title="Bridge-initiated headless video (loopback self-call answered natively, display stays off) as an HA switch. Zero bus commands.">
+                <input type="checkbox" bind:checked={config.config.Streaming.CameraSession} />
+                Camera session
+              </label>
+            </div>
+            <div class="form-group">
+              <label for="camera_session_duration">Camera Session Duration (seconds)</label>
+              <input type="number" id="camera_session_duration" bind:value={config.config.Streaming.CameraSessionDuration} />
+            </div>
+            <div class="form-group">
               <label for="video_backend">Video Backend</label>
               <select id="video_backend" bind:value={config.config.Streaming.VideoBackend}>
                 <option value="avmedia">avmedia (cooperative, recommended)</option>
