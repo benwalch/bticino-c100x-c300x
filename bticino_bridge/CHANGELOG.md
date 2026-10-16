@@ -25,6 +25,12 @@
   ignored) and API paths `/api/sip/devaddr/...` → `/api/sip/native-dev-addr/...`.
   The numeric `sip.dev_addr` is unrelated and unchanged; `sip.*` events now
   report it as `dev_addr`.
+- SIP status and system diagnostics now share a single liveness probe
+  (`*#130**1*2##`) instead of polling the doorbell query (`*#8**33##`),
+  whose answer is echoed on the monitor port and was logged as
+  "Doorbell sound enabled (unmuted)" on every poll.
+- MQTT: the bus frame entity is now named "OWN Bus (Event)", matching the
+  other event labels (`Entrance Doorbell (Event)`, `Call (Event)`, …).
 - Relay ingress bound to loopback (`127.0.0.1:10002/10000`); LAN RTP injection no longer possible, local tap/GStreamer/`*7*300` unaffected.
 - RTSP idle-session reaper now releases relay consumers, GStreamer and self-call like the other teardown paths; server restart recreates its stop channel.
 

@@ -96,7 +96,7 @@ Each fires with a timestamp and an `event_type`; the payload is JSON on the topi
 | Entrance doorbell (event) | `bticino/doorbell/entrance/event` | `pressed` |
 | Floor doorbell (event) | `bticino/doorbell/floor/event` | `pressed` |
 | Call (event) | `bticino/call/event` | `incoming`, `connected`, `ended` (incoming carries `caller`) |
-| Bus frame (event) | `bticino/bus/frame/event` | `frame` (carries `raw`) |
+| OWN Bus (event) | `bticino/bus/frame/event` | `frame` (carries `raw`) |
 
 These complement the `binary_sensor`/`sensor` versions: the binary sensors show
 current state, the event entities give a clean per-trigger event for automations.

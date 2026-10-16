@@ -927,7 +927,7 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Event: OpenWebNet bus frame (raw) ---
 	b.discovery("event", "bticino_bus_frame_event", map[string]interface{}{
-		"name":         "OWN Bus Event",
+		"name":         "OWN Bus (Event)",
 		"unique_id":    "bticino_intercom_bus_frame_event",
 		"object_id":    "bticino_bus_frame_event",
 		"state_topic":  dp + "/bus/frame/event",

@@ -1115,25 +1115,20 @@ func main() {
 					mqttBridge.PublishMessageStats()
 				}
 
-				// Publish SIP status (query via netcat on port 30006, NOT port 20000)
+				// One liveness probe per cycle feeds both SIP status and
+				// diagnostics. The bell query used here before (*#8**33##) has
+				// its answer echoed on the monitor port and matched in the
+				// activity-log table, so every poll looked like a mute event.
 				if mqttBridge != nil {
-					_, err := mqttBridge.ExecuteCommand(bticino.CmdBellQuery)
-					sipOk := err == nil
-					mqttBridge.PublishSIPStatus(sipOk)
-					if sipOk {
+					_, err := mqttBridge.ExecuteCommand(bticino.CmdSystemStatus)
+					alive := err == nil
+					mqttBridge.PublishSIPStatus(alive)
+					if alive {
 						monitorFields["sip_status"] = "registered"
-					} else {
-						monitorFields["sip_status"] = "unregistered"
-					}
-				}
-
-				// Publish system diagnostics (heartbeat via netcat)
-				if mqttBridge != nil {
-					_, err := mqttBridge.ExecuteCommand("*#130**1*2##")
-					if err == nil {
 						mqttBridge.PublishSystemDiagnostics("ok")
 						monitorFields["system_diag"] = "ok"
 					} else {
+						monitorFields["sip_status"] = "unregistered"
 						mqttBridge.PublishSystemDiagnostics("error")
 						monitorFields["system_diag"] = "error"
 					}
