@@ -25,6 +25,10 @@
   ignored) and API paths `/api/sip/devaddr/...` → `/api/sip/native-dev-addr/...`.
   The numeric `sip.dev_addr` is unrelated and unchanged; `sip.*` events now
   report it as `dev_addr`.
+- Answering-machine leftovers on units without one (Classe 100X) no longer
+  publish: the retained `voicemail` state, the `answering` device-config
+  mirror, the message parser and the `/api/status` component report are all
+  gone; `/api/status` says `message_parser: unavailable` instead.
 - SIP status and system diagnostics now share a single liveness probe
   (`*#130**1*2##`) instead of polling the doorbell query (`*#8**33##`),
   whose answer is echoed on the monitor port and was logged as

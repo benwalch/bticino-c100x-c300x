@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
+	"bticino_bridge/pkg/bticino"
 )
 
 // FileWatcher monitors changes in device configuration files
@@ -160,6 +162,9 @@ func (w *FileWatcher) publishConfigChange() {
 }
 
 func (w *FileWatcher) publishAnsweringChange(cfg *Config) {
+	if !bticino.AnsweringMachineAvailable() {
+		return
+	}
 	prefix := w.topicPrefix + "/answering"
 	activated := "false"
 	if cfg.Answering.Activated {

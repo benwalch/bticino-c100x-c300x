@@ -1679,7 +1679,9 @@ func (b *MQTTBridge) publishAllStates() {
 	sip := b.sipRegistered
 	b.mu.RUnlock()
 
-	b.publish(dp+"/voicemail", boolState(voicemail), true)
+	if bticino.AnsweringMachineAvailable() {
+		b.publish(dp+"/voicemail", boolState(voicemail), true)
+	}
 	b.publish(dp+"/audio/ring/muted", boolState(bell), true)
 	b.publish(dp+"/mute/state", boolState(mute), true)
 	b.publish(dp+"/display/power", boolState(display), true)

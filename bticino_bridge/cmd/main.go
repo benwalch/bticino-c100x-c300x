@@ -299,9 +299,14 @@ func main() {
 	// ==================== COMPONENTS: BTicino Integration ====================
 	logger.Info("🔧 Initializing Enhanced BTicino Components...")
 
-	// Initialize Message Parser for answering machine
-	messageParser = messageparser.NewMessageParser()
-	logger.Info("✅ Enhanced Message Parser: Configured for real BTicino filesystem")
+	// Initialize Message Parser for answering machine (300X only: the
+	// Classe 100X ships the binaries but has no answering machine).
+	if bticino.AnsweringMachineAvailable() {
+		messageParser = messageparser.NewMessageParser()
+		logger.Info("✅ Enhanced Message Parser: Configured for real BTicino filesystem")
+	} else {
+		logger.Info("Message Parser disabled: no answering machine on this unit")
+	}
 
 	// Initialize Enhanced Command Handler
 	if owClient != nil {

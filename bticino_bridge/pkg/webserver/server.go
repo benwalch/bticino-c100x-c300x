@@ -510,11 +510,15 @@ func (ws *WebServer) handleAPIStatus(w http.ResponseWriter, r *http.Request) {
 	messageCount := 0
 	newMessages := 0
 	storageUsed := "0%"
-	amStatus, err := ws.messageParser.GetAnsweringMachineStatus()
-	if err == nil {
-		messageCount = amStatus.TotalMessages
-		newMessages = amStatus.NewMessages
-		storageUsed = amStatus.StorageUsed
+	parserStatus := "unavailable"
+	if bticino.AnsweringMachineAvailable() {
+		parserStatus = "active"
+		amStatus, err := ws.messageParser.GetAnsweringMachineStatus()
+		if err == nil {
+			messageCount = amStatus.TotalMessages
+			newMessages = amStatus.NewMessages
+			storageUsed = amStatus.StorageUsed
+		}
 	}
 
 	status := map[string]interface{}{
@@ -529,7 +533,7 @@ func (ws *WebServer) handleAPIStatus(w http.ResponseWriter, r *http.Request) {
 		},
 		"components": map[string]interface{}{
 			"message_parser": map[string]interface{}{
-				"status":         "active",
+				"status":         parserStatus,
 				"messages_found": messageCount,
 				"new_messages":   newMessages,
 			},

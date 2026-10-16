@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
+	"bticino_bridge/pkg/bticino"
 )
 
 // MQTTPublisherInterface defines the interface for publishing to MQTT
@@ -97,7 +99,9 @@ func (p *DeviceMQTTPublisher) publishAll() {
 
 	// Publish each section
 	p.publishSystemConfig(cfg)
-	p.publishAnsweringMachine(cfg)
+	if bticino.AnsweringMachineAvailable() {
+		p.publishAnsweringMachine(cfg)
+	}
 	p.publishRingtones(cfg)
 	p.publishVolumes(cfg)
 	p.publishDisplay(cfg)
