@@ -25,6 +25,12 @@
   ignored) and API paths `/api/sip/devaddr/...` → `/api/sip/native-dev-addr/...`.
   The numeric `sip.dev_addr` is unrelated and unchanged; `sip.*` events now
   report it as `dev_addr`.
+- SIP self-healing: if Flexisip drops one of the bridge's connections (seen
+  once after ~19 h of uptime), the bridge now re-dials and re-registers that
+  identity with 1s→60s backoff instead of writing into the dead socket until
+  the next restart. A per-connection generation counter ignores errors from
+  already-replaced connections (no reconnect loops), the call state reports
+  `Reconnecting`, and the listener log spam (one line every 2 s) is gone.
 - Answering-machine leftovers on units without one (Classe 100X) no longer
   publish: the retained `voicemail` state, the `answering` device-config
   mirror, the message parser and the `/api/status` component report are all

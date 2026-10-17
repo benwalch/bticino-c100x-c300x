@@ -322,7 +322,7 @@ func isBenignReadError(err error) bool {
 // re-INVITEs (app calls carry a "Media change" one) and ending early on BYE
 // or stop.
 func (c *BTicinoSIPClient) drainCameraDialog(dlg *cameraDialog, stop <-chan struct{}, duration time.Duration) {
-	conn := c.webrtcID.conn
+	conn, gen := c.identityConn(c.webrtcID)
 	if conn == nil {
 		return
 	}
@@ -350,6 +350,7 @@ func (c *BTicinoSIPClient) drainCameraDialog(dlg *cameraDialog, stop <-chan stru
 			errs++
 			if errs >= 5 {
 				c.logger.WithError(err).Warn("Camera session: dialog connection lost")
+				c.connError(c.webrtcID, gen, err)
 				return
 			}
 			continue
@@ -400,7 +401,7 @@ func (c *BTicinoSIPClient) answerCameraReinvite(conn net.Conn, dlg *cameraDialog
 // for the native 200 OK and ACKs it. No fork is involved: the Request-URI
 // already names the native contact.
 func (c *BTicinoSIPClient) establishCameraDialog(uri, sdp string) (*cameraDialog, error) {
-	conn := c.webrtcID.conn
+	conn, gen := c.identityConn(c.webrtcID)
 	if conn == nil {
 		return nil, fmt.Errorf("sip not connected")
 	}
@@ -416,6 +417,7 @@ func (c *BTicinoSIPClient) establishCameraDialog(uri, sdp string) (*cameraDialog
 
 	inv := buildCameraInvite(c.config, uri, callID, fromTag, cseq, sdp)
 	if _, err := conn.Write([]byte(inv)); err != nil {
+		c.connError(c.webrtcID, gen, err)
 		return nil, fmt.Errorf("send INVITE: %w", err)
 	}
 	deadline := time.Now().Add(12 * time.Second)
@@ -423,6 +425,7 @@ func (c *BTicinoSIPClient) establishCameraDialog(uri, sdp string) (*cameraDialog
 	for time.Now().Before(deadline) {
 		msgs, err := c.readSIPMessagesFrom(conn, time.Until(deadline))
 		if err != nil {
+			c.connError(c.webrtcID, gen, err)
 			return nil, err
 		}
 		for _, response := range msgs {

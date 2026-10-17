@@ -32,6 +32,7 @@ const (
 	Connected
 	VideoStreaming
 	Terminating
+	Reconnecting
 )
 
 func (c CallState) String() string {
@@ -52,6 +53,8 @@ func (c CallState) String() string {
 		return "VideoStreaming"
 	case Terminating:
 		return "Terminating"
+	case Reconnecting:
+		return "Reconnecting"
 	default:
 		return "Unknown"
 	}
@@ -109,10 +112,14 @@ type sipIdentity struct {
 	username string
 	password string // HA1 hash
 	conn     net.Conn
-	fromTag  string
-	callID   string
-	cseq     int
-	mutex    sync.Mutex
+	// gen increments whenever conn is replaced; errors reported with an
+	// older generation are stale and must not trigger another reconnect.
+	gen          uint64
+	reconnecting bool
+	fromTag      string
+	callID       string
+	cseq         int
+	mutex        sync.Mutex
 	// readBuf holds leftover TCP bytes from a previous read that did not
 	// yet form a complete SIP message (framing, see readSIPMessagesFrom).
 	readBuf []byte
@@ -392,7 +399,11 @@ func (c *BTicinoSIPClient) registerIdentity(id *sipIdentity) error {
 	if err != nil {
 		return err
 	}
+	id.mutex.Lock()
 	id.conn = conn
+	id.gen++
+	id.readBuf = nil // framing leftovers belong to the old connection
+	id.mutex.Unlock()
 
 	c.logger.Infof("registerIdentity(%s): connected to %s, local addr: %s",
 		id.username, conn.RemoteAddr(), conn.LocalAddr())
@@ -400,11 +411,11 @@ func (c *BTicinoSIPClient) registerIdentity(id *sipIdentity) error {
 	registerMsg := c.buildRegisterRequestForIdentity(id)
 	c.logger.Debugf("registerIdentity(%s): sending REGISTER:\n%s", id.username, registerMsg)
 
-	if _, err := id.conn.Write([]byte(registerMsg)); err != nil {
+	if _, err := conn.Write([]byte(registerMsg)); err != nil {
 		return fmt.Errorf("failed to send REGISTER for %s: %v", id.username, err)
 	}
 
-	response, err := c.readSIPMessageFrom(id.conn, 10*time.Second)
+	response, err := c.readSIPMessageFrom(conn, 10*time.Second)
 	if err != nil {
 		return fmt.Errorf("failed to read REGISTER response for %s: %v", id.username, err)
 	}
@@ -459,11 +470,12 @@ func (c *BTicinoSIPClient) handleAuthChallengeForIdentity(id *sipIdentity, respo
 
 // unregisterIdentity sends REGISTER with expires=0
 func (c *BTicinoSIPClient) unregisterIdentity(id *sipIdentity) {
-	if id == nil || id.conn == nil {
+	conn, _ := c.identityConn(id)
+	if conn == nil {
 		return
 	}
 	msg := c.buildUnregisterRequestForIdentity(id)
-	id.conn.Write([]byte(msg))
+	conn.Write([]byte(msg))
 }
 
 // localListener listens for incoming SIP messages on the answerer identity
@@ -480,20 +492,26 @@ func (c *BTicinoSIPClient) localListener() {
 		default:
 		}
 
-		if c.localID == nil || c.localID.conn == nil {
+		if c.localID == nil {
+			c.logger.Warnf("%s connection lost, listener exiting", c.answerUser)
+			return
+		}
+		conn, gen := c.identityConn(c.localID)
+		if conn == nil {
 			c.logger.Warnf("%s connection lost, listener exiting", c.answerUser)
 			return
 		}
 
-		msg, err := c.readSIPMessageFrom(c.localID.conn, 60*time.Second)
+		msg, err := c.readSIPMessageFrom(conn, 60*time.Second)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				// Timeout is normal — just keep listening
 				continue
 			}
 			c.logger.WithError(err).Warnf("%s listener: read error", c.answerUser)
-			// Try to reconnect
-			time.Sleep(2 * time.Second)
+			if c.connError(c.localID, gen, err) {
+				return // reconnectLoop starts a fresh listener
+			}
 			continue
 		}
 
@@ -845,10 +863,12 @@ func (c *BTicinoSIPClient) MakeCall(target string) error {
 	inviteMsg := c.buildInviteRequest(target)
 	c.logger.Infof("=== MAKECALL: Sending INVITE ===\n%s", inviteMsg)
 
-	c.webrtcID.mutex.Lock()
-	_, err := c.webrtcID.conn.Write([]byte(inviteMsg))
-	c.webrtcID.mutex.Unlock()
-	if err != nil {
+	conn, gen := c.identityConn(c.webrtcID)
+	if conn == nil {
+		return fmt.Errorf("failed to send INVITE: no connection")
+	}
+	if _, err := conn.Write([]byte(inviteMsg)); err != nil {
+		c.connError(c.webrtcID, gen, err)
 		return fmt.Errorf("failed to send INVITE: %v", err)
 	}
 
@@ -859,12 +879,13 @@ func (c *BTicinoSIPClient) MakeCall(target string) error {
 	gotOK := false
 
 	for time.Now().Before(deadline) {
-		messages, readErr := c.readSIPMessagesFrom(c.webrtcID.conn, time.Until(deadline))
+		messages, readErr := c.readSIPMessagesFrom(conn, time.Until(deadline))
 		if readErr != nil {
 			if netErr, ok := readErr.(net.Error); ok && netErr.Timeout() {
 				c.logger.Warn("=== MAKECALL: Timeout waiting for response ===")
 				break
 			}
+			c.connError(c.webrtcID, gen, readErr)
 			return fmt.Errorf("failed to read INVITE response: %v", readErr)
 		}
 
@@ -1288,6 +1309,8 @@ func (c *BTicinoSIPClient) buildSDP() string {
 }
 
 func (c *BTicinoSIPClient) Hangup() error {
+	conn, _ := c.identityConn(c.webrtcID)
+
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -1300,17 +1323,23 @@ func (c *BTicinoSIPClient) Hangup() error {
 
 		byeMsg := c.buildByeRequest()
 
-		if c.webrtcID != nil && c.webrtcID.conn != nil {
-			if _, err := c.webrtcID.conn.Write([]byte(byeMsg)); err != nil {
+		if conn != nil {
+			if _, err := conn.Write([]byte(byeMsg)); err != nil {
 				c.logger.WithError(err).Error("Failed to send BYE")
-				c.callState = Registered
 				c.sessionActive = false
+				// Reconnect owns callState while it runs.
+				if c.callState != Reconnecting {
+					c.callState = Registered
+				}
 				c.eventBus.PublishWithSource("sip.call.ended", map[string]interface{}{}, "sip")
 				return err
 			}
 		}
 
 		c.sessionActive = false
+	}
+	if c.callState == Reconnecting {
+		return nil
 	}
 	if c.callState != Registered || c.sessionActive {
 		c.callState = Registered
@@ -1375,18 +1404,8 @@ func (c *BTicinoSIPClient) registrationManager() {
 			// Only re-register when idle or registered (not during a call)
 			if state == Registered || state == Idle {
 				c.logger.Debug("Re-registering SIP identities")
-
-				if c.webrtcID != nil {
-					if err := c.reRegisterIdentity(c.webrtcID); err != nil {
-						c.logger.WithError(err).Error("Failed to refresh webrtc registration")
-					}
-				}
-
-				if c.localID != nil {
-					if err := c.reRegisterIdentity(c.localID); err != nil {
-						c.logger.WithError(err).Errorf("Failed to refresh %s registration", c.answerUser)
-					}
-				}
+				c.refreshRegistration(c.webrtcID)
+				c.refreshRegistration(c.localID)
 			}
 		}
 	}
