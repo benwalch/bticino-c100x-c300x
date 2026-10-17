@@ -33,6 +33,8 @@ architecture and capabilities.
 | Document | Description |
 |----------|-------------|
 | [FLEXISIP_LOCAL_CONFIG.md](FLEXISIP_LOCAL_CONFIG.md) | Flexisip SIP proxy configuration on the device |
+| [FLEXISIP_C100X_SETUP.md](FLEXISIP_C100X_SETUP.md) | Local SIP identities for this unit (webrtc/c100x) |
+| [NATIVE_FIRMWARE.md](NATIVE_FIRMWARE.md) | **Native firmware findings** — Flexisip internals, keystore/passphrase trap, SIP/OWN behaviour, operational do-nots |
 | [SERVER_INFORMATION.md](SERVER_INFORMATION.md) | Device details: firmware, network, filesystem |
 | [VERSIONING.md](VERSIONING.md) | Versioning strategy and release process |
 

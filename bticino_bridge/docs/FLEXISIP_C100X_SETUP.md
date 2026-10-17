@@ -93,8 +93,11 @@ gap, §6).
 
 ## 6. Bridge-side follow-ups (repo)
 
-* Reconnect-on-failure in `registrationManager` (`pkg/sip/client.go`):
-  re-REGISTER errors must redial + full REGISTER, not retry dead sockets.
+* ~~Reconnect-on-failure in `registrationManager` (`pkg/sip/client.go`)~~ —
+  **done 2026-10-17**: a lost connection re-dials and re-registers that identity
+  with 1s→60s backoff (`pkg/sip/sip_reconnect.go`); a per-connection generation
+  counter ignores errors from replaced sockets. Verified by two forced Flexisip
+  outages.
 * TCP framing rewrite (same file, uncommitted at time of writing):
   per-identity leftover buffering + Content-Length framing; the old
   single-`Read` splitter drops coalesced messages and chokes on fragments
@@ -102,10 +105,16 @@ gap, §6).
 
 ## 7. Rollback
 
+⚠️ **`flexisipsh start` alone is not enough on this unit.** The TLS transport
+(5061) needs the keystore passphrase, which is only pushed at boot through
+`/var/tmp/bt_answering_machine.fifo` by `bt_answering_machine`. Worse, even a
+hand-restarted Flexisip leaves the **native** SIP client unregistered — the
+unit then cannot be reached until it is rebooted. See
+[NATIVE_FIRMWARE.md](NATIVE_FIRMWARE.md) §3.4/§3.8.
+
 ```bash
 cp /home/bticino/cfg/extra/users.db.txt.bak-<ts> /etc/flexisip/users/users.db.txt
-/etc/init.d/flexisipsh stop; sleep 2
-/etc/init.d/flexisipsh start <current-lan-ip>
+# then reboot the device — do NOT restart flexisip by hand
 ```
 
 Then restart the bridge. The unit returns to pre-change SIP behavior
