@@ -6,6 +6,7 @@ ha_config/my_login_details.md
 ha_config/info_wifi.txt
 *.pem
 *.key
+*.crt
 
 # === Python ===
 __pycache__/
@@ -24,3 +25,6 @@ venv/
 .DS_Store
 Thumbs.db
 prepare_firmware.log
+
+# internal execution workspace (ledger/scratch — never public)
+.internal/

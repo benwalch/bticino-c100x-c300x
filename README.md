@@ -25,7 +25,7 @@ git clone https://github.com/fquinto/bticinoClasse300x.git
 cd bticino-c100x-c300x
 sudo python3 -m pip install --upgrade pip
 sudo python3 -m pip install -r requirements.txt
-sudo python3 main.py
+sudo python3 legacy/main.py
 ```
 
 (Using Docker):
@@ -47,7 +47,7 @@ docker compose run bticino
 
 ### SSH availability
 
-Every firmware built by `main.py` includes `bt_ssh_guard`, with or without MQTT. It checks once a
+Every firmware built by `legacy/main.py` includes `bt_ssh_guard`, with or without MQTT. It checks once a
 minute that port 22 is listening and otherwise restarts dropbear. `init` respawns the guard itself
 (`sshg` entry in `/etc/inittab`).
 

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Repository layout follows upstream: the firmware build script and its helpers
+  moved to `legacy/`.
+  Migration: run `sudo python3 legacy/main.py` from the repository root.
 - Breaking: `sip.native_dev_addr` no longer falls back to a built-in unit
   address, because that address belongs to one unit. Camera sessions now
   refuse to start while it is unset.

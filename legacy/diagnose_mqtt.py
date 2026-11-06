@@ -246,8 +246,8 @@ class MQTTDiagnostic:
         if any("sudo" in issue.lower() for issue in self.issues_found):
             print("   • Run firmware preparation with proper sudo privileges")
         
-        print("   • Check the improved error messages in main.py during firmware preparation")
-        print("   • Use 'sudo python3 main.py' to see detailed error output")
+        print("   • Check the improved error messages in legacy/main.py during firmware preparation")
+        print("   • Use 'sudo python3 legacy/main.py' to see detailed error output")
         print()
 
 def main():
