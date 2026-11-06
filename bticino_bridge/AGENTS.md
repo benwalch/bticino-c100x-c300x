@@ -22,12 +22,12 @@ Even in build mode, propose a detailed plan first what you are going to do
 - Keep the commit message precise but don't get too long.
 - Avoid overly verbose description in the message. (no changelog-like text in the commit).
 - Never include Co-Authored-By: in the commit message
+- when committing files with secrets, device ids or other identifiers: replace secrets with "<CHANGE-ME>" or other appropriate placeholders before committing, change them back after committing.
 
 ### Documenting changes
 If something changes, note it in CHANGELOG.md.
 For breaking changes, describe a migration path if possible
-Never include any secrets in the commit. replace secrets with "<CHANGE-ME>" before committing,
-change them back after committing.
+Never include any secrets, current IP or MAC Adresses, device IDS or other identifiers in the documentation, always use a placeholder or a default value
 
 ## Device access
 - Host: ask the user for the current IP at the start of every session.
