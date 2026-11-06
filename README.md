@@ -22,7 +22,7 @@ When running the Python script, you'll have these options:
 
 ```bash
 git clone https://github.com/fquinto/bticinoClasse300x.git
-cd bticinoClasse300x
+cd bticino-c100x-c300x
 sudo python3 -m pip install --upgrade pip
 sudo python3 -m pip install -r requirements.txt
 sudo python3 main.py
@@ -32,7 +32,7 @@ sudo python3 main.py
 
 ```bash
 git clone https://github.com/fquinto/bticinoClasse300x.git
-cd bticinoClasse300x
+cd bticino-c100x-c300x
 docker compose run bticino
 ```
 
