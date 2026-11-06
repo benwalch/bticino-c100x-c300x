@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Firmware builds now always include `bt_ssh_guard`: `init` respawns it, and it
+  restarts dropbear when port 22 stops listening, recording each outage on flash.
+  It replaces the dropbear check in `bt_service_watchdog`, which offered no
+  protection without MQTT and was fooled by open SSH sessions.
+  Migration: rebuild and flash the firmware, or install the script and the
+  `sshg` inittab entry by hand (see the root `README.md`).
 - Camera session switch (`switch.bticino_video_session`, opt-in via
   `streaming.camera_session`): bridge-initiated headless video over a
   loopback self-call the native unit answers (display stays off). Manual

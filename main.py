@@ -19,6 +19,9 @@ import pyminizip
 import wget
 import re
 
+SSH_GUARD_PATH = '/usr/sbin/bt_ssh_guard'
+SSH_GUARD_INITTAB_ENTRY = f'sshg:5:respawn:{SSH_GUARD_PATH}'
+
 class PrepareFirmware():
     """Firmware prepare class."""
 
@@ -299,6 +302,8 @@ class PrepareFirmware():
         self.setup_ssh_key_rights()
         self.enable_dropbear()
         self.logger.info('Enabled dropbear')
+        self.install_ssh_guard(cwd)
+        self.logger.info('Installed SSH guard')
         self.save_version(cwd, __version__)
         if self.install_mqtt == 'y':
             ok = self.prepare_mqtt(cwd)
@@ -672,7 +677,7 @@ class PrepareFirmware():
             (f'{cwd}/mqtt_scripts/filter.py', f'{self.mnt_loc}/home/root/filter.py', '775', True),
             (f'{cwd}/mqtt_scripts/jq-linux-armhf', f'{self.mnt_loc}/usr/bin/jq', '775', True),
             (f'{cwd}/mqtt_scripts/evtest', f'{self.mnt_loc}/usr/bin/evtest', '775', True),
-            # Service watchdog — monitors dropbear, scsserver, mosquitto and
+            # Service watchdog — monitors scsserver, mosquitto and
             # TcpDump2Mqtt itself; installs as a standard init.d service so it
             # runs independently and survives TcpDump2Mqtt crashes.
             (f'{cwd}/mqtt_scripts/bt_service_watchdog',
@@ -916,6 +921,22 @@ class PrepareFirmware():
         # return to temporary folder
         os.chdir(self.workingdir)
         print('enabled ✅')
+
+    def install_ssh_guard(self, cwd):
+        """Install the guard that restarts dropbear; init respawns the guard itself."""
+        print('Installing SSH guard... ', end='', flush=True)
+        guard_in_image = f'{self.mnt_loc}{SSH_GUARD_PATH}'
+        subprocess.run(['sudo', 'cp', f'{cwd}/firmware_scripts/bt_ssh_guard', guard_in_image],
+                       check=True)
+        subprocess.run(['sudo', 'chmod', '755', guard_in_image], check=True)
+
+        inittab = f'{self.mnt_loc}/etc/inittab'
+        with open(inittab, 'r', encoding='utf-8') as f:
+            entry_present = SSH_GUARD_INITTAB_ENTRY in f.read().splitlines()
+        if not entry_present:
+            subprocess.run(['sudo', 'tee', '-a', inittab], input=f'\n{SSH_GUARD_INITTAB_ENTRY}\n',
+                           text=True, stdout=subprocess.DEVNULL, check=True)
+        print('installed ✅')
 
     def save_version(self, cwd, version):
         """Save version."""

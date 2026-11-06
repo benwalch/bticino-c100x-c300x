@@ -1,15 +1,16 @@
 #!/bin/sh
 ### BEGIN INIT INFO
 # Provides:          bt-service-watchdog
-# Required-Start:    $network dropbear mosquitto
+# Required-Start:    $network mosquitto
 # Required-Stop:     $network
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: BTicino service watchdog
-# Description:       Monitors critical BTicino daemons (dropbear, scsserver,
-#                    mosquitto, TcpDump2Mqtt) and restarts them if they crash.
-#                    Runs independently of TcpDump2Mqtt so that SSH and gate
-#                    commands remain available even if the MQTT bridge fails.
+# Description:       Monitors critical BTicino daemons (scsserver, mosquitto,
+#                    TcpDump2Mqtt) and restarts them if they crash.
+#                    Runs independently of TcpDump2Mqtt so that gate commands
+#                    remain available even if the MQTT bridge fails.
+#                    dropbear is supervised by bt_ssh_guard.
 ### END INIT INFO
 
 PIDFILE=/var/run/bt_service_watchdog.pid
@@ -20,12 +21,6 @@ watchdog_loop() {
 	echo "$(date): BTicino service watchdog started (PID $$)" >> $LOGFILE
 
 	while true; do
-		# --- dropbear (SSH server) ---
-		if ! /usr/bin/pgrep -x dropbear > /dev/null 2>&1; then
-			echo "$(date): dropbear not running - restarting" >> $LOGFILE
-			/etc/init.d/dropbear start >> $LOGFILE 2>&1
-		fi
-
 		# --- scsserver (SCS bus daemon - required for gate/intercom commands) ---
 		if ! /usr/bin/pgrep -x scsserver > /dev/null 2>&1; then
 			echo "$(date): scsserver not running - restarting via bt_daemon-apps" >> $LOGFILE

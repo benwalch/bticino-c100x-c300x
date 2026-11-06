@@ -1,0 +1,24 @@
+#!/bin/sh
+GUARD_LOG=/home/bticino/cfg/extra/ssh_guard.log
+SYSLOG_COPY=/home/bticino/cfg/extra/ssh_guard_syslog.log
+
+ssh_is_listening() {
+    grep -qsE ':0016 [0-9A-F]+:0000 0A' /proc/net/tcp /proc/net/tcp6
+}
+
+save_diagnostics() {
+    { date; ps -ef; } >> "$GUARD_LOG"
+    cp /var/log/log_rotation.log "$SYSLOG_COPY"
+}
+
+outage_recorded=false
+while true; do
+    sleep 60
+    if ssh_is_listening; then
+        outage_recorded=false
+        continue
+    fi
+    "$outage_recorded" || save_diagnostics
+    outage_recorded=true
+    /etc/init.d/dropbear start >> "$GUARD_LOG" 2>&1
+done

@@ -123,8 +123,9 @@ Two buttons in HA's **Configuration** section, **off by default**. Enable with
 | Restart device | `bticino/system/reboot/set` | **Reboots the whole intercom** (`/sbin/reboot`) |
 
 > ⚠️ The reboot button restarts the entire door unit. Restarting dropbear (SSH)
-> is intentionally **not** offered — the device has no service supervisor for it,
-> so a failed restart would drop SSH permanently.
+> is intentionally **not** offered. Firmware built with `bt_ssh_guard` brings a
+> stopped dropbear back within about a minute; without it, a failed restart
+> leaves the unit without SSH until the next reboot.
 
 ## Doorbell camera
 
