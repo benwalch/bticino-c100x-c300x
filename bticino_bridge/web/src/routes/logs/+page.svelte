@@ -69,7 +69,7 @@
     {#if loading}
       <div class="loading">Loading logs...</div>
     {:else if error}
-      <div class="error">Error: {error}</div>
+      <div class="error-banner">Error: {error}</div>
     {:else}
       <!-- Controls -->
       <div class="controls-bar">
@@ -338,15 +338,19 @@
     font-size: 1.2rem;
   }
   
-  .loading, .error {
+  .loading, .error-banner {
     text-align: center;
     padding: 3rem;
     font-size: 1.2rem;
   }
   
-  .error {
+  .error-banner {
     color: #f44336;
     background: #FFEBEE;
     border-radius: 8px;
+  }
+
+  .error {
+    color: #f44336;
   }
 </style>
