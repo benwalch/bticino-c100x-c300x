@@ -9,13 +9,25 @@ The software was originally written for Classe 300X — verify 300X assumptions
 ### Always propose your plan
 Even in build mode, propose a detailed plan first what you are going to do
 
+### Code and comments
+- Write "speaking code", a reader understands by reading code, not comments.
+- This should not lead to "over-engineering", implementing methods only for readiness would be the wrong  
+  implementation of this rule.
+- No overly verbose code commenting. Re-think your implementation if detailed comments are 
+  needed to understand it.
+- If you need to comment an implementation, keep it short but precise
+- Documentation belongs to README.md, if appropriate in CHANGELOG.md as well.
+
 ### Commits
-Keep the commit message precise but don't get too long.
-Avoid overly verbose description in the message. (no changelog-like text in the commit).
+- Keep the commit message precise but don't get too long.
+- Avoid overly verbose description in the message. (no changelog-like text in the commit).
+- Never include Co-Authored-By: in the commit message
 
 ### Documenting changes
 If something changes, note it in CHANGELOG.md.
 For breaking changes, describe a migration path if possible
+Never include any secrets in the commit. replace secrets with "<CHANGE-ME>" before committing,
+change them back after committing.
 
 ## Device access
 - Host: ask the user for the current IP at the start of every session.
