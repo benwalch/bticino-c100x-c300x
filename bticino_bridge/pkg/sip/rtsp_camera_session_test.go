@@ -30,7 +30,7 @@ func newCameraRTSPServerWithState(t *testing.T, state CallState) (*EnhancedRTSPS
 		atomic.AddInt32(&stopped, 1)
 	})
 	c := &BTicinoSIPClient{
-		config:     &SIPConfig{},
+		config:     &SIPConfig{NativeDevAddr: "00000000-0000-4000-8000-000000000001"},
 		callState:  state,
 		eventBus:   bus,
 		logger:     logger,

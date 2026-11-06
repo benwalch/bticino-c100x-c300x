@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Breaking: `sip.native_dev_addr` no longer falls back to a built-in unit
+  address, because that address belongs to one unit. Camera sessions now
+  refuse to start while it is unset.
+  Migration: set `sip.native_dev_addr`, or find it with the settings wizard.
 - Firmware builds now always include `bt_ssh_guard`: `init` respawns it, and it
   restarts dropbear when port 22 stops listening, recording each outage on flash.
   It replaces the dropbear check in `bt_service_watchdog`, which offered no
@@ -20,7 +24,7 @@
   still to the doorbell camera entity.
 - Unit address for the session SDP offer: `sip.native_dev_addr`, the unit UUID
   offered as `a=DEVADDR`. Verified per unit — a wrong value is refused with an
-  instant 486 — and empty falls back to the validated default. The settings SIP
+  instant 486. The settings SIP
   tab gains a guided discovery wizard: passive 30s listen on the loopback SIP
   leg while the user starts a camera view in the app, auto-verify of the found
   value with one test INVITE (a 486 after provisionals means the unit is busy,

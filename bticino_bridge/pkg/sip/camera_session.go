@@ -12,11 +12,6 @@ import (
 	"bticino_bridge/pkg/bticino"
 )
 
-// DefaultNativeDevAddr is the fallback offer address (validated unit).
-func DefaultNativeDevAddr() string { return defaultNativeDevAddr }
-
-const defaultNativeDevAddr = "00000000-0000-4000-8000-000000000001"
-
 // cameraDialog is a confirmed loopback dialog with the native unit.
 type cameraDialog struct {
 	callID  string
@@ -95,7 +90,12 @@ func (c *BTicinoSIPClient) runCameraSession(duration time.Duration) {
 		c.logger.WithError(err).Warn("Camera session: no native contact")
 		return
 	}
-	sdp, err := buildCameraSDP(c.sessionNativeDevAddr())
+	nativeDevAddr := c.sessionNativeDevAddr()
+	if nativeDevAddr == "" {
+		c.logger.Warn("Camera session: sip.native_dev_addr is not configured")
+		return
+	}
+	sdp, err := buildCameraSDP(nativeDevAddr)
 	if err != nil {
 		c.logger.WithError(err).Warn("Camera session: no media offer")
 		return
@@ -218,13 +218,11 @@ func parseProcNetTCP(data string, ownPorts map[int]bool, user string) (string, e
 	return "", fmt.Errorf("unreachable")
 }
 
-// sessionNativeDevAddr resolves the offer address: configured per unit,
-// fallback to the validated one.
 func (c *BTicinoSIPClient) sessionNativeDevAddr() string {
-	if c.config != nil && c.config.NativeDevAddr != "" {
-		return c.config.NativeDevAddr
+	if c.config == nil {
+		return ""
 	}
-	return defaultNativeDevAddr
+	return c.config.NativeDevAddr
 }
 
 // buildCameraSDP offers speex audio + H264 video with fresh crypto keys,

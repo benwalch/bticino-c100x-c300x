@@ -33,7 +33,7 @@ func newSessionTestClient() (*BTicinoSIPClient, *int32, *int32) {
 		atomic.AddInt32(&stopped, 1)
 	})
 	c := &BTicinoSIPClient{
-		config:     &SIPConfig{},
+		config:     &SIPConfig{NativeDevAddr: "00000000-0000-4000-8000-000000000001"},
 		callState:  Registered,
 		eventBus:   bus,
 		logger:     logrus.New(),
@@ -188,11 +188,30 @@ func TestIsBenignReadError(t *testing.T) {
 	}
 }
 
-// Empty config falls back to the validated address; a set value wins.
-func TestSessionNativeDevAddrFallback(t *testing.T) {
+func TestCameraSessionWithoutNativeDevAddrNeverDials(t *testing.T) {
+	c, _, stopped := newSessionTestClient()
+	c.config.NativeDevAddr = ""
+	c.resolveNativeFunc = func() (string, error) { return "sip:native@127.0.0.1:54688", nil }
+	var dialed int32
+	c.establishDialogFunc = func(string, string) (*cameraDialog, error) {
+		atomic.AddInt32(&dialed, 1)
+		return nil, errors.New("must not dial")
+	}
+	if err := c.StartCameraSession(60*time.Millisecond, "test"); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if !waitEnded(stopped, 1) {
+		t.Fatal("no stopped event")
+	}
+	if got := atomic.LoadInt32(&dialed); got != 0 {
+		t.Fatalf("dialed %d times", got)
+	}
+}
+
+func TestSessionNativeDevAddrComesFromConfigOnly(t *testing.T) {
 	c := &BTicinoSIPClient{config: &SIPConfig{}}
-	if got := c.sessionNativeDevAddr(); got != defaultNativeDevAddr {
-		t.Fatalf("fallback = %q", got)
+	if got := c.sessionNativeDevAddr(); got != "" {
+		t.Fatalf("unset = %q", got)
 	}
 	c.config.NativeDevAddr = "custom-devaddr"
 	if got := c.sessionNativeDevAddr(); got != "custom-devaddr" {

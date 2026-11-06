@@ -56,8 +56,7 @@ func (ws *WebServer) handleAPINativeDevAddr(w http.ResponseWriter, r *http.Reque
 	value := ws.config.SIP.NativeDevAddr
 	source := "configured"
 	if value == "" {
-		value = sip.DefaultNativeDevAddr()
-		source = "default"
+		source = "unset"
 	}
 	ws.writeJSON(w, map[string]interface{}{"value": value, "source": source})
 }

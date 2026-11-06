@@ -83,8 +83,8 @@ type SIPConfig struct {
 	SIPTarget     string          `yaml:"sip_target"`   // INVITE target user override (default: answerer per DeviceVariant)
 	// NativeDevAddr is the unit UUID offered in session SDP (a=DEVADDR).
 	// Unrelated to DevAddr above (the numeric WHO address). Verified per
-	// unit: a wrong value gets an instant 486. Empty falls back to the
-	// unit it was validated on; find yours by capturing one app call.
+	// unit: a wrong value gets an instant 486. Required for camera sessions;
+	// find yours by capturing one app call.
 	NativeDevAddr string `yaml:"native_dev_addr"`
 }
 
