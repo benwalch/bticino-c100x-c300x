@@ -60,6 +60,10 @@ type EnhancedRTSPServer struct {
 	// precedence over videoActivation; both false rejects all demand.
 	cameraSession     bool
 	cameraSessionHold time.Duration
+	// prefetchedStill is captured while the video leg is still up (during the
+	// teardown grace) so the session does not have to capture it before BYE.
+	prefetchedStill []byte
+	prefetchedAt    time.Time
 	// lastAttempt/awaitingSession pace async dials: a fresh dial needs
 	// quiet time after the previous attempt, and only a confirmed start
 	// clears the in-flight marker. Without this, viewer churn redials
@@ -732,9 +736,41 @@ func (r *EnhancedRTSPServer) stopMediaWhenIdle(reason string) {
 				"reason": reason,
 			}, "gstreamer")
 		}
+		// Capture the end-of-session still while the video leg is still up;
+		// it runs alongside the grace instead of delaying the teardown.
+		go r.prefetchStill()
 		time.Sleep(5 * time.Second)
 		r.releaseSelfCallIfIdle(reason)
 	}()
+}
+
+// prefetchStill stores one still for the session that is about to be stopped.
+// Only meaningful while an RTSP-owned camera session is feeding the relay.
+func (r *EnhancedRTSPServer) prefetchStill() {
+	if r.sipClient == nil || !r.sipClient.CameraSessionActive() ||
+		r.sipClient.CameraSessionSource() != "rtsp" {
+		return
+	}
+	jpeg := r.SnapshotRelayFrame(4 * time.Second)
+	if jpeg == nil {
+		return
+	}
+	r.mutex.Lock()
+	r.prefetchedStill = jpeg
+	r.prefetchedAt = time.Now()
+	r.mutex.Unlock()
+}
+
+// TakePrefetchedStill returns and clears a still captured during teardown.
+func (r *EnhancedRTSPServer) TakePrefetchedStill(maxAge time.Duration) []byte {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	if r.prefetchedStill == nil || time.Since(r.prefetchedAt) > maxAge {
+		return nil
+	}
+	jpeg := r.prefetchedStill
+	r.prefetchedStill = nil
+	return jpeg
 }
 
 // cleanupConnectionSessions removes all sessions that used a specific TCP connection.
@@ -1038,11 +1074,13 @@ func (r *EnhancedRTSPServer) releaseSelfCallIfIdle(reason string) {
 	}
 	// Only reap sessions the RTSP side owns: an MQTT-started session with
 	// no viewers must keep running (an earlier version killed those here).
+	stoppedCamera := false
 	if r.sipClient != nil && r.sipClient.CameraSessionActive() {
 		if r.sipClient.CameraSessionSource() != "rtsp" {
 			return
 		}
 		r.sipClient.StopCameraSession()
+		stoppedCamera = true
 	} else if r.sipClient != nil {
 		r.sipClient.Hangup()
 	}
@@ -1055,6 +1093,11 @@ func (r *EnhancedRTSPServer) releaseSelfCallIfIdle(reason string) {
 	r.selfCallCooldownUntil = time.Time{}
 	r.coopActivated = false
 	r.mutex.Unlock()
+	if stoppedCamera {
+		// The session publishes sip.call.ended after its BYE; publishing it
+		// here would disarm the video tap before the still is captured.
+		return
+	}
 	r.eventBus.PublishWithSource("sip.call.ended", map[string]interface{}{
 		"reason": reason,
 	}, "sip")

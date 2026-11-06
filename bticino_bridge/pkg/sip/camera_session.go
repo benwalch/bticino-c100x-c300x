@@ -119,9 +119,13 @@ func (c *BTicinoSIPClient) runCameraSession(duration time.Duration) {
 	}, "sip")
 	c.logger.Info("Camera session connected, holding media window")
 	c.eventBus.PublishWithSource("video.session.started", map[string]interface{}{}, "sip")
-	c.drainCameraDialog(dlg, stop, duration)
-	if jpeg := c.grabFrame(); jpeg != nil {
-		c.eventBus.PublishWithSource("video.session.frame", map[string]interface{}{"jpeg": jpeg}, "sip")
+	reason := c.drainCameraDialog(dlg, stop, duration)
+	c.logger.Infof("Camera session: stopping (%s)", reason)
+	// A dialog ended by the native side has no video left worth capturing.
+	if reason != sessionEndNative {
+		if jpeg := c.grabFrame(); jpeg != nil {
+			c.eventBus.PublishWithSource("video.session.frame", map[string]interface{}{"jpeg": jpeg}, "sip")
+		}
 	}
 	c.terminate(dlg)
 	c.mutex.Lock()
@@ -318,25 +322,32 @@ func isBenignReadError(err error) bool {
 	return strings.Contains(err.Error(), "timeout")
 }
 
+// Camera session end reasons, logged by runCameraSession.
+const (
+	sessionEndStopRequested = "stop requested"
+	sessionEndNative        = "native ended the dialog"
+	sessionEndReadErrors    = "dialog connection lost"
+	sessionEndHoldElapsed   = "hold elapsed"
+)
+
 // drainCameraDialog holds the dialog for duration, answering mid-dialog
-// re-INVITEs (app calls carry a "Media change" one) and ending early on BYE
-// or stop.
-func (c *BTicinoSIPClient) drainCameraDialog(dlg *cameraDialog, stop <-chan struct{}, duration time.Duration) {
+// re-INVITEs (app calls carry a "Media change" one) and returns why it ended.
+func (c *BTicinoSIPClient) drainCameraDialog(dlg *cameraDialog, stop <-chan struct{}, duration time.Duration) string {
 	conn, gen := c.identityConn(c.webrtcID)
 	if conn == nil {
-		return
+		return sessionEndReadErrors
 	}
 	deadline := time.Now().Add(duration)
 	var errs int
 	for {
 		select {
 		case <-stop:
-			return
+			return sessionEndStopRequested
 		default:
 		}
 		remaining := time.Until(deadline)
 		if remaining <= 0 {
-			return
+			return sessionEndHoldElapsed
 		}
 		if remaining > 2*time.Second {
 			remaining = 2 * time.Second
@@ -351,7 +362,7 @@ func (c *BTicinoSIPClient) drainCameraDialog(dlg *cameraDialog, stop <-chan stru
 			if errs >= 5 {
 				c.logger.WithError(err).Warn("Camera session: dialog connection lost")
 				c.connError(c.webrtcID, gen, err)
-				return
+				return sessionEndReadErrors
 			}
 			continue
 		}
@@ -362,7 +373,7 @@ func (c *BTicinoSIPClient) drainCameraDialog(dlg *cameraDialog, stop <-chan stru
 				c.answerCameraReinvite(conn, dlg, m)
 			case m.Method == "BYE":
 				c.sendBYEResponse(c.webrtcID, m)
-				return
+				return sessionEndNative
 			}
 		}
 	}

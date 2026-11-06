@@ -656,11 +656,16 @@ func main() {
 			logger.Info("MQTT: camera session switch wired (native answers loopback self-call)")
 		}
 
-		// End-of-session stills come from the live relay flow. 8s matches the
-		// proven cooperative timeout: the decoder must launch and sync to
-		// an IDR before frames are clean.
+		// End-of-session stills come from the live relay flow: prefer the one
+		// captured during the teardown grace (8s matches the proven
+		// cooperative timeout as fallback).
 		if sipStarted && sipClient != nil && rtspServer != nil {
-			sipClient.SetFrameGrabber(func() []byte { return rtspServer.SnapshotRelayFrame(8 * time.Second) })
+			sipClient.SetFrameGrabber(func() []byte {
+				if jpeg := rtspServer.TakePrefetchedStill(20 * time.Second); jpeg != nil {
+					return jpeg
+				}
+				return rtspServer.SnapshotRelayFrame(8 * time.Second)
+			})
 		}
 	} else {
 		logger.Info("Video/SIP system disabled in configuration")

@@ -31,6 +31,16 @@
   ignored) and API paths `/api/sip/devaddr/...` → `/api/sip/native-dev-addr/...`.
   The numeric `sip.dev_addr` is unrelated and unchanged; `sip.*` events now
   report it as `dev_addr`.
+- Camera sessions now log why they ended (`stop requested`, `native ended the
+  dialog`, `dialog connection lost`, `hold elapsed`) and skip the
+  end-of-session still when the native side already ended the dialog — there is
+  no video left to capture, and it used to burn the full 8 s timeout.
+- Ending an RTSP view stops the native session ~10 s sooner: the
+  end-of-session still is now captured during the teardown grace (video still
+  flowing) instead of after the session had been torn down, where it burned
+  the full 8 s timeout and published nothing. `sip.call.ended` is no longer
+  published ahead of the session's own BYE, so the video tap stays armed for
+  the capture.
 - SIP self-healing: if Flexisip drops one of the bridge's connections (seen
   once after ~19 h of uptime), the bridge now re-dials and re-registers that
   identity with 1s→60s backoff instead of writing into the dead socket until
