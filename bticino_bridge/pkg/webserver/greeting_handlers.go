@@ -54,14 +54,30 @@ const (
 func (ws *WebServer) handleGreeting(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
+		if ws.rejectWithoutAnsweringMachine(w) {
+			return
+		}
 		ws.handleGreetingSet(w, r)
 	case http.MethodGet:
 		ws.handleGreetingStatus(w, r)
 	case http.MethodDelete:
+		if ws.rejectWithoutAnsweringMachine(w) {
+			return
+		}
 		ws.handleGreetingClear(w, r)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (ws *WebServer) rejectWithoutAnsweringMachine(w http.ResponseWriter) bool {
+	if bticino.AnsweringMachineAvailable() {
+		return false
+	}
+	ws.writeTalkbackJSON(w, http.StatusNotImplemented, map[string]interface{}{
+		"success": false, "error": "this unit has no answering machine",
+	})
+	return true
 }
 
 // handleGreetingSet recibe un audio en el cuerpo, lo normaliza a PCM s16le
