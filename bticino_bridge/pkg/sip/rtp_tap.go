@@ -32,6 +32,11 @@ func NativeVideoRTPPortForVariant(variant string) int {
 	return NativeVideoRTPPort300X
 }
 
+// NativeAudioRTPPort is the loopback port bt_av_media sends cleartext downlink
+// Speex audio to (RTP PT=110) when a network party joins the call. Verified on
+// a 300X only.
+const NativeAudioRTPPort = 5000
+
 // frameSource abstracts the raw frame source (real AF_PACKET on the device,
 // a synthetic source in tests).
 type frameSource interface {

@@ -5,7 +5,7 @@
 mqtt:
   broker: 192.168.1.3
   port: 1883
-  username: mqtt_user
+  username: ha
   password: CHANGE_ME
   discovery: true  # Important: enables auto-discovery
   discovery_prefix: homeassistant
@@ -190,5 +190,5 @@ show_header_toggle: false
 # 6. MQTT TOPICS FOR MANUAL MONITORING
 # You can use MQTT Explorer or mosquitto_sub to monitor:
 #
-# mosquitto_sub -h 192.168.1.3 -p 1883 -u mqtt_user -P CHANGE_ME -t "homeassistant/sensor/bticino/+/state"
-# mosquitto_sub -h 192.168.1.3 -p 1883 -u mqtt_user -P CHANGE_ME -t "homeassistant/binary_sensor/bticino/+/state"
+# mosquitto_sub -h 192.168.1.3 -p 1883 -u ha -P CHANGE_ME -t "homeassistant/sensor/bticino/+/state"
+# mosquitto_sub -h 192.168.1.3 -p 1883 -u ha -P CHANGE_ME -t "homeassistant/binary_sensor/bticino/+/state"

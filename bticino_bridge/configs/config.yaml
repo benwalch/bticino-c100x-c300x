@@ -43,6 +43,21 @@ sip:
   # per unit (wrong values get an instant 486); required for camera sessions.
   # Find yours via the settings wizard. Unrelated to the numeric dev_addr above.
 
+  # Contestador SIP bajo demanda desde HA (F1). Fail-closed: enabled=false por
+  # defecto. El deploy NO pushea config.yaml — hay que dar de alta este bloque
+  # a mano en el device (ver docs/answerer-setup.md) tras registrar la ruta con
+  # scripts/setup_answerer_route.sh.
+  answerer:
+    enabled: false          # master switch F1 (poner true en el device tras dar de alta el route)
+    user: "bridge"
+    audio_port: 10100
+    video_port: 10102       # -1 = rechazar m=video (audio-only)
+    max_call_seconds: 120
+    ring_timeout_seconds: 70 # guarda de timbre: sin contestar ni CANCEL, cierra con 480 (default 70, como la app 1.17.3)
+    talk_enabled: false     # F2: hablar desde HA (micro→go2rtc :40004→ffmpeg SRTP→placa); poner true en el device
+    talk_keepalive: false   # subida de audio continua (silencio speex si el micro calla) para que la placa abra el audio de bajada; requiere talk_enabled
+    route_file: "/etc/flexisip/users/route_ext.conf"
+
 # ==================== MQTT ====================
 mqtt:
   enabled: true
@@ -121,6 +136,9 @@ streaming:
   # bticino/video/session/set. Off by default; duration in seconds.
   camera_session: false
   camera_session_duration: 30
+  # live_audio_on_call: mirror the native audio leg (lo:5000) to the RTSP audio
+  # relay. Not verified on the Classe 100X, off by default.
+  live_audio_on_call: false
 
 # ==================== NETWORK ====================
 network:
@@ -217,8 +235,30 @@ additional_locks:
   # - name: "Side Door"
   #   where: 22
 
+# ==================== CLASIFICADOR DE ACCESOS ====================
+# Clasifica cada apertura del portal como telefonillo/llave correlacionando con
+# timbres/llamadas previos. Solo escucha el bus interno; no envía comandos.
+access:
+  enabled: false
+  correlation_window: 30s      # apertura dentro de este tiempo tras timbre/llamada → "telefonillo"
+  max_hold_wait: 8s            # cuánto esperar al cierre para medir la duración del pulso
+  duration_visitor_max: 3500ms # duración ≤ → rango "visita" (solo ajusta la CONFIANZA, no la etiqueta)
+
 # ==================== UDP PROXY ====================
 udp_proxy:
   enabled: false
   listen_port: 40004
   target_port: 4000
+
+# ==================== AUDIO FULL-DUPLEX ====================
+# Audio full-duplex en la pata propia del bridge (oír + hablar con la puerta).
+# Fail-closed: si se omite el bloque, queda desactivado.
+audio:
+  duplex_enabled: false
+  duplex_sink_path: "/home/bticino/cfg/extra/recordings/door_audio.wav"
+  # Espejo pasivo del audio de bajada nativo (tap lo:5000, sdd
+  # 2026-08-21-audio-tap-5000). Fail-closed: si se omite, queda desactivado.
+  listen_tap_enabled: false
+  # Sink WAV dedicado del oído pasivo (distinto de duplex_sink_path, para no
+  # compartir archivo con la pata duplex).
+  listen_sink_path: "/home/bticino/cfg/extra/recordings/door_audio_listen.wav"

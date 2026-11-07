@@ -35,6 +35,7 @@ func newCameraRTSPServerWithState(t *testing.T, state CallState) (*EnhancedRTSPS
 		eventBus:   bus,
 		logger:     logger,
 		answerUser: bticino.SIPUsernameForVariant(bticino.DeviceVariant),
+		webrtcID:   &sipIdentity{username: "webrtc"},
 	}
 	// Blocked pipe keeps the hold loop parked until Stop, like a live dialog.
 	near, far := net.Pipe()

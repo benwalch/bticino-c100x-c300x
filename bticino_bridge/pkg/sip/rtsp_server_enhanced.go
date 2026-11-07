@@ -909,13 +909,13 @@ a=framerate:7
 	}
 
 	if config.AudioEnabled {
-		sdp += fmt.Sprintf(`m=audio 0 RTP/AVP 110
+		sdp += fmt.Sprintf(`m=audio 0 RTP/AVP %[1]d
 b=AS:16
-a=rtpmap:110 speex/8000
-a=fmtp:110 vbr=on
+a=rtpmap:%[1]d speex/8000
+a=fmtp:%[1]d vbr=on
 a=control:trackID=audio
 a=maxptime:20
-`)
+`, RTSPAudioPT)
 	}
 
 	return sdp
@@ -1038,8 +1038,19 @@ func (r *EnhancedRTSPServer) sessionCleanup() {
 	}
 }
 
-// Compile-time assertion: the RTSP server satisfies CallActiveMarker.
+// Compile-time assertion: the RTSP server satisfies CallActiveMarker (setter)
+// and CallActiveChecker (getter, PanelView non-interference guard).
 var _ CallActiveMarker = (*EnhancedRTSPServer)(nil)
+var _ CallActiveChecker = (*EnhancedRTSPServer)(nil)
+
+// IsCallActive indica si hay una llamada en curso (nativa marcada por SetCallActive
+// o self-INVITE propio). Lo consulta PanelView para no originar el ojo si el
+// nativo ya ocupa los slots (no-interferencia).
+func (r *EnhancedRTSPServer) IsCallActive() bool {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	return r.callActive
+}
 
 // SetCallActive marks whether a native call is in progress. When true,
 // ensureSIPCallActive() SKIPS the self-INVITE (the video session already exists).

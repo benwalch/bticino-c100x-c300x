@@ -1,6 +1,7 @@
 package sip
 
 import (
+	"errors"
 	"net"
 	"time"
 )
@@ -86,6 +87,10 @@ func (c *BTicinoSIPClient) reconnectLoop(id *sipIdentity, reason string, old net
 		}, "sip")
 	}
 	c.logger.WithField("reason", reason).Warnf("SIP %s connection lost — reconnecting", id.username)
+	// The listener is gone: the REGISTER below reads its own responses.
+	id.mutex.Lock()
+	id.respCh = nil
+	id.mutex.Unlock()
 
 	for attempt := 0; ; attempt++ {
 		select {
@@ -93,7 +98,11 @@ func (c *BTicinoSIPClient) reconnectLoop(id *sipIdentity, reason string, old net
 			return
 		default:
 		}
-		if err := c.registerIdentity(id); err == nil {
+		id.readMu.Lock()
+		err := c.registerIdentity(id)
+		id.readMu.Unlock()
+		if err == nil {
+			id.markRegistered()
 			c.onReconnected(id)
 			return
 		} else {
@@ -119,7 +128,7 @@ func (c *BTicinoSIPClient) onReconnected(id *sipIdentity) {
 	default:
 	}
 	if id == c.localID {
-		go c.localListener()
+		c.startLocalListener()
 	}
 	if id == c.webrtcID {
 		conn, _ := c.identityConn(c.webrtcID)
@@ -135,16 +144,32 @@ func (c *BTicinoSIPClient) onReconnected(id *sipIdentity) {
 	}, "sip")
 }
 
-// refreshRegistration re-registers an identity on its current connection and
-// reconnects when that connection turns out to be gone.
+// refreshRegistration renews a registration after half of its expiry, on the
+// current connection, and reconnects when that connection turns out to be gone.
+// A socket owned by another reader only defers the renewal.
 func (c *BTicinoSIPClient) refreshRegistration(id *sipIdentity) {
 	if id == nil {
 		return
 	}
+	id.mutex.Lock()
+	reconnecting := id.reconnecting
+	since := time.Since(id.lastRegistered)
+	id.mutex.Unlock()
+	half := time.Duration(c.config.ExpirySeconds) * time.Second / 2
+	if reconnecting || since < half {
+		return
+	}
 	_, gen := c.identityConn(id)
-	if err := c.reRegisterIdentity(id); err != nil {
-		if !c.connError(id, gen, err) {
-			c.logger.WithError(err).Debug("SIP re-registration failed on a replaced connection")
+	err := c.reRegisterIdentity(id)
+	switch {
+	case err == nil:
+	case errors.Is(err, errSocketBusy):
+		if since > half*3/2 {
+			c.logger.Warnf("SIP %s re-REGISTER deferred and the registration expires soon (socket busy)", id.username)
+		} else {
+			c.logger.Debugf("SIP %s re-REGISTER deferred: socket busy", id.username)
 		}
+	case !c.connError(id, gen, err):
+		c.logger.WithError(err).Debug("SIP re-registration failed on a replaced connection")
 	}
 }

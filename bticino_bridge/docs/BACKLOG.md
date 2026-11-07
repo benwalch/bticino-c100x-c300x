@@ -27,6 +27,17 @@ spec → plan before implementation.
   take effect — currently only `--log-level` applies); (b) a `logrotate`
   config on device; (c) keep `--log-level warn` on the starter. Partial
   mitigation landed: routine SIP listener traffic downgraded to Debug.
+- **Clasificador de eventos de acceso / cerradura por duración.**
+  **✅ HECHO (v0.20.0, 2026-08-21)** — implementado con correlación timbre/llamada
+  como señal primaria (mejor que el umbral de duración original). Ver
+  `docs/internal/specs/2026-08-21-access-classifier-design.md`.
+
+  El bus OpenWebNet
+  emite eventos de cerradura (apertura → cierre + duración) de **cualquier piso**
+  (sin identificar el piso concreto — privacidad de edificio). Patrón empírico
+  observado por el usuario:
+  - **~2-3 s** → apertura tras telefonillo (visita a la que le abren).
+  - **~4 s** → apertura con **llave RFID** (típicamente residente llegando).
 
 - **Access/lock event classifier by duration.** The OpenWebNet bus
   emits lock events (unlock → lock + duration) from **any floor**

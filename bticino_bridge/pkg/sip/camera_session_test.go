@@ -38,6 +38,7 @@ func newSessionTestClient() (*BTicinoSIPClient, *int32, *int32) {
 		eventBus:   bus,
 		logger:     logrus.New(),
 		answerUser: bticino.SIPUsernameForVariant(bticino.DeviceVariant),
+		webrtcID:   &sipIdentity{username: "webrtc"},
 	}
 	return c, &started, &stopped
 }

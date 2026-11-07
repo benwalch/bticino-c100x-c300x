@@ -100,6 +100,9 @@ func (c *BTicinoSIPClient) runCameraSession(duration time.Duration) {
 		c.logger.WithError(err).Warn("Camera session: no media offer")
 		return
 	}
+	c.stopDialogWatch()
+	c.webrtcID.readMu.Lock() // this session is the socket's reader until it ends
+	defer c.webrtcID.readMu.Unlock()
 	dlg, err := c.establish(uri, sdp)
 	if err != nil {
 		c.logger.WithError(err).Warn("Camera session: dial failed")
@@ -496,6 +499,9 @@ func (c *BTicinoSIPClient) VerifyNativeDevAddr(candidate string) error {
 	if err != nil {
 		return err
 	}
+	c.stopDialogWatch()
+	c.webrtcID.readMu.Lock()
+	defer c.webrtcID.readMu.Unlock()
 	dlg, err := c.establish(uri, sdp)
 	if err != nil {
 		return err
