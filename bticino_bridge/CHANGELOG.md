@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- The bridge no longer sends test commands on the bus at startup, among them
+  `*1*0*11##` (light point 11) and `*2*1*11##` (shutter point 11).
 - Merged the upstream bridge up to 0.29.4. Its features are not verified on the
   Classe 100X and start off: `sip.answerer`, `streaming.panel_view`,
   `streaming.live_audio_on_call`, `audio.duplex_enabled`,

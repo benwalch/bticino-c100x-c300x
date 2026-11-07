@@ -254,64 +254,6 @@ func main() {
 				// Enable critical commands for door unlock functionality
 				logger.Warn("🔓 Enabling critical commands for door unlock functionality")
 				owClient.EnableCriticalCommands(true)
-
-				// Test basic connectivity with proven BTicino commands from device analysis
-				logger.Info("🔍 Testing real BTicino device commands...")
-
-				if commandHandler != nil {
-					// Test answering machine status using enhanced commands
-					logger.Info("Testing enhanced answering machine commands...")
-
-					// Use a simple OpenWebNet query first to verify basic connectivity
-					response, err := owClient.SendCommand("*99*0##")
-					if err != nil {
-						logger.Warnf("Basic status query failed: %v", err)
-					} else {
-						logger.Infof("Basic device connectivity: %v", response)
-					}
-
-					// Test real BTicino commands with proper timing
-					realTestCommands := []struct {
-						command string
-						desc    string
-					}{
-						{bticino.CmdBellQuery, "Bell/ringer status query"},
-						{"*7*73#1#100*##", "Display activation (required before answering machine control)"},
-						{"*1*0*11##", "Light status on point 11"},
-					}
-
-					for _, test := range realTestCommands {
-						response, err := owClient.SendCommand(test.command)
-						if err != nil {
-							logger.Warnf("Real command %s (%s) failed: %v", test.command, test.desc, err)
-						} else {
-							logger.Infof("%s: %v", test.desc, response)
-						}
-						time.Sleep(310 * time.Millisecond) // Real BTicino timing from device analysis
-					}
-
-					logger.Info("Enhanced command handler active with real BTicino integration")
-				} else {
-					// Fallback to basic test commands if enhanced handler not available
-					testCommands := []struct {
-						command string
-						desc    string
-					}{
-						{"*99*0##", "Basic status query"},
-						{"*1*0*11##", "Light status on point 11"},
-						{"*2*1*11##", "Shutter UP on point 11"},
-					}
-
-					for _, test := range testCommands {
-						response, err := owClient.SendCommand(test.command)
-						if err != nil {
-							logger.Warnf("Command %s (%s) failed: %v", test.command, test.desc, err)
-						} else {
-							logger.Infof("%s: %v", test.desc, response)
-						}
-						time.Sleep(200 * time.Millisecond)
-					}
-				}
 			}
 		} else {
 			logger.Info("Running in test mode - no OpenWebNet device connection")
