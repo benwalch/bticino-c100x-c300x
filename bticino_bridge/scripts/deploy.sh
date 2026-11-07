@@ -112,10 +112,7 @@ fi
 if [ "$SKIP_WEB" = false ] && [ -d "web" ]; then
     log "[1/3] Building web frontend..."
     if [ -f "web/package.json" ]; then
-        cd web
-        npm install --silent
-        npm run build --silent
-        cd ..
+        ./scripts/build_web.sh
         log_success "Web frontend built (web/dist/)"
     else
         log_warning "web/package.json not found, skipping web build"

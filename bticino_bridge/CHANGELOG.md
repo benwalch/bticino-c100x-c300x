@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- `make deploy` and `scripts/deploy.sh` now stop when the web build fails. Before,
+  Node versions too old for Vite left the previous `web/dist` in place and the
+  deploy still reported success.
+  Migration: run `nvm use` in `bticino_bridge/` (`.nvmrc` selects Node 22) before
+  building.
 - The bridge no longer sends test commands on the bus at startup, among them
   `*1*0*11##` (light point 11) and `*2*1*11##` (shutter point 11).
 - `POST` and `DELETE /api/talkback/greeting` return 501 on units without an

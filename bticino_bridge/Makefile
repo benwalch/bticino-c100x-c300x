@@ -12,12 +12,8 @@ build: build-web build-go
 # Build frontend Svelte
 build-web:
 	@echo "🔨 Building web frontend..."
-	@if [ -d "web" ] && [ -f "web/package.json" ]; then \
-		cd web && npm install --silent && npm run build --silent; \
-		echo "✅ Web frontend built (web/dist/)"; \
-	else \
-		echo "⚠️  Web directory not found, skipping web build"; \
-	fi
+	@./scripts/build_web.sh
+	@echo "✅ Web frontend built (web/dist/)"
 
 # Build backend Go
 build-go:
