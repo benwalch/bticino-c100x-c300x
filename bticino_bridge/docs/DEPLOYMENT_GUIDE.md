@@ -436,7 +436,7 @@ ls -l bticino_bridge
 ldd bticino_bridge 2>&1 || echo "ldd not available"
 
 # Try running with debug
-./bticino_bridge -log-level debug 2>&1 | head -20
+./bticino_bridge -test -log-level debug 2>&1 | head -20
 ```
 
 ### Problem: Configuration not loading
@@ -658,7 +658,7 @@ ssh bticino "pkill -9 -f bticino_bridge"
 ssh bticino "echo '0.12.1' > /home/bticino/cfg/extra/VERSION"
 
 # 3. Start with correct config
-ssh bticino "cd /home/bticino/cfg/extra && nohup ./bticino_bridge -config config_streaming.yaml > /var/log/bticino_bridge.log 2>&1 &"
+ssh bticino "cd /home/bticino/cfg/extra && nohup ./bticino_bridge -config config_streaming.yaml > /dev/null 2>&1 &"
 ```
 
 ### Verify deployment:

@@ -10,7 +10,7 @@
 bridge:
   name: "BTicino Bridge Enhanced"
   version: "0.14.1"
-  log_level: "debug"  # debug, info, warn, error
+  log_level: "debug"  # no effect, use logging.level
 
 # ==================== OPENWEBNET ====================
 openwebnet:
@@ -101,8 +101,8 @@ hardware:
 logging:
   level: 'info'
   file: '/var/log/bticino_bridge.log'
-  max_size: 10MB
-  max_files: 5
+  max_size: 2MB   # per file; lives in RAM, max_size x max_files must not exceed 48MB
+  max_files: 3    # total files, including the active one
 
 # ==================== STREAMING (RTSP/WebRTC) ====================
 streaming:

@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+- The bridge rotates its own log and applies `logging.level`, `file`, `max_size`
+  and `max_files`, which had no effect before. New defaults: `2MB` and 3 files, so
+  at most 6 MB in the tmpfs behind `/var/log`. `max_files` counts the active file.
+  Without `logging.level` or `--log-level` the level is now `error`, not `info`, so
+  start lines, including the version, are not logged; set `level: info` to keep them.
+  `--log-level` still wins when given. The log now survives a bridge restart.
+  Lines that cannot be written are dropped and counted; the bridge keeps running.
+  Go crashes such as panics go to `bticino_bridge.crash.log` next to the binary, on
+  flash, so they survive a reboot. Each start adds one line with version and time,
+  and the file is cut back to its last 256 KB at startup when it exceeds 1 MB. The
+  next start logs an error when the previous run crashed. If the log file cannot be
+  opened, the bridge retries every 5 s and notes the problem in the crash log.
+  `scripts/deploy.sh` shows the crash log when the bridge is not running after a
+  deploy.
+  `logging.file` must be in `/var/log` or `/tmp`, `max_files` must not exceed 16 and
+  `max_size` x `max_files` must not exceed 48 MB. Other values are refused when saving in the web interface and
+  replaced by the defaults at startup, with an error in the log. A `-test` run logs
+  to stderr. The log level in the web settings now sets `logging.level`, and log
+  settings apply after a bridge restart.
+  Migration: start the bridge with `> /dev/null 2>&1`. A redirect to
+  `bticino_bridge.log` makes two writers share that file. A config that still sets
+  `10MB` and 5 files exceeds the limit and falls back to `2MB` and 3 files. An older
+  binary only logs to stdout, so start it with its old redirect after a rollback.
 - `make deploy` and `scripts/deploy.sh` now stop when the web build fails. Before,
   Node versions too old for Vite left the previous `web/dist` in place and the
   deploy still reported success.

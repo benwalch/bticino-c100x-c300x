@@ -426,6 +426,18 @@ func LoadConfig(configPath string) (*Config, error) {
 	}
 
 	// Set defaults if not specified
+	if config.Logging.Level == "" {
+		config.Logging.Level = "error"
+	}
+	if config.Logging.File == "" {
+		config.Logging.File = "/var/log/bticino_bridge.log"
+	}
+	if config.Logging.MaxSize == "" {
+		config.Logging.MaxSize = "2MB"
+	}
+	if config.Logging.MaxFiles == 0 {
+		config.Logging.MaxFiles = 3
+	}
 	if config.OpenWebNet.Host == "" {
 		config.OpenWebNet.Host = "localhost"
 	}
@@ -559,10 +571,10 @@ func GetDefaultConfig() *Config {
 			TemplatesDir: "web/templates",
 		},
 		Logging: LoggingConfig{
-			Level:    "info",
+			Level:    "error",
 			File:     "/var/log/bticino_bridge.log",
-			MaxSize:  "10MB",
-			MaxFiles: 5,
+			MaxSize:  "2MB",
+			MaxFiles: 3,
 		},
 		UDPProxy: UDPProxyConfig{
 			Enabled:    false,

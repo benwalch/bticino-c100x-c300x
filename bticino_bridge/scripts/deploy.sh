@@ -221,16 +221,21 @@ fi
 # of orphaning the native dialog (grace covers frame grab + BYE), then -9
 # only if it hangs)
 log "Restarting service..."
-ssh "$REMOTE" "cd $REMOTE_DIR && (pkill bticino_bridge || true) && sleep 15 && (pkill -9 bticino_bridge || true) && sleep 2 && nohup ./bticino_bridge -config config.yaml > /var/log/bticino_bridge.log 2>&1 &"
+ssh "$REMOTE" "cd $REMOTE_DIR && (pkill bticino_bridge || true) && sleep 15 && (pkill -9 bticino_bridge || true) && sleep 2 && nohup ./bticino_bridge -config config.yaml > /dev/null 2>&1 &"
 sleep 5
 log_success "Service restarted"
 
 # Verify
 log "Verifying..."
-if ssh "$REMOTE" "ps aux | grep bticino_bridge | grep -v grep > /dev/null 2>&1"; then
+# The bridge starts about 17 s after the restart command, so this checks it about
+# 10 s into its run, which also catches an early crash. pidof, because the remote
+# shell that started the bridge also has its name in the process list.
+sleep 22
+if ssh "$REMOTE" "pidof bticino_bridge > /dev/null"; then
     log_success "Service running"
 else
-    log_error "Service not running"
+    log_error "Service not running. Last lines of the crash log:"
+    ssh "$REMOTE" "tail -n 30 $REMOTE_DIR/bticino_bridge.crash.log" || true
     exit 1
 fi
 

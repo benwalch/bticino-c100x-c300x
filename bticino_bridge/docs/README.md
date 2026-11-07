@@ -100,7 +100,7 @@ base64 /tmp/bticino_bridge | ssh bticino "base64 -d > /home/bticino/cfg/extra/bt
   && echo 'Binary deployed'"
 
 # Start on device
-ssh bticino "cd /home/bticino/cfg/extra && nohup ./bticino_bridge > /tmp/bticino_test.log 2>&1 &"
+ssh bticino "cd /home/bticino/cfg/extra && nohup ./bticino_bridge > /dev/null 2>&1 &"
 ```
 
 ### Access Points (on device 192.168.1.38)

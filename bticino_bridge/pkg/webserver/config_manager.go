@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"bticino_bridge/pkg/config"
+	"bticino_bridge/pkg/logging"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
@@ -181,6 +182,16 @@ func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResu
 			result.Errors = append(result.Errors, "Invalid log level (use debug/info/warn/error)")
 			result.Valid = false
 		}
+	}
+
+	for _, problem := range logging.Validate(logging.Options{
+		Level:    cfg.Logging.Level,
+		File:     cfg.Logging.File,
+		MaxSize:  cfg.Logging.MaxSize,
+		MaxFiles: cfg.Logging.MaxFiles,
+	}) {
+		result.Errors = append(result.Errors, problem.Error())
+		result.Valid = false
 	}
 
 	// Validate SIP

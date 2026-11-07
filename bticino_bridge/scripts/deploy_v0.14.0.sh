@@ -49,7 +49,7 @@ echo "6. Updating version file..."
 echo "0.14.0" | ssh $DEVICE "cat > $REMOTE_DIR/VERSION"
 
 echo "7. Starting new bridge..."
-ssh $DEVICE "cd $REMOTE_DIR && nohup ./bticino_bridge -config config.yaml > /var/log/bticino_bridge.log 2>&1 &"
+ssh $DEVICE "cd $REMOTE_DIR && nohup ./bticino_bridge -config config.yaml > /dev/null 2>&1 &"
 sleep 3
 
 echo "8. Verifying bridge is running..."

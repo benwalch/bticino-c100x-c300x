@@ -29,7 +29,7 @@ func RestartBridgeAsync(logger *logrus.Logger) {
 
 	go func() {
 		// Start the replacement after the current process has exited.
-		script := `sleep 2; cd "$1" || exit 1; shift; exec "$@" > /var/log/bticino_bridge.log 2>&1`
+		script := `sleep 2; cd "$1" || exit 1; shift; exec "$@" > /dev/null 2>&1`
         cmdArgs := []string{"-c", script, "bridge-restart", dir, exe}
         cmdArgs = append(cmdArgs, args...)
         cmd := exec.Command("setsid", append([]string{"sh"}, cmdArgs...)...)

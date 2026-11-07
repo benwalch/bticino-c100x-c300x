@@ -43,7 +43,7 @@ start_bridge() {
     cd "$BRIDGE_DIR"
     
     # Start bridge in background and save PID
-    nohup "./$BRIDGE_BINARY" > "$BRIDGE_LOG_FILE" 2>&1 &
+    nohup "./$BRIDGE_BINARY" > /dev/null 2>&1 &
     echo $! > "$BRIDGE_PID_FILE"
     
     # Wait a moment and check if it's still running

@@ -40,7 +40,7 @@ That runs the whole robust flow:
 | `./deploy-standard.sh full` | build + deploy |
 | `./deploy-standard.sh web` | Build **and** deploy the Svelte frontend only (no binary, no restart) |
 | `./deploy-standard.sh status` | Version + instance count on the device |
-| `./deploy-standard.sh logs` | Tail the runtime log (`/tmp/bridge_deploy.log`) |
+| `./deploy-standard.sh logs` | Tail the runtime log (`/var/log/bticino_bridge.log`) |
 | `./deploy-standard.sh restart` | Restart (single instance) |
 | `./deploy-standard.sh rollback` | Restore `bticino_bridge.prev` |
 | `./deploy-standard.sh stop` | Stop the bridge |
@@ -84,7 +84,7 @@ ssh bticino 'cd /home/bticino/cfg/extra &&
   cp -a bticino_bridge bticino_bridge.prev &&
   for p in $(ps | grep bticino_bridge | grep -v grep | awk "{print \$1}"); do kill -9 $p; done &&
   mv bticino_bridge.new bticino_bridge &&
-  setsid sh -c "exec ./bticino_bridge > /tmp/bridge_deploy.log 2>&1" < /dev/null > /dev/null 2>&1 &'
+  setsid sh -c "exec ./bticino_bridge > /dev/null 2>&1" < /dev/null > /dev/null 2>&1 &'
 
 # 3. Verify
 ssh bticino 'wget -qO- http://127.0.0.1:8082/api/status'

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"syscall"
@@ -19,6 +20,7 @@ import (
 	"bticino_bridge/pkg/events"
 	"bticino_bridge/pkg/homekit"
 	"bticino_bridge/pkg/input"
+	"bticino_bridge/pkg/logging"
 	"bticino_bridge/pkg/openwebnet"
 	"bticino_bridge/pkg/sip"
 	versionpkg "bticino_bridge/pkg/version"
@@ -115,7 +117,7 @@ func main() {
 	// Parse command line flags
 	var (
 		configPath       = flag.String("config", "configs/config.yaml", "Path to configuration file")
-		logLevel         = flag.String("log-level", "info", "Log level (debug, info, warn, error)")
+		logLevel         = flag.String("log-level", "", "Log level (debug, info, warn, error); overrides logging.level")
 		version          = flag.Bool("version", false, "Show version information")
 		testMode         = flag.Bool("test", false, "Run in test mode (no actual device connection)")
 		webPort          = flag.Int("web-port", 0, "Override web server port (0 = use config)")
@@ -144,16 +146,45 @@ func main() {
 		ForceColors:   true,
 	})
 
-	// Set log level from command line
-	switch *logLevel {
-	case "debug":
-		logger.SetLevel(logrus.DebugLevel)
-	case "warn":
-		logger.SetLevel(logrus.WarnLevel)
-	case "error":
-		logger.SetLevel(logrus.ErrorLevel)
-	default:
-		logger.SetLevel(logrus.InfoLevel)
+	// Load the config first, so all start lines already follow logging.*
+	cfg, err := config.LoadConfig(*configPath)
+	if err != nil {
+		cfg = config.GetDefaultConfig()
+	}
+
+	logOptions := logging.Options{
+		Level:    cfg.Logging.Level,
+		File:     cfg.Logging.File,
+		MaxSize:  cfg.Logging.MaxSize,
+		MaxFiles: cfg.Logging.MaxFiles,
+	}
+	if *logLevel != "" {
+		logOptions.Level = *logLevel
+	}
+	// A -test run must show its output and leave the log of a running bridge alone.
+	if *testMode {
+		logOptions.File = ""
+	}
+
+	// Before Configure, so that a log file problem can reach the crash log.
+	var previousCrash string
+	var crashErr error
+	if !*testMode {
+		var exe string
+		if exe, crashErr = os.Executable(); crashErr == nil {
+			// Next to the binary, which on the device means on flash.
+			crashLog := filepath.Join(filepath.Dir(exe), "bticino_bridge.crash.log")
+			previousCrash, crashErr = logging.EnableCrashLog(crashLog, versionpkg.GetVersion())
+		}
+	}
+
+	logging.Configure(logger, logOptions)
+
+	if crashErr != nil {
+		logger.Errorf("Crash log: %v", crashErr)
+	}
+	if previousCrash != "" {
+		logger.Errorf("Previous run crashed: %s (see bticino_bridge.crash.log)", previousCrash)
 	}
 
 	logger.Info("🚀 === BTicino Bridge ===")
@@ -166,11 +197,8 @@ func main() {
 	logger.Info("  📱 Answering Machine")
 	logger.Info("  🔄 Enhanced EventBus & Real-time Processing")
 
-	// Load configuration
-	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
-		logger.Warnf("Failed to load config from %s, using defaults: %v", *configPath, err)
-		cfg = config.GetDefaultConfig()
+		logger.Errorf("Failed to load config from %s, using defaults: %v", *configPath, err)
 	}
 
 	// Override web port if specified

@@ -214,7 +214,7 @@
             </div>
             <div class="form-group">
               <label for="bridge_log_level">Log Level</label>
-              <select id="bridge_log_level" bind:value={config.config.Bridge.LogLevel}>
+              <select id="bridge_log_level" bind:value={config.config.Logging.Level}>
                 <option value="debug">Debug</option>
                 <option value="info">Info</option>
                 <option value="warn">Warning</option>
@@ -228,6 +228,7 @@
             <div class="form-group">
               <label for="log_size">Max Log Size</label>
               <input type="text" id="log_size" bind:value={config.config.Logging.MaxSize} />
+              <small>Max 48 MB across all log files, at most 16 files. Log file must be in /var/log or /tmp. Log settings apply after a bridge restart.</small>
             </div>
           </div>
         </div>

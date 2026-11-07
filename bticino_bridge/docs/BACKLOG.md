@@ -18,15 +18,10 @@ spec → plan before implementation.
 
 ## Other
 
-- **Log rotation that actually works.** `/var/log` is a tmpfs symlink
-  (`/var/volatile/log`, 261M) and the bridge logs via shell redirect, so the
-  `logging.max_size/max_files` config is decorative and nothing ever rotates:
-  on 2026-10-12 the SIP listener flood filled tmpfs 100% and silenced all
-  logging for ~19h with the process alive. Options: (a) bridge-managed file
-  output honoring `MaxSize`/`MaxFiles` (+ make `logging.level/file` actually
-  take effect — currently only `--log-level` applies); (b) a `logrotate`
-  config on device; (c) keep `--log-level warn` on the starter. Partial
-  mitigation landed: routine SIP listener traffic downgraded to Debug.
+- **Log rotation that actually works.** **✅ DONE** — the bridge rotates its own
+  log and honors `logging.*`, see `pkg/logging`. Background: `/var/log` is a tmpfs
+  symlink (`/var/volatile/log`, 261M); on 2026-10-12 the SIP listener flood filled
+  tmpfs 100% and silenced all logging for ~19h with the process alive.
 - **Clasificador de eventos de acceso / cerradura por duración.**
   **✅ HECHO (v0.20.0, 2026-08-21)** — implementado con correlación timbre/llamada
   como señal primaria (mejor que el umbral de duración original).

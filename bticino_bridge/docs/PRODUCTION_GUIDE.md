@@ -179,8 +179,8 @@ Dangerous OpenWebNet commands are gated behind the client's safety levels
 
 ### **Weekly Maintenance**
 ```bash
-# Check log file size
-du -h /var/log/bticino_bridge.log
+# Check log file sizes
+du -h /var/log/bticino_bridge*
 
 # Restart service for memory cleanup
 ./bticino_bridge_control.sh restart
@@ -252,7 +252,8 @@ Still on the roadmap (see `ROADMAP_VIDEO_AUDIO.md` and `FUTURE_IMPROVEMENTS.md`)
 - `/home/bticino/cfg/extra/bticino_mqtt_bridge_arm` - Main service binary
 - `/home/bticino/cfg/extra/bticino_bridge_control.sh` - Control script
 - `/home/bticino/cfg/extra/configs/config.yaml` - Configuration
-- `/var/log/bticino_bridge.log` - Service logs
+- `/var/log/bticino_bridge.log` - Service logs, in RAM, rotated by the bridge
+- `/home/bticino/cfg/extra/bticino_bridge.crash.log` - Go crashes, on flash, survives a reboot
 - `/tmp/bticino_bridge.pid` - Process ID file
 
 **Documentation:**
@@ -358,7 +359,7 @@ If Home Assistant times out reaching the camera, verify these ports are ACCEPTed
 ssh bticino 'pgrep -la bticino_bridge'
 
 # Check logs
-ssh bticino 'tail -50 /tmp/bridge_deploy.log'
+ssh bticino 'tail -50 /var/log/bticino_bridge.log'
 
 # Check MQTT status
 ssh bticino 'wget -qO- http://127.0.0.1:8082/api/status'
