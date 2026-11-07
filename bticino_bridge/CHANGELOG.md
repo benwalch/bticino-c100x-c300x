@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- `make deploy` and `scripts/deploy.sh` spare the flash: backups are hard links, so
+  they copy no data, and only files that changed are written. A transfer goes into
+  RAM first and reaches the flash only with a matching checksum. After a successful
+  start, 2 backups each of the binary and `config.yaml` remain; older ones are
+  deleted. Old web assets are removed. The binary is built stripped (`-s -w`) and
+  with `-trimpath`, so it is about 30% smaller and debuggers lack its symbols. A
+  failed Go build now stops the deploy.
+  Migration: copy backups you want to keep off the device before the next deploy.
 - The bridge rotates its own log and applies `logging.level`, `file`, `max_size`
   and `max_files`, which had no effect before. New defaults: `2MB` and 3 files, so
   at most 6 MB in the tmpfs behind `/var/log`. `max_files` counts the active file.

@@ -18,7 +18,7 @@ build-web:
 # Build backend Go
 build-go:
 	@echo "🔨 Building Go binary..."
-	GOOS=linux GOARCH=arm GOARM=7 go build -o bticino_bridge ./cmd/main.go
+	GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags='-s -w' -o bticino_bridge ./cmd/main.go
 	@echo "✅ Go binary built (bticino_bridge)"
 
 # Deploy a dispositivo (build + deploy)

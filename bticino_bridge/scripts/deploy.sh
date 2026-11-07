@@ -34,6 +34,7 @@ VERBOSE=false
 REMOTE="bticino"
 REMOTE_DIR="/home/bticino/cfg/extra"
 CONFIG_FILE="configs/config.yaml"
+KEEP_BACKUPS=2
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -127,8 +128,8 @@ fi
 # Step 2: Build Go
 if [ "$SKIP_GO" = false ]; then
     log "[2/3] Building Go binary..."
-    GOOS=linux GOARCH=arm GOARM=7 go build -o bticino_bridge ./cmd/main.go 2>&1 | grep -v "^#" || true
-    if [ -f "bticino_bridge" ]; then
+    # Stripped: a smaller binary means fewer flash writes. Stack traces keep their lines.
+    if GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags='-s -w' -o bticino_bridge ./cmd/main.go; then
         log_success "Go binary built (bticino_bridge)"
     else
         log_error "Failed to build Go binary"
@@ -146,49 +147,108 @@ if ! ssh -o BatchMode=yes -o ConnectTimeout=5 "$REMOTE" "echo OK" > /dev/null 2>
 fi
 log_success "SSH OK"
 
-# Transfer binary
-log "Transferring binary..."
-# Transfer VERSION file
-echo "Transferring VERSION file..."
-cat VERSION | ssh "$REMOTE" "cat > $REMOTE_DIR/VERSION"
-log_success "VERSION file transferred"
+# The flash is mounted sync with data=journal, so every write counts twice:
+# only what changed is written, and backups are hard links, which copy no data.
+REMOTE_SUMS=$(mktemp)
+trap 'rm -f "$REMOTE_SUMS"' EXIT
+ssh "$REMOTE" "cd $REMOTE_DIR && md5sum bticino_bridge VERSION config.yaml web/dist/index.html web/dist/assets/* docs/* 2>/dev/null" > "$REMOTE_SUMS" || true
 
-base64 < bticino_bridge | ssh "$REMOTE" "cd $REMOTE_DIR && base64 -d > bticino_bridge.new && chmod +x bticino_bridge.new"
-log_success "Binary transferred"
+local_md5() {
+    if command -v md5sum > /dev/null; then
+        md5sum < "$1" | cut -d' ' -f1
+    else
+        md5 -q "$1"
+    fi
+}
 
-# Backup
-log "Creating backup..."
-ssh "$REMOTE" "cd $REMOTE_DIR && [ -f bticino_bridge ] && cp bticino_bridge bticino_bridge.backup.\$(date +%Y%m%d_%H%M%S) || true"
-log_success "Backup created"
+is_unchanged() { # local_file remote_path
+    grep -qFx "$(local_md5 "$1")  $2" "$REMOTE_SUMS"
+}
 
-# Activate
-log "Activating new binary..."
-ssh "$REMOTE" "cd $REMOTE_DIR && mv bticino_bridge.new bticino_bridge"
-log_success "Binary activated"
+# Decodes into RAM first, so a broken transfer never reaches the flash, then writes
+# <remote_path>.new in large blocks.
+send_new() { # local_file remote_path
+    local md5
+    md5=$(local_md5 "$1")
+    base64 < "$1" | ssh "$REMOTE" "cd $REMOTE_DIR || exit 1
+        stage=/tmp/bticino_deploy.stage
+        base64 -d > \$stage
+        rc=1
+        if [ \"\$(md5sum < \$stage | cut -d' ' -f1)\" = '$md5' ] &&
+           dd if=\$stage of='$2.new' bs=1M 2> /dev/null &&
+           [ \"\$(md5sum < '$2.new' | cut -d' ' -f1)\" = '$md5' ]; then
+            rc=0
+        else
+            rm -f '$2.new'
+        fi
+        rm -f \$stage
+        exit \$rc"
+}
 
-# Transfer Svelte web files (if present)
+install_file() { # local_file remote_path
+    is_unchanged "$1" "$2" && return 0
+    if ! send_new "$1" "$2" || ! ssh "$REMOTE" "cd $REMOTE_DIR && mv '$2.new' '$2'"; then
+        log_error "Transfer of $1 failed, device file unchanged"
+        exit 1
+    fi
+}
+
+# The rename gives <remote_path> a new inode, so the backup keeps the old content
+# even if the file is rewritten in place later.
+install_with_backup() { # local_file remote_path mode
+    if is_unchanged "$1" "$2"; then
+        log "$2 unchanged, nothing written"
+        return 0
+    fi
+    if ! send_new "$1" "$2"; then
+        log_error "Transfer of $1 failed, device file unchanged"
+        exit 1
+    fi
+    if ! ssh "$REMOTE" "cd $REMOTE_DIR && chmod $3 '$2.new' &&
+        if [ -f '$2' ]; then ln -f '$2' \"$2.backup.\$(date +%Y%m%d_%H%M%S)\" || exit 1; fi
+        mv '$2.new' '$2'"; then
+        log_error "Activating $2 failed"
+        exit 1
+    fi
+    log_success "$2 transferred (backup is a hard link)"
+}
+
+log "Transferring..."
+install_file VERSION VERSION
+if [ -f bticino_bridge ]; then
+    install_with_backup bticino_bridge bticino_bridge 755
+else
+    log_error "bticino_bridge not found"
+    exit 1
+fi
+
+# Transfer Svelte web files (if present). Assets first, so the new index.html never
+# points to a missing file.
 if [ "$SKIP_WEB" = false ] && [ -d "web/dist" ]; then
     log "Transferring Svelte web files..."
-    ssh "$REMOTE" "cd $REMOTE_DIR && mkdir -p web/dist/assets"
-    # Copy files with base64 (more reliable than scp)
-    base64 < web/dist/index.html | ssh "$REMOTE" "base64 -d > $REMOTE_DIR/web/dist/index.html"
+    ssh "$REMOTE" "mkdir -p $REMOTE_DIR/web/dist/assets"
+    asset_names=""
     for file in web/dist/assets/*; do
         if [ -f "$file" ]; then
             filename=$(basename "$file")
-            base64 < "$file" | ssh "$REMOTE" "base64 -d > $REMOTE_DIR/web/dist/assets/$filename"
+            asset_names="$asset_names $filename"
+            install_file "$file" "web/dist/assets/$filename"
         fi
     done
-    log_success "Svelte web files transferred"
+    install_file web/dist/index.html web/dist/index.html
+    # Old builds would otherwise stay on the flash forever.
+    if [ -n "$asset_names" ]; then
+        ssh "$REMOTE" "cd $REMOTE_DIR/web/dist/assets && for f in *; do case ' $asset_names ' in *\" \$f \"*) ;; *) rm -f \"\$f\" ;; esac; done" ||
+            log_warning "Could not remove old web assets"
+    fi
+    log_success "Svelte web files up to date"
 fi
 
 # Transfer config.yaml (matches '-config config.yaml' used on restart)
 if [ "$SKIP_CONFIG" = false ]; then
     if [ -f "$CONFIG_FILE" ]; then
         log "Transferring config ($CONFIG_FILE -> $REMOTE_DIR/config.yaml)..."
-        ssh "$REMOTE" "cd $REMOTE_DIR && [ -f config.yaml ] && cp config.yaml config.yaml.backup.\$(date +%Y%m%d_%H%M%S) || true"
-        base64 < "$CONFIG_FILE" | ssh "$REMOTE" "base64 -d > $REMOTE_DIR/config.yaml.new"
-        ssh "$REMOTE" "cd $REMOTE_DIR && mv config.yaml.new config.yaml"
-        log_success "Config transferred (remote backup created)"
+        install_with_backup "$CONFIG_FILE" config.yaml 644
     else
         log_warning "Config file $CONFIG_FILE not found, skipping config deploy"
     fi
@@ -203,13 +263,12 @@ if [ "$SKIP_DOCS" = false ]; then
         ssh "$REMOTE" "mkdir -p $REMOTE_DIR/docs"
         for file in docs/index.html docs/swagger.json docs/swagger.yaml docs/swagger-ui-bundle.js docs/swagger-ui-standalone-preset.js docs/swagger-ui.css; do
             if [ -f "$file" ]; then
-                filename=$(basename "$file")
-                base64 < "$file" | ssh "$REMOTE" "base64 -d > $REMOTE_DIR/docs/$filename"
+                install_file "$file" "docs/$(basename "$file")"
             else
                 log_warning "Docs file $file not found, skipping"
             fi
         done
-        log_success "API docs transferred (check /api/docs/ with trailing slash)"
+        log_success "API docs up to date (check /api/docs/ with trailing slash)"
     else
         log_warning "docs/ directory not found, skipping docs deploy"
     fi
@@ -238,6 +297,12 @@ else
     ssh "$REMOTE" "tail -n 30 $REMOTE_DIR/bticino_bridge.crash.log" || true
     exit 1
 fi
+
+# Only after a successful start, so a failed deploy still has all its rollback options.
+log "Removing old backups, keeping $KEEP_BACKUPS of each..."
+ssh "$REMOTE" "cd $REMOTE_DIR && for prefix in bticino_bridge.backup. config.yaml.backup.; do
+        ls -1r \"\$prefix\"* 2> /dev/null | tail -n +$((KEEP_BACKUPS + 1)) | while read -r old; do rm -f \"\$old\"; done
+    done" || log_warning "Could not remove old backups"
 
 echo
 echo -e "${GREEN}╔═══════════════════════════════════════════════════════════╗${NC}"
