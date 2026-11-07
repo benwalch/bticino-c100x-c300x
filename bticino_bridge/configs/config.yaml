@@ -43,19 +43,19 @@ sip:
   # per unit (wrong values get an instant 486); required for camera sessions.
   # Find yours via the settings wizard. Unrelated to the numeric dev_addr above.
 
-  # Contestador SIP bajo demanda desde HA (F1). Fail-closed: enabled=false por
-  # defecto. El deploy NO pushea config.yaml — hay que dar de alta este bloque
-  # a mano en el device (ver docs/answerer-setup.md) tras registrar la ruta con
-  # scripts/setup_answerer_route.sh.
+  # On-demand SIP answerer from HA (F1). Fail-closed: enabled=false by default.
+  # Enable it only after registering the route with scripts/setup_answerer_route.sh
+  # (see docs/answerer-setup.md). scripts/deploy.sh overwrites the device's
+  # config.yaml unless --skip-config is used.
   answerer:
-    enabled: false          # master switch F1 (poner true en el device tras dar de alta el route)
+    enabled: false          # F1 master switch (set to true on the device after registering the route)
     user: "bridge"
     audio_port: 10100
-    video_port: 10102       # -1 = rechazar m=video (audio-only)
+    video_port: 10102       # -1 = reject m=video (audio-only)
     max_call_seconds: 120
-    ring_timeout_seconds: 70 # guarda de timbre: sin contestar ni CANCEL, cierra con 480 (default 70, como la app 1.17.3)
-    talk_enabled: false     # F2: hablar desde HA (micro→go2rtc :40004→ffmpeg SRTP→placa); poner true en el device
-    talk_keepalive: false   # subida de audio continua (silencio speex si el micro calla) para que la placa abra el audio de bajada; requiere talk_enabled
+    ring_timeout_seconds: 70 # ring guard: with no answer and no CANCEL, closes with 480 (default 70, like app 1.17.3)
+    talk_enabled: false     # F2: talk from HA (mic→go2rtc :40004→ffmpeg SRTP→door panel); set to true on the device
+    talk_keepalive: false   # continuous uplink audio (speex silence while the mic is quiet) so the door panel opens the downlink audio; requires talk_enabled
     route_file: "/etc/flexisip/users/route_ext.conf"
 
 # ==================== MQTT ====================
@@ -235,14 +235,15 @@ additional_locks:
   # - name: "Side Door"
   #   where: 22
 
-# ==================== CLASIFICADOR DE ACCESOS ====================
-# Clasifica cada apertura del portal como telefonillo/llave correlacionando con
-# timbres/llamadas previos. Solo escucha el bus interno; no envía comandos.
+# ==================== ACCESS CLASSIFIER ====================
+# Classifies each door opening as intercom ("telefonillo") or key ("llave") by
+# correlating it with earlier rings and calls. Only listens to the internal bus;
+# sends no commands.
 access:
   enabled: false
-  correlation_window: 30s      # apertura dentro de este tiempo tras timbre/llamada → "telefonillo"
-  max_hold_wait: 8s            # cuánto esperar al cierre para medir la duración del pulso
-  duration_visitor_max: 3500ms # duración ≤ → rango "visita" (solo ajusta la CONFIANZA, no la etiqueta)
+  correlation_window: 30s      # opening within this time after a ring or call → "telefonillo"
+  max_hold_wait: 8s            # how long to wait for the door to close to measure the pulse duration
+  duration_visitor_max: 3500ms # duration ≤ → "visitor" range (only adjusts the CONFIDENCE, not the label)
 
 # ==================== UDP PROXY ====================
 udp_proxy:
@@ -250,15 +251,15 @@ udp_proxy:
   listen_port: 40004
   target_port: 4000
 
-# ==================== AUDIO FULL-DUPLEX ====================
-# Audio full-duplex en la pata propia del bridge (oír + hablar con la puerta).
-# Fail-closed: si se omite el bloque, queda desactivado.
+# ==================== FULL-DUPLEX AUDIO ====================
+# Full-duplex audio on the bridge's own leg (listen to and talk with the door).
+# Fail-closed: if the block is omitted, it stays disabled.
 audio:
   duplex_enabled: false
   duplex_sink_path: "/home/bticino/cfg/extra/recordings/door_audio.wav"
-  # Espejo pasivo del audio de bajada nativo (tap lo:5000, sdd
-  # 2026-08-21-audio-tap-5000). Fail-closed: si se omite, queda desactivado.
+  # Passive mirror of the native downlink audio (tap lo:5000, design doc
+  # 2026-08-21-audio-tap-5000). Fail-closed: if omitted, it stays disabled.
   listen_tap_enabled: false
-  # Sink WAV dedicado del oído pasivo (distinto de duplex_sink_path, para no
-  # compartir archivo con la pata duplex).
+  # Dedicated WAV sink of the passive listener (separate from duplex_sink_path, so
+  # it does not share a file with the duplex leg).
   listen_sink_path: "/home/bticino/cfg/extra/recordings/door_audio_listen.wav"
