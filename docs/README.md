@@ -22,6 +22,8 @@ describes how to build a firmware in this fork.
   table and how to find new frames.
 - [The bridge](../bticino_bridge/README.md) — the Home Assistant bridge that is
   baked into the image.
+- [App versus bridge](app-vs-bridge.md) — what the bridge replaces, what still
+  needs the cloud, and the one-time provisioning flow.
 
 ## Safety and legal
 
@@ -52,3 +54,5 @@ rooted device.
   between the native stack and Home Assistant, and the non-interference rule.
 - [Cloud-survival mode](diagrams/05-cloud-survival.svg) — what is cut or
   redirected and what keeps working, reversibly.
+- [App versus bridge](diagrams/06-app-vs-bridge.svg) — the app's two planes, what
+  the bridge replaces, and the cloud leftovers.

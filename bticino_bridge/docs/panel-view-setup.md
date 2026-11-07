@@ -4,8 +4,7 @@
 > restart Flexisip by hand on a Classe 100X: SIP then stays broken until a reboot.
 
 Guía para activar el botón **Ver placa** de Home Assistant en el device y para
-ejecutar el gate en vivo de la v0.29.0. Diseño completo en
-`internal/specs/2026-10-08-ver-placa-design.md` (upstream, not in this repository).
+ejecutar el gate en vivo de la v0.29.0.
 
 > **Estado (v0.29.3, gate en vivo 2026-10-16):** el ojo enciende la placa
 > (`DEVADDR=20`), dura los 30 s del auto-off, **tres ojos seguidos funcionan** y la

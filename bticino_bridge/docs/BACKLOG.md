@@ -29,8 +29,7 @@ spec → plan before implementation.
   mitigation landed: routine SIP listener traffic downgraded to Debug.
 - **Clasificador de eventos de acceso / cerradura por duración.**
   **✅ HECHO (v0.20.0, 2026-08-21)** — implementado con correlación timbre/llamada
-  como señal primaria (mejor que el umbral de duración original). Ver
-  `docs/internal/specs/2026-08-21-access-classifier-design.md`.
+  como señal primaria (mejor que el umbral de duración original).
 
   El bus OpenWebNet
   emite eventos de cerradura (apertura → cierre + duración) de **cualquier piso**
