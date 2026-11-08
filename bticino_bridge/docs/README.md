@@ -67,6 +67,7 @@ architecture and capabilities.
 | [FUTURE_IMPROVEMENTS.md](FUTURE_IMPROVEMENTS.md) | Future improvements roadmap |
 | [ROADMAP_VIDEO_AUDIO.md](ROADMAP_VIDEO_AUDIO.md) | Video/audio roadmap (talk-back, native WebRTC) |
 | [BACKLOG.md](BACKLOG.md) | Backlog of pending ideas |
+| [FUTURE_FEATURES.md](FUTURE_FEATURES.md) | Worked-out plans not yet implemented (autostart, manual start from HA) |
 | [plans/](plans/) | Implementation plans (e.g. live video on call) |
 | [specs/](specs/) | Design specs (e.g. live video on call) |
 

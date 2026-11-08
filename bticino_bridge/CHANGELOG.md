@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- New `docs/FUTURE_FEATURES.md` with the tested but not implemented plan for a bridge
+  autostart after reboot, and the idea of a manual start from Home Assistant.
 - The periodic `Publishing LED states to MQTT` line is now logged at debug level.
 - `make deploy` and `scripts/deploy.sh` spare the flash: backups are hard links, so
   they copy no data, and only files that changed are written. A transfer goes into
