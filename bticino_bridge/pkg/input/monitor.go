@@ -26,10 +26,11 @@ type InputMonitor struct {
 	OnTouchEvent   func(TouchEvent)
 
 	// Internal state
-	running  bool
-	stopChan chan struct{}
-	wg       sync.WaitGroup
-	mutex    sync.RWMutex
+	running   bool
+	stopChan  chan struct{}
+	wg        sync.WaitGroup
+	mutex     sync.RWMutex
+	openFiles map[*os.File]bool // closed by Stop to end blocked reads
 
 	// GPIO state tracking
 	gpioStates map[int]bool
@@ -106,6 +107,7 @@ func NewInputMonitor(logger *logrus.Logger) *InputMonitor {
 		GPIOPins:   bticino.GPIOPinsForVariant(bticino.DeviceVariant),
 		Logger:     logger,
 		stopChan:   make(chan struct{}),
+		openFiles:  make(map[*os.File]bool),
 		gpioStates: make(map[int]bool),
 	}
 }
@@ -139,19 +141,39 @@ func (im *InputMonitor) Start() error {
 // Stop stops all input monitoring
 func (im *InputMonitor) Stop() error {
 	im.mutex.Lock()
-	defer im.mutex.Unlock()
-
 	if !im.running {
+		im.mutex.Unlock()
 		return nil
 	}
 
 	im.Logger.Info("Stopping input monitor...")
 	im.running = false
 	close(im.stopChan)
+	for file := range im.openFiles {
+		file.Close()
+	}
+	im.mutex.Unlock()
 
 	im.wg.Wait()
 	im.Logger.Info("Input monitor stopped")
 	return nil
+}
+
+// trackOpenFile registers file for Stop and reports false once stopping.
+func (im *InputMonitor) trackOpenFile(file *os.File) bool {
+	im.mutex.Lock()
+	defer im.mutex.Unlock()
+	if !im.running {
+		return false
+	}
+	im.openFiles[file] = true
+	return true
+}
+
+func (im *InputMonitor) untrackOpenFile(file *os.File) {
+	im.mutex.Lock()
+	delete(im.openFiles, file)
+	im.mutex.Unlock()
 }
 
 // IsRunning returns true if the monitor is running
@@ -201,8 +223,12 @@ func (im *InputMonitor) monitorEventDevice(device string) {
 		// Reset retry count on successful open
 		retryCount = 0
 
-		// Read events in binary format
+		if !im.trackOpenFile(file) {
+			file.Close()
+			break
+		}
 		readErr := im.readEventLoop(device, file)
+		im.untrackOpenFile(file)
 		file.Close()
 
 		if !im.IsRunning() {

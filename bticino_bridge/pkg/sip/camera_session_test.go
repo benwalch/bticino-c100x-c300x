@@ -35,6 +35,7 @@ func newSessionTestClient() (*BTicinoSIPClient, *int32, *int32) {
 	c := &BTicinoSIPClient{
 		config:     &SIPConfig{NativeDevAddr: "00000000-0000-4000-8000-000000000001"},
 		callState:  Registered,
+		running:    true,
 		eventBus:   bus,
 		logger:     logrus.New(),
 		answerUser: bticino.SIPUsernameForVariant(bticino.DeviceVariant),

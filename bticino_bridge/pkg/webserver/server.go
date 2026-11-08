@@ -199,6 +199,7 @@ type WebServer struct {
 	configPath               string                       // Path to configuration file
 	sseClients               map[chan []byte]bool         // SSE clients for real-time updates
 	sseMu                    sync.Mutex
+	shuttingDown             chan struct{}         // closed on Shutdown so SSE streams end
 	talkback                 *sip.TalkbackInjector // Talk-back (upstream audio) injector — experimental
 	audioCall                AudioSayer            // Talk-back v2: own local audio call
 	restartBridgeFunc        func()                // Bridge restart action (injectable in tests)
@@ -435,6 +436,9 @@ func (ws *WebServer) Start(ctx context.Context) error {
 		Addr:    fmt.Sprintf("0.0.0.0:%d", ws.config.Web.Port),
 		Handler: ws.authMiddleware(mux),
 	}
+	// Shutdown waits for every active request, and an SSE stream never ends by itself.
+	ws.shuttingDown = make(chan struct{})
+	ws.server.RegisterOnShutdown(func() { close(ws.shuttingDown) })
 
 	go func() {
 		if err := ws.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -921,6 +925,8 @@ func (ws *WebServer) handleSSEvents(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-notify:
+			return
+		case <-ws.shuttingDown:
 			return
 		case data := <-clientChan:
 			fmt.Fprintf(w, "data: %s\n\n", data)

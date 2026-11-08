@@ -341,23 +341,28 @@ func (c *BTicinoSIPClient) Start() error {
 
 func (c *BTicinoSIPClient) Stop() error {
 	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
 	if !c.running {
+		c.mutex.Unlock()
 		return nil
 	}
+	c.running = false
+	c.mutex.Unlock()
 
 	c.logger.Info("Stopping BTicino SIP client")
 
 	// End a camera session first so the native side gets its BYE: a killed
 	// bridge otherwise orphans the dialog, blocking later dials. The wait
-	// covers the end-of-session frame grab plus the BYE round-trip.
+	// covers the end-of-session frame grab plus the BYE round-trip. The
+	// session needs c.mutex to finish, so it must not be held here.
 	if c.CameraSessionActive() {
 		c.StopCameraSession()
 		for i := 0; i < 120 && c.CameraSessionActive(); i++ {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 	if c.registerTick != nil {
 		c.registerTick.Stop()
@@ -377,7 +382,6 @@ func (c *BTicinoSIPClient) Stop() error {
 
 	close(c.stopCh)
 
-	c.running = false
 	c.callState = Idle
 	c.sessionActive = false
 

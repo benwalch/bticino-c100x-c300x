@@ -10,8 +10,9 @@ import (
 
 func readerTestClient(expiry int) *BTicinoSIPClient {
 	return &BTicinoSIPClient{
-		config: &SIPConfig{ExpirySeconds: expiry},
-		logger: logrus.New(),
+		config:  &SIPConfig{ExpirySeconds: expiry},
+		logger:  logrus.New(),
+		running: true,
 	}
 }
 

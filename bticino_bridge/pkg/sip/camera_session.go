@@ -46,6 +46,10 @@ func (c *BTicinoSIPClient) grabFrame() []byte {
 // Source names the owner ("mqtt", "rtsp"): only the owner reaps the session.
 func (c *BTicinoSIPClient) StartCameraSession(duration time.Duration, source string) error {
 	c.mutex.Lock()
+	if !c.running {
+		c.mutex.Unlock()
+		return fmt.Errorf("SIP client is not running")
+	}
 	if c.cameraSessionActive {
 		c.mutex.Unlock()
 		return fmt.Errorf("camera session already active")
@@ -57,9 +61,10 @@ func (c *BTicinoSIPClient) StartCameraSession(duration time.Duration, source str
 	}
 	c.cameraSessionActive = true
 	c.cameraSessionSource = source
-	c.cameraSessionStop = make(chan struct{})
+	stop := make(chan struct{})
+	c.cameraSessionStop = stop
 	c.mutex.Unlock()
-	go c.runCameraSession(duration)
+	go c.runCameraSession(duration, stop)
 	return nil
 }
 
@@ -73,7 +78,7 @@ func (c *BTicinoSIPClient) StopCameraSession() {
 	c.mutex.Unlock()
 }
 
-func (c *BTicinoSIPClient) runCameraSession(duration time.Duration) {
+func (c *BTicinoSIPClient) runCameraSession(duration time.Duration, stop <-chan struct{}) {
 	if duration <= 0 {
 		duration = 30 * time.Second
 	}
@@ -114,7 +119,6 @@ func (c *BTicinoSIPClient) runCameraSession(duration time.Duration) {
 	c.remoteTag = dlg.toTag
 	c.sessionActive = true
 	c.callState = Connected
-	stop := c.cameraSessionStop
 	c.mutex.Unlock()
 	c.eventBus.PublishWithSource("sip.call.connected", map[string]interface{}{
 		"target":   c.answerUser,

@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+- The bridge now shuts down cleanly on `TERM`. Before, it hung at
+  `Stopping BTicino SIP client` (seen on the device): the SIP client waited for
+  a lock it already held. `deploy.sh` and the restart then killed it with `-9`
+  after 15 s, so MQTT did not publish `offline` (Home Assistant only learned it
+  from the last will) and the OpenWebNet connections were not closed. Two
+  further hangs in the same shutdown are fixed: the input monitor waited for
+  reads on `/dev/input/event*` that only end with a key press, and the web
+  server waited for open `/api/events` streams (an open dashboard).
+- A camera session stopped while it is still dialing now ends right after the
+  dial instead of holding for the full `camera_session_duration`. After the SIP
+  client has stopped, no new camera session starts.
+
 - Security: bus commands no longer go through a shell. Before, each one ran as
   `sh -c "echo '<frame>' | nc 0 30006"`, so a crafted command over
   `POST /api/controls/command` or the MQTT topic `<prefix>/command/send` could
