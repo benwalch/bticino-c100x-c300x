@@ -44,7 +44,7 @@ reimplement techniques, never copy code.
 > 1. `make deploy` (new bridge) + copy `_investigacion/device_backups/talkback_test.wav` to the device.
 > 2. With a call in progress, watch the panel's audio port (from the SDP in the
 >    loopback capture, or try candidates 7078/5224/etc.).
-> 3. `curl -XPOST http://192.168.1.38:8082/api/talkback/start -d '{"host":"127.0.0.1","port":<PUERTO>,"source":"/var/volatile/talkback_test.wav","loop":true,"arm":true}'`
+> 3. `curl -XPOST http://192.168.1.38:8082/api/talkback/start -d '{"host":"127.0.0.1","port":<PUERTO>,"source":"/tmp/talkback_test.wav","loop":true,"arm":true}'`
 > 4. Listen whether the panel plays the tone. Iterate over ports if not.
 
 Both downstream flows need an **active native session** (eye/auto-on button or a

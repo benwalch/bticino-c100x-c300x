@@ -15,7 +15,7 @@ Apple HomeKit, a Svelte web dashboard, a REST API and hardware-accelerated
 | **Live video on call (:6554 `/doorbell-video`)** | ✅ Working — passive AF_PACKET tap of the native video leg (`lo:5002`, cleartext H.264) → relay → RTSP → go2rtc → HA. **Zero bus commands**; on by default (`streaming.live_on_call: true`), independent of `video_on_demand` |
 | **RTSP on-demand video (:6554 `/doorbell`)** | 🧪 Experimental — **off by default** (`video_on_demand: false`). Self-INVITE activation competes with the native camera; only enable once validated on your unit |
 | **Camera snapshots** | ✅ Working — cooperative single `*7*300` (VPU decode → JPEG); doorbell camera published to MQTT on ring |
-| **Web/API authentication** | ✅ Working — optional HTTP Basic Auth over the whole server (`security.web_auth_required` + `web_username`/`web_password`); fail-closed if enabled without a password |
+| **Web/API authentication** | ✅ Working — optional HTTP Basic Auth over the whole server (`security.web_auth_required` + `web_username`/`web_password`); fail-closed if enabled without a password. POST, PUT and DELETE from other sites are refused (403), so a web page cannot open the door through a logged-in browser |
 | **Incoming call detection** | ✅ Working — `doorbell.pressed`/`call.hangup` (OWN bus) drive live video; `GET /api/call`, hangup |
 | Svelte web dashboard (:8082) | ✅ Working — 6 pages (dashboard w/ GPIO tooltips, controls w/ System reboot/restart, messages, memos, logs, settings) |
 | REST API (40+ endpoints) | ✅ Working — Swagger UI at `/api/docs/`; incl. `POST /api/system/restart-bridge`, `POST /api/system/reboot` |

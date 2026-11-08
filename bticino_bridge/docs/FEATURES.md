@@ -1,7 +1,7 @@
 # BTicino Bridge - Features and Architecture
 
 **Version**: 0.24.0
-**Language**: Go 1.24 + Svelte 4
+**Language**: Go 1.25 + Svelte 4
 **Target**: Linux ARM7 (NXP i.MX6ULL, BTicino Classe 300X)
 
 ---
@@ -361,7 +361,6 @@ Turn it on if the dashboard is reachable beyond a trusted network.
 | GET | `/api/config/backups` | List available backups |
 | GET | `/api/config/history` | Change history (last 100) |
 | GET | `/api/config/device` | Device config from system files |
-| GET | `/api/config/sip-accounts` | SIP accounts from Flexisip |
 
 #### Device Settings
 

@@ -78,7 +78,7 @@ See [`bticino_bridge/README.md`](/bticino_bridge/README.md) and
 
 ### BTicino Bridge Requirements
 
-- Go 1.24+ and Node.js (for the Svelte frontend) on the build machine
+- Go 1.25+ and Node.js (for the Svelte frontend) on the build machine
 - MQTT Broker (e.g., Home Assistant Mosquitto)
 
 ### Building the bridge

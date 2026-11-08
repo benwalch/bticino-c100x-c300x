@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+- Security: the web server refuses POST, PUT and DELETE requests that a browser
+  sends from another site (403), using Go's `http.CrossOriginProtection`. Before,
+  any web page open in a browser that had logged in to the dashboard could open
+  the door or send bus commands, because the browser adds Basic Auth by itself.
+  The dashboard itself, `curl` and Home Assistant are not affected. GET stays
+  allowed, so `GET /api/snapshot` can still be triggered from other sites.
+  Migration: building needs Go 1.25 or newer.
+- Security: the bridge no longer starts when `config.yaml` cannot be read or
+  parsed. Before, it silently fell back to built-in defaults, without web
+  authentication and with HomeKit on a default PIN. It now exits with code 1 and
+  writes `cannot load config …` to stderr and to `bticino_bridge.crash.log`,
+  which `scripts/deploy.sh` shows. A `-test` run needs a readable config too.
+- Security: `POST /api/talkback/start` accepts only a `source` below `/tmp` or
+  `/home/bticino/cfg/extra` and only a loopback `host` (or none); anything else
+  is refused with 400 before the bus command is sent. Before, it streamed any
+  readable file to any host. `POST /api/audio/duplex/start` checks `talk` the
+  same way.
+- Removed `GET /api/config/sip-accounts`. Nothing used it, and it returned the
+  Flexisip accounts with their password hashes.
+
 - Fixed two crashes. The GPIO poller wrote its state map without the lock while
   the 30 s status check read it; the Go runtime aborts such a program with
   `concurrent map read and map write`. And a `settings.xml` that fails to parse,

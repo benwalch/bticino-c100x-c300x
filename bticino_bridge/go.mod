@@ -1,8 +1,6 @@
 module bticino_bridge
 
-go 1.24.0
-
-toolchain go1.24.4
+go 1.25.0
 
 require (
 	github.com/brutella/hap v0.0.35

@@ -58,6 +58,14 @@ func (ws *WebServer) handleAudioDuplexStart(w http.ResponseWriter, r *http.Reque
 	}
 
 	talk := r.URL.Query().Get("talk")
+	if talk != "" {
+		if err := validateAudioFilePath(talk); err != nil {
+			ws.writeAudioDuplexJSON(w, http.StatusBadRequest, map[string]interface{}{
+				"success": false, "error": "talk not allowed: " + err.Error(),
+			})
+			return
+		}
+	}
 	answer, err := ws.duplexController.OpenDuplex(ws.config.Audio.DuplexSinkPath, talk)
 	if err != nil {
 		if errors.Is(err, sip.ErrAudioLegBusy) {

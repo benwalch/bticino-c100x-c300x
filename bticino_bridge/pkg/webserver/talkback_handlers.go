@@ -3,6 +3,7 @@ package webserver
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -72,6 +73,19 @@ func (ws *WebServer) handleTalkbackStart(w http.ResponseWriter, r *http.Request)
 	if body.Port <= 0 || body.Source == "" {
 		ws.writeTalkbackJSON(w, http.StatusBadRequest, map[string]interface{}{
 			"success": false, "error": "'port' (>0) and 'source' (WAV path) are required",
+		})
+		return
+	}
+	if err := validateAudioFilePath(body.Source); err != nil {
+		ws.writeTalkbackJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"success": false, "error": "source not allowed: " + err.Error(),
+		})
+		return
+	}
+	// The door station is reached through the local media leg only.
+	if body.Host != "" && !net.ParseIP(body.Host).IsLoopback() {
+		ws.writeTalkbackJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"success": false, "error": "'host' must be a loopback address",
 		})
 		return
 	}

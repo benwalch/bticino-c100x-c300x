@@ -421,7 +421,6 @@ func (ws *WebServer) Start(ctx context.Context) error {
 	// Device config (Phase 1: QML → Bridge synchronization)
 	mux.HandleFunc("/api/config/device", ws.handleAPIDeviceConfig)
 	mux.HandleFunc("/api/config/language", ws.handleAPILanguage)
-	mux.HandleFunc("/api/config/sip-accounts", ws.handleAPISIPAccounts)
 
 	// (Legacy UI removed: its snake_case keys did not match the backend
 	// and a partial save could mangle the config — audit 2026-08-19)
@@ -434,7 +433,7 @@ func (ws *WebServer) Start(ctx context.Context) error {
 
 	ws.server = &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", ws.config.Web.Port),
-		Handler: ws.authMiddleware(mux),
+		Handler: http.NewCrossOriginProtection().Handler(ws.authMiddleware(mux)),
 	}
 	// Shutdown waits for every active request, and an SSE stream never ends by itself.
 	ws.shuttingDown = make(chan struct{})

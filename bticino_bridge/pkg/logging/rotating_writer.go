@@ -138,7 +138,7 @@ func (w *RotatingWriter) failed(err error) {
 	w.retryAt = w.now().Add(reopenInterval)
 	if w.lastProblem.IsZero() || w.now().Sub(w.lastProblem) >= problemInterval {
 		w.lastProblem = w.now()
-		recordProblem(fmt.Sprintf("log file problem: %v", err))
+		RecordProblem(fmt.Sprintf("log file problem: %v", err))
 	}
 }
 

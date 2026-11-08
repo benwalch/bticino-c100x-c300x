@@ -133,10 +133,26 @@ func main() {
 		ForceColors:   true,
 	})
 
-	// Load the config first, so all start lines already follow logging.*
+	// Before the config, so that a config or log file problem can reach the crash log.
+	var previousCrash string
+	var crashErr error
+	if !*testMode {
+		var exe string
+		if exe, crashErr = os.Executable(); crashErr == nil {
+			// Next to the binary, which on the device means on flash.
+			crashLog := filepath.Join(filepath.Dir(exe), "bticino_bridge.crash.log")
+			previousCrash, crashErr = logging.EnableCrashLog(crashLog, versionpkg.GetVersion())
+		}
+	}
+
+	// Load the config before logging, so all start lines already follow logging.*
+	// Without it there are no credentials and no web auth: never start on defaults.
 	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
-		cfg = config.GetDefaultConfig()
+		message := fmt.Sprintf("cannot load config %s: %v", *configPath, err)
+		logging.RecordProblem(message)
+		fmt.Fprintln(os.Stderr, message)
+		os.Exit(1)
 	}
 
 	logOptions := logging.Options{
@@ -151,18 +167,6 @@ func main() {
 	// A -test run must show its output and leave the log of a running bridge alone.
 	if *testMode {
 		logOptions.File = ""
-	}
-
-	// Before Configure, so that a log file problem can reach the crash log.
-	var previousCrash string
-	var crashErr error
-	if !*testMode {
-		var exe string
-		if exe, crashErr = os.Executable(); crashErr == nil {
-			// Next to the binary, which on the device means on flash.
-			crashLog := filepath.Join(filepath.Dir(exe), "bticino_bridge.crash.log")
-			previousCrash, crashErr = logging.EnableCrashLog(crashLog, versionpkg.GetVersion())
-		}
 	}
 
 	logging.Configure(logger, logOptions)
