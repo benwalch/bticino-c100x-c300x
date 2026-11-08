@@ -356,7 +356,7 @@ func (im *InputMonitor) monitorGPIO() {
 			im.Logger.Warnf("Failed to read initial GPIO %d state: %v", pin, err)
 			continue
 		}
-		im.gpioStates[pin] = state
+		im.updateGPIOState(pin, state)
 		im.Logger.Debugf("GPIO %d initial state: %t", pin, state)
 	}
 
@@ -384,26 +384,31 @@ func (im *InputMonitor) checkGPIOChanges() {
 			continue
 		}
 
-		oldState, exists := im.gpioStates[pin]
-		if !exists || oldState != newState {
-			// State changed or first read
-			im.gpioStates[pin] = newState
+		oldState, known := im.updateGPIOState(pin, newState)
+		if !known || oldState == newState {
+			continue
+		}
+		im.Logger.Infof("GPIO %d state changed: %t -> %t", pin, oldState, newState)
 
-			if exists { // Only fire event if this is a real change, not initial state
-				im.Logger.Infof("GPIO %d state changed: %t -> %t", pin, oldState, newState)
+		screenEvent := ScreenEvent{
+			GPIO:      pin,
+			State:     newState,
+			Timestamp: time.Now(),
+		}
 
-				screenEvent := ScreenEvent{
-					GPIO:      pin,
-					State:     newState,
-					Timestamp: time.Now(),
-				}
-
-				if im.OnScreenChange != nil {
-					go im.OnScreenChange(screenEvent)
-				}
-			}
+		if im.OnScreenChange != nil {
+			go im.OnScreenChange(screenEvent)
 		}
 	}
+}
+
+// updateGPIOState stores state and returns the previous one, if any.
+func (im *InputMonitor) updateGPIOState(pin int, state bool) (old bool, known bool) {
+	im.mutex.Lock()
+	defer im.mutex.Unlock()
+	old, known = im.gpioStates[pin]
+	im.gpioStates[pin] = state
+	return old, known
 }
 
 // readGPIOValue reads the current value of a GPIO pin

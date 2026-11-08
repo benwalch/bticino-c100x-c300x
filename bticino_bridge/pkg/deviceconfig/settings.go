@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 )
 
 // SettingsXML represents the structure of the settings.xml file (directory 0)
@@ -85,7 +84,7 @@ func ReadSettingsXML(path string) (*SettingsXML, error) {
 
 	var raw RawSettingsXML
 	if err := xml.Unmarshal(data, &raw); err != nil {
-		return ReadSettingsXMLSimple(path)
+		return nil, fmt.Errorf("parse settings.xml: %w", err)
 	}
 
 	settings := &SettingsXML{
@@ -212,89 +211,6 @@ func assignVolume(v *Volumes, cid string, volume int) {
 	case "14129":
 		v.SIP = volume
 	}
-}
-
-// ReadSettingsXMLSimple does a simple parsing using strings
-func ReadSettingsXMLSimple(path string) (*SettingsXML, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-
-	content := string(data)
-	settings := &SettingsXML{
-		Ringtones: Ringtones{},
-		Volumes:   Volumes{},
-		Display:   Display{},
-	}
-
-	// Find all obj elements with id_ringtone
-	lines := strings.Split(content, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if !strings.Contains(line, "id_ringtone=") && !strings.Contains(line, "cid=\"141") {
-			continue
-		}
-
-		// Extract cid
-		cidStart := strings.Index(line, "cid=\"")
-		if cidStart == -1 {
-			continue
-		}
-		cidEnd := strings.Index(line[cidStart:], "\"")
-		if cidEnd == -1 {
-			continue
-		}
-		cid := line[cidStart+5 : cidStart+cidEnd]
-
-		// Extract id_ringtone
-		ringStart := strings.Index(line, "id_ringtone=\"")
-		var ringtoneID int
-		if ringStart != -1 {
-			ringEnd := strings.Index(line[ringStart:], "\"")
-			if ringEnd != -1 {
-				ringtoneID, _ = strconv.Atoi(line[ringStart+13 : ringStart+ringEnd])
-			}
-		}
-
-		// Extract uii from the ist element
-		uiiStart := strings.Index(line, "uii=\"")
-		var uii int
-		if uiiStart != -1 {
-			uiiEnd := strings.Index(line[uiiStart:], "\"")
-			if uiiEnd != -1 {
-				uii, _ = strconv.Atoi(line[uiiStart+5 : uiiStart+uiiEnd])
-			}
-		}
-
-		// Assign by UII
-		if uii > 0 && ringtoneID > 0 {
-			assignRingtone(&settings.Ringtones, uii, ringtoneID)
-		}
-
-		// Find volume
-		volStart := strings.Index(line, "volume=\"")
-		if volStart != -1 {
-			volEnd := strings.Index(line[volStart:], "\"")
-			if volEnd != -1 {
-				volume, _ := strconv.Atoi(line[volStart+8 : volStart+volEnd])
-				assignVolume(&settings.Volumes, cid, volume)
-			}
-		}
-
-		// Find brightness
-		if cid == "14151" {
-			brightStart := strings.Index(line, "brightness=\"")
-			if brightStart != -1 {
-				brightEnd := strings.Index(line[brightStart:], "\"")
-				if brightEnd != -1 {
-					settings.Display.Brightness, _ = strconv.Atoi(line[brightStart+12 : brightStart+brightEnd])
-				}
-			}
-		}
-	}
-
-	return settings, nil
 }
 
 // GetRingtone returns the ringtone for a specific UII

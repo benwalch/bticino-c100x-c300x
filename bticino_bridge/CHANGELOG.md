@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Fixed two crashes. The GPIO poller wrote its state map without the lock while
+  the 30 s status check read it; the Go runtime aborts such a program with
+  `concurrent map read and map write`. And a `settings.xml` that fails to parse,
+  for example while the firmware rewrites it, no longer crashes the bridge: the
+  string-based fallback parser panicked on every such file and is removed. The
+  read now fails with `parse settings.xml: …` and the next periodic read
+  publishes the values again.
+
 - The bridge now shuts down cleanly on `TERM`. Before, it hung at
   `Stopping BTicino SIP client` (seen on the device): the SIP client waited for
   a lock it already held. `deploy.sh` and the restart then killed it with `-9`
