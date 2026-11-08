@@ -854,7 +854,7 @@ func main() {
 			logger.WithError(err).Error("Failed to start MQTT bridge, continuing without MQTT")
 			mqttBridge = nil
 		} else {
-			logger.Infof("MQTT: Connected to Home Assistant at %s:%d", cfg.MQTT.Host, cfg.MQTT.Port)
+			logger.Infof("MQTT: Bridge started for %s:%d", cfg.MQTT.Host, cfg.MQTT.Port)
 
 			// Wire EventBus to MQTT bridge for event forwarding
 			mqttBridge.SetEventBus(eventBus)
@@ -890,8 +890,9 @@ func main() {
 	// Query real device state at startup (voicemail, doorbell)
 	if mqttBridge != nil {
 		go func() {
-			// Wait 5s for the MQTT bridge to be fully connected
+			// The answers are published once, so they need the MQTT connection.
 			time.Sleep(5 * time.Second)
+			mqttBridge.WaitForConnection()
 			logger.Info("Querying initial device state...")
 
 			mqttBridge.QueryBellStatus()
@@ -1180,7 +1181,11 @@ func main() {
 	}
 
 	if mqttBridge != nil {
-		logger.Infof("  MQTT: Connected to %s:%d (39+%d HA entities, 8+%d command topics)", cfg.MQTT.Host, cfg.MQTT.Port, len(cfg.AdditionalLocks), len(cfg.AdditionalLocks))
+		state := "connected"
+		if !mqttBridge.IsConnected() {
+			state = "not connected yet, retrying"
+		}
+		logger.Infof("  MQTT: %s, %s:%d (39+%d HA entities, 8+%d command topics)", state, cfg.MQTT.Host, cfg.MQTT.Port, len(cfg.AdditionalLocks), len(cfg.AdditionalLocks))
 	}
 
 	if multicastListener != nil {

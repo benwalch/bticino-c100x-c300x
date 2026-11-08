@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+- MQTT no longer stays off when the broker is not reachable at bridge start, for
+  example when Home Assistant boots later after a power loss: the bridge retries
+  every 30 s until the first connection, then the reconnect works as before. Each
+  new connection error is logged once as a warning, so a wrong password shows up
+  without filling the log. The device config publisher waits for the connection
+  instead of giving up, and so do the startup queries, whose network info was lost
+  before. Log lines changed: `MQTT: Connected to Home Assistant at`
+  is now `MQTT: Bridge started for`, and the startup summary says whether MQTT is
+  connected; `MQTT Bridge connected to` still marks a successful connection.
 - New `docs/FUTURE_FEATURES.md` with the tested but not implemented plan for a bridge
   autostart after reboot, and the idea of a manual start from Home Assistant.
 - The periodic `Publishing LED states to MQTT` line is now logged at debug level.

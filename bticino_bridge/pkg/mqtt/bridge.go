@@ -35,6 +35,8 @@ type MQTTBridge struct {
 	config         *config.Config
 	logger         *logrus.Logger
 	client         pahomqtt.Client
+	retryInterval  time.Duration
+	waitPoll       time.Duration
 	eventBus       events.EventBus
 	openwebnet     *openwebnet.Client
 	messageParser  *messageparser.MessageParser
@@ -166,6 +168,8 @@ func NewMQTTBridge(cfg *config.Config, logger *logrus.Logger) (*MQTTBridge, erro
 		voicemailEnabled: true,  // Default: enabled
 		doorbellSoundOn:  true,  // Default: enabled
 		displayOn:        false, // Default: off (screensaver)
+		retryInterval:    connectRetryInterval,
+		waitPoll:         connectWaitPoll,
 	}, nil
 }
 
@@ -180,7 +184,17 @@ func (b *MQTTBridge) dataPrefix() string {
 	return p
 }
 
-// Start initializes and starts the MQTT bridge
+const (
+	// connectRetryInterval is the pause between connection attempts until the first
+	// connection succeeds; after that paho's auto-reconnect takes over.
+	connectRetryInterval = 30 * time.Second
+	// connectWaitPoll is how often code that needs a connection checks for it.
+	connectWaitPoll = 5 * time.Second
+)
+
+// Start initializes and starts the MQTT bridge. A broker that is not reachable yet
+// is no error: the bridge keeps trying in the background, because the broker may
+// start later than the bridge, for example after a power loss.
 func (b *MQTTBridge) Start(ctx context.Context) error {
 	b.logger.Info("Starting MQTT Bridge for Home Assistant...")
 
@@ -241,12 +255,41 @@ func (b *MQTTBridge) Start(ctx context.Context) error {
 
 	mqttClient := pahomqtt.NewClient(opts)
 	b.client = mqttClient // Assign BEFORE Connect() to avoid nil pointer in OnConnectHandler callback
-	if token := mqttClient.Connect(); token.Wait() && token.Error() != nil {
-		return fmt.Errorf("failed to connect to MQTT broker: %w", token.Error())
+	if err := b.connectOnce(); err != nil {
+		b.logger.WithError(err).Warnf("MQTT broker %s not reachable, retrying every %s", brokerURL, b.retryInterval)
+		go b.retryConnect(ctx, brokerURL, err)
+		return nil
 	}
 
 	b.logger.Infof("MQTT Bridge connected to %s", brokerURL)
 	return nil
+}
+
+func (b *MQTTBridge) connectOnce() error {
+	token := b.client.Connect()
+	token.Wait()
+	return token.Error()
+}
+
+// retryConnect tries until the first connection succeeds. A new error is logged
+// once, so a wrong password stays visible without filling the log.
+func (b *MQTTBridge) retryConnect(ctx context.Context, brokerURL string, lastErr error) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(b.retryInterval):
+		}
+		err := b.connectOnce()
+		if err == nil {
+			b.logger.Infof("MQTT Bridge connected to %s", brokerURL)
+			return
+		}
+		if err.Error() != lastErr.Error() {
+			b.logger.WithError(err).Warnf("MQTT broker %s still not reachable, retrying", brokerURL)
+			lastErr = err
+		}
+	}
 }
 
 // IsConnected returns the MQTT connection state
@@ -327,11 +370,9 @@ func (b *MQTTBridge) SetCommandHandler(ch *bticino_commands.BTicinoCommandHandle
 }
 
 // SetDeviceConfigPublisher initializes the device config publisher via MQTT
+// It waits for the first MQTT connection, which may come later than the start.
 func (b *MQTTBridge) SetDeviceConfigPublisher(interval time.Duration) {
-	if !b.IsConnected() {
-		b.logger.Warn("Cannot start device config publisher: MQTT not connected")
-		return
-	}
+	b.WaitForConnection()
 
 	publisher := deviceconfig.NewDeviceMQTTPublisher(b.logger, b, b.dataPrefix())
 	publisher.Start(interval)
@@ -341,6 +382,14 @@ func (b *MQTTBridge) SetDeviceConfigPublisher(interval time.Duration) {
 	watcher := deviceconfig.NewFileWatcher(b.logger, b, b.dataPrefix())
 	watcher.Start()
 	b.logger.Info("Device config file watcher started for real-time sync")
+}
+
+// WaitForConnection blocks until MQTT is connected. Publishes before that are lost,
+// so one-time messages such as the startup queries must wait for it.
+func (b *MQTTBridge) WaitForConnection() {
+	for !b.IsConnected() {
+		time.Sleep(b.waitPoll)
+	}
 }
 
 // SetFileWatcher optionally start file watcher separately
