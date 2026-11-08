@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"regexp"
@@ -73,25 +72,13 @@ func (s *SimpleMQTTBridge) GetVideoStats() map[string]interface{} {
 	}
 }
 
-// ExecuteCommand sends an OpenWebNet command via netcat (non-interfering method)
 func (s *SimpleMQTTBridge) ExecuteCommand(command string) (bool, error) {
-	s.logger.WithField("command", command).Info("Executing OpenWebNet command via netcat (SimpleMQTTBridge)")
-
-	// Use netcat method to avoid interfering with native BTicino processes
-	// This is the same method used in the working script
-	cmd := exec.Command("sh", "-c", fmt.Sprintf("echo '%s' | nc 0 30006", command))
-
-	if err := cmd.Run(); err != nil {
-		s.logger.WithError(err).WithField("command", command).Error("Failed to execute OpenWebNet command via netcat")
-		return false, fmt.Errorf("failed to send command %s via netcat: %w", command, err)
+	if err := openwebnet.SendLocalFrame(command); err != nil {
+		s.logger.WithError(err).WithField("command", command).Error("OWN command failed")
+		return false, fmt.Errorf("OWN command %q failed: %w", command, err)
 	}
 
-	s.logger.WithFields(map[string]interface{}{
-		"command": command,
-		"method":  "netcat",
-		"port":    "30006",
-	}).Info("OpenWebNet command executed successfully via netcat")
-
+	s.logger.WithField("command", command).Info("OWN command sent")
 	return true, nil
 }
 

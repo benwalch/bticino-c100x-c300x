@@ -20,7 +20,7 @@ Apple HomeKit, a Svelte web dashboard, a REST API and hardware-accelerated
 | Svelte web dashboard (:8082) | ✅ Working — 6 pages (dashboard w/ GPIO tooltips, controls w/ System reboot/restart, messages, memos, logs, settings) |
 | REST API (40+ endpoints) | ✅ Working — Swagger UI at `/api/docs/`; incl. `POST /api/system/restart-bridge`, `POST /api/system/reboot` |
 | Real-time SSE (`/api/events`) | ✅ Working — live LED/GPIO updates, no polling |
-| OpenWebNet client (80+ cmds) | ✅ Working — monitor on port 20000 + commands via netcat to 30006 |
+| OpenWebNet client (80+ cmds) | ✅ Working — monitor on port 20000 + commands via one short connection each to 30006 |
 | MQTT Home Assistant (42+ entities) | ✅ Working — auto-discovery + object_id |
 | Device config sync (conf.xml, aswm, tvcc) | ✅ Working — QML→Bridge→MQTT (languages, ringtones, volumes, display) |
 | Answering machine: messages + memos | ✅ Working — mark read/unread, delete, download video |
@@ -77,7 +77,7 @@ BTicino Classe 300X
 
  bticino-bridge (ARM binary)
   ├── OpenWebNet Client ──── Monitors port 20000 (read-only)
-  │                          Commands via netcat to 30006 (non-interfering mode)
+  │                          Commands via short connections to 30006 (non-interfering mode)
   ├── Web Server (:8082) ─── Embedded Svelte SPA + REST API + Swagger UI + SSE
   ├── MQTT Bridge ────────── Paho MQTT → HA broker (39+ auto-discovery entities)
   ├── HomeKit Bridge ─────── brutella/hap on :8081 (lock, doorbell, camera)
@@ -92,9 +92,11 @@ BTicino Classe 300X
 ### Non-interfering mode (critical)
 
 The bridge shares the device with the native BTicino processes. To avoid fighting
-them for ports/hardware it only **monitors** on port 20000 and sends commands by
-shelling out to netcat (`echo '<frame>' | nc 0 30006`) instead of holding its own
-sockets. Do not open persistent sockets to 30006/30007. BTicino requires ~310 ms
+them for ports/hardware it only **monitors** on port 20000 and sends each command in
+its own short connection to 30006, the same exchange as `echo '<frame>' | nc 0 30006`:
+the frame and a newline, a half-close, then it waits up to 5 s for the server to close.
+Only a single frame is accepted (digits, `*` and `#`, starting with `*` and ending
+with the only `##`). Do not open persistent sockets to 30006/30007. BTicino requires ~310 ms
 of spacing between commands.
 
 ## Go packages

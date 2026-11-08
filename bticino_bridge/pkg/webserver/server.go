@@ -14,6 +14,7 @@ import (
 	"bticino_bridge/pkg/bticino"
 	"bticino_bridge/pkg/config"
 	"bticino_bridge/pkg/messageparser"
+	"bticino_bridge/pkg/openwebnet"
 	"bticino_bridge/pkg/sip"
 	"bticino_bridge/pkg/version"
 	"github.com/sirupsen/logrus"
@@ -1254,7 +1255,7 @@ func (ws *WebServer) handleLightOn(w http.ResponseWriter, r *http.Request) {
 }
 
 // @Summary Send arbitrary OpenWebNet command
-// @Description Send any OpenWebNet command (must start with * and end with ##)
+// @Description Send one OpenWebNet frame (digits, '*' and '#'; starts with * and ends with ##)
 // @Tags Controls
 // @Accept json
 // @Produce json
@@ -1276,9 +1277,8 @@ func (ws *WebServer) handleArbitraryCommand(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Basic validation: OWN commands start with * and end with ##
-	if !strings.HasPrefix(body.Command, "*") || !strings.HasSuffix(body.Command, "##") {
-		http.Error(w, "Invalid OpenWebNet command format (must start with * and end with ##)", http.StatusBadRequest)
+	if !openwebnet.IsSingleFrame(body.Command) {
+		http.Error(w, "Invalid OpenWebNet command: exactly one frame of digits, '*' and '#', starting with * and ending with ##", http.StatusBadRequest)
 		return
 	}
 

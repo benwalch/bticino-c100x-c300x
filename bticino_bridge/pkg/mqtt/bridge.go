@@ -2294,17 +2294,13 @@ func (b *MQTTBridge) PublishMessage(topic, payload string, retain bool) {
 
 // ==================== COMMAND EXECUTION ====================
 
-// executeOWN sends an OpenWebNet command via netcat (non-interfering)
 func (b *MQTTBridge) executeOWN(command string) (bool, error) {
-	b.logger.WithField("command", command).Debug("Executing OWN command via netcat")
-
-	cmd := exec.Command("sh", "-c", fmt.Sprintf("echo '%s' | nc 0 30006", command))
-	if err := cmd.Run(); err != nil {
+	if err := openwebnet.SendLocalFrame(command); err != nil {
 		b.logger.WithError(err).WithField("command", command).Error("OWN command failed")
-		return false, fmt.Errorf("netcat command %s failed: %w", command, err)
+		return false, fmt.Errorf("OWN command %q failed: %w", command, err)
 	}
 
-	b.logger.WithField("command", command).Info("OWN command executed via netcat")
+	b.logger.WithField("command", command).Info("OWN command sent")
 	return true, nil
 }
 

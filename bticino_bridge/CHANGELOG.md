@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+- Security: bus commands no longer go through a shell. Before, each one ran as
+  `sh -c "echo '<frame>' | nc 0 30006"`, so a crafted command over
+  `POST /api/controls/command` or the MQTT topic `<prefix>/command/send` could
+  run shell commands as root. The bridge now opens its own short connection with
+  the same exchange as the busybox `nc` in the firmware: the frame and a newline,
+  a half-close, then it waits for the server to close. That wait now ends after
+  5 s; `nc` had no limit. Only a single frame is sent: digits, `*` and `#`,
+  starting with `*` and ending with the only `##`, as the OpenWebNet
+  specification defines it. Anything else is refused before connecting, over
+  MQTT as well, which did not check at all before. The web endpoint answers 400.
+  Log lines changed: `OWN command executed via netcat` and
+  `OpenWebNet command executed successfully via netcat` are now `OWN command sent`.
+
 - MQTT no longer stays off when the broker is not reachable at bridge start, for
   example when Home Assistant boots later after a power loss: the bridge retries
   every 30 s until the first connection, then the reconnect works as before. Each
