@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- The periodic `Publishing LED states to MQTT` line is now logged at debug level.
 - `make deploy` and `scripts/deploy.sh` spare the flash: backups are hard links, so
   they copy no data, and only files that changed are written. A transfer goes into
   RAM first and reaches the flash only with a matching checksum. After a successful

@@ -1298,7 +1298,7 @@ func main() {
 
 				// Check LED status and publish to MQTT
 				if mqttBridge != nil && len(currentLEDs) > 0 {
-					logger.WithField("leds", currentLEDs).Info("Publishing LED states to MQTT")
+					logger.WithField("leds", currentLEDs).Debug("Publishing LED states to MQTT")
 					mqttBridge.PublishLEDStatus(currentLEDs)
 
 					// Broadcast LED states to web UI via SSE
