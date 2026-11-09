@@ -364,6 +364,9 @@ func (c *BTicinoSIPClient) Stop() error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
+	// Before the sockets close: their readers then see a shutdown, not a lost connection.
+	close(c.stopCh)
+
 	if c.registerTick != nil {
 		c.registerTick.Stop()
 	}
@@ -379,8 +382,6 @@ func (c *BTicinoSIPClient) Stop() error {
 		c.unregisterIdentity(c.localID)
 		c.localID.conn.Close()
 	}
-
-	close(c.stopCh)
 
 	c.callState = Idle
 	c.sessionActive = false
@@ -538,6 +539,11 @@ func (c *BTicinoSIPClient) localListener() {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				// Timeout is normal — just keep listening
 				continue
+			}
+			select {
+			case <-c.stopCh:
+				return
+			default:
 			}
 			c.logger.WithError(err).Warnf("%s listener: read error", c.answerUser)
 			// Either way a fresh listener follows from onReconnected; staying here

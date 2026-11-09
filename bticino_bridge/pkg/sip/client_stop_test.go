@@ -3,9 +3,13 @@ package sip
 import (
 	"io"
 	"net"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 )
 
 // connectedSessionClient returns a running client whose camera session holds
@@ -96,5 +100,38 @@ func TestStartCameraSessionRefusedAfterStop(t *testing.T) {
 	c.mutex.Unlock()
 	if err := c.StartCameraSession(time.Minute, "test"); err == nil {
 		t.Fatal("StartCameraSession succeeded on a stopped client")
+	}
+}
+
+// Shutdown closes the SIP sockets on purpose: their readers must not take
+// that for a lost connection and start re-registering.
+func TestStopDoesNotReconnect(t *testing.T) {
+	c, _, _ := newSessionTestClient()
+	c.stopCh = make(chan struct{})
+	logger, hook := logrustest.NewNullLogger()
+	c.logger = logger
+	near, far := net.Pipe()
+	go io.Copy(io.Discard, far)
+	t.Cleanup(func() { far.Close() })
+	c.localID = &sipIdentity{username: c.answerUser, conn: near}
+
+	listening := make(chan struct{})
+	go func() { close(listening); c.localListener() }()
+	<-listening
+	time.Sleep(50 * time.Millisecond)
+
+	stopWithin(t, 5*time.Second, c.Stop)
+	time.Sleep(100 * time.Millisecond)
+
+	for _, entry := range hook.AllEntries() {
+		if entry.Level <= logrus.WarnLevel || strings.Contains(entry.Message, "reconnect") {
+			t.Errorf("unexpected log on shutdown: %s %q", entry.Level, entry.Message)
+		}
+	}
+	c.localID.mutex.Lock()
+	reconnecting := c.localID.reconnecting
+	c.localID.mutex.Unlock()
+	if reconnecting {
+		t.Fatal("reconnect loop started by Stop")
 	}
 }

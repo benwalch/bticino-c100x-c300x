@@ -13,6 +13,9 @@
   with the session ACK were dropped, and frames before the event handler was
   installed were ignored (up to about 45 s while the SIP start was retried).
   The monitor now connects only after its handler is in place.
+- Stopping the bridge no longer logs `listener: read error` and
+  `SIP … connection lost — reconnecting`; the SIP client no longer takes its own
+  shutdown for a lost connection.
 
 - Security: the web server refuses POST, PUT and DELETE requests that a browser
   sends from another site (403), using Go's `http.CrossOriginProtection`. Before,

@@ -53,6 +53,11 @@ func (c *BTicinoSIPClient) reconnect(id *sipIdentity, reason string) {
 	if id == nil {
 		return
 	}
+	select {
+	case <-c.stopCh:
+		return
+	default:
+	}
 	id.mutex.Lock()
 	if id.reconnecting {
 		id.mutex.Unlock()
