@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -132,5 +133,35 @@ func TestRegisterChecksStatusCode(t *testing.T) {
 				t.Fatalf("registered=%v (err=%v), want %v", gotOK, err, wantOK)
 			}
 		})
+	}
+}
+
+// After the native side's BYE the dialog is gone; our own BYE would only
+// earn a 481.
+func TestNativeByeEndsSessionWithoutOwnBye(t *testing.T) {
+	c, _, stopped := newSessionTestClient()
+	c.logger.SetOutput(io.Discard)
+	near, far := net.Pipe()
+	defer near.Close()
+	defer far.Close()
+	c.webrtcID = &sipIdentity{username: "webrtc", conn: near}
+	c.resolveNativeFunc = func() (string, error) { return "sip:native@127.0.0.1:5060", nil }
+	c.establishDialogFunc = func(uri, sdp string) (*cameraDialog, error) {
+		return &cameraDialog{callID: "current@127.0.0.1", toTag: "native1", contact: uri, cseq: 1}, nil
+	}
+	var terminated int32
+	c.terminateDialogFunc = func(*cameraDialog) { atomic.AddInt32(&terminated, 1) }
+
+	if err := c.StartCameraSession(10*time.Second, "test"); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	far.Write([]byte(sipBye("current@127.0.0.1")))
+	readPipeMessage(t, far)
+	if !waitEnded(stopped, 1) {
+		t.Fatal("session did not end on the native BYE")
+	}
+	if got := atomic.LoadInt32(&terminated); got != 0 {
+		t.Fatalf("sent our own BYE %d times after the native one", got)
 	}
 }

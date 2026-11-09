@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- When the native unit ends a camera session (after about 30 s), the bridge
+  no longer sends a BYE of its own, which was answered with 481.
+
 - On shutdown the RTSP accept loop and the RTP reader no longer spin on their
   closed sockets, which logged dozens of `use of closed network connection`
   errors per stop.

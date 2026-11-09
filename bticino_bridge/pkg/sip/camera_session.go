@@ -128,13 +128,14 @@ func (c *BTicinoSIPClient) runCameraSession(duration time.Duration, stop <-chan 
 	c.eventBus.PublishWithSource("video.session.started", map[string]interface{}{}, "sip")
 	reason := c.drainCameraDialog(dlg, stop, duration)
 	c.logger.Infof("Camera session: stopping (%s)", reason)
-	// A dialog ended by the native side has no video left worth capturing.
+	// A dialog ended by the native side has no video left worth capturing,
+	// and a BYE of ours would only earn a 481.
 	if reason != sessionEndNative {
 		if jpeg := c.grabFrame(); jpeg != nil {
 			c.eventBus.PublishWithSource("video.session.frame", map[string]interface{}{"jpeg": jpeg}, "sip")
 		}
+		c.terminate(dlg)
 	}
-	c.terminate(dlg)
 	c.mutex.Lock()
 	c.callState = Registered
 	c.sessionActive = false
