@@ -378,7 +378,10 @@ func (c *BTicinoSIPClient) drainCameraDialog(dlg *cameraDialog, stop <-chan stru
 				c.answerCameraReinvite(conn, dlg, m)
 			case m.Method == "BYE":
 				c.sendBYEResponse(c.webrtcID, m)
-				return sessionEndNative
+				if sipCallID(m) == dlg.callID {
+					return sessionEndNative
+				}
+				c.logger.Debugf("Camera session: answered a BYE of an older dialog (Call-ID=%s)", sipCallID(m))
 			}
 		}
 	}
@@ -401,7 +404,7 @@ func (c *BTicinoSIPClient) answerCameraReinvite(conn net.Conn, dlg *cameraDialog
 	}
 	lines = append(lines,
 		fmt.Sprintf("From: %s", invite.Headers["From"]),
-		fmt.Sprintf("To: %s;tag=%s", strings.Split(invite.Headers["To"], ";tag=")[0], dlg.toTag),
+		fmt.Sprintf("To: %s", invite.Headers["To"]),
 		fmt.Sprintf("Call-ID: %s", dlg.callID),
 		fmt.Sprintf("CSeq: %s", cseq),
 		fmt.Sprintf("Contact: <sip:%s@127.0.0.1:%d;transport=tcp>", cUsername(c.config), c.config.LocalPort),

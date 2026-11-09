@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+- A camera session is no longer ended by a late BYE of an earlier dialog; such
+  a BYE is answered with 200 and the running session continues.
+- The answer to a re-INVITE during a camera session now carries the request's
+  `To` header as RFC 3261 requires. It used the native side's tag instead of
+  ours.
+- SIP registration is judged by the status code of the answer. Before, the
+  whole message was searched for `200 `, so once the CSeq reached 200 (after
+  about 8 hours of refreshes) a refusal also counted as registered.
+
 - The OpenWebNet monitor on port 20000 no longer gives up. After a dropped
   connection it retried `retry_attempts` times `retry_delay` apart (3 s by
   default) and then stopped for good, so doorbell events silently stopped

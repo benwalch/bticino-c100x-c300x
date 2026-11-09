@@ -453,10 +453,10 @@ func (c *BTicinoSIPClient) registerIdentity(id *sipIdentity) error {
 
 	c.logger.Infof("registerIdentity(%s): got response: status=%s", id.username, response.StatusCode)
 
-	if strings.Contains(response.Raw, "200 ") || strings.Contains(response.Raw, "200 OK") || strings.Contains(response.Raw, "200 Registration") {
+	if response.StatusCode == "200" {
 		c.logger.Infof("registerIdentity(%s): registered (no auth required, trusted-hosts)", id.username)
 		return nil
-	} else if strings.Contains(response.Raw, "401 Unauthorized") {
+	} else if response.StatusCode == "401" {
 		return c.handleAuthChallengeForIdentity(id, response)
 	}
 
