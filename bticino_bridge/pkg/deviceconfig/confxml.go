@@ -16,6 +16,7 @@ type ConfXML struct {
 	NTPalgo    string `json:"ntp_algo"`
 	DateFormat int    `json:"date_format"`
 	Fuso       string `json:"fuso"`
+	Model      string `json:"model"` // exact model, e.g. "Classe 100 X16E"
 }
 
 // RawConfXML original XML structure for parsing
@@ -96,6 +97,7 @@ func parseConfXMLSimple(content string) *ConfXML {
 	conf.NTPServer = extract("ntp_server")
 	conf.NTPalgo = extract("ntp_algo")
 	conf.Fuso = extract("fuso")
+	conf.Model = extract("modello")
 
 	if df := extract("dateformat"); df != "" {
 		fmt.Sscanf(df, "%d", &conf.DateFormat)

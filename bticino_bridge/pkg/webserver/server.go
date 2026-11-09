@@ -558,12 +558,14 @@ func (ws *WebServer) handleAPIStatus(w http.ResponseWriter, r *http.Request) {
 		"uptime":    ws.getUptime(),
 		"boot_time": ws.startTime.Format(time.RFC3339), // allows verifying restarts even if the restart times out
 		"device": map[string]interface{}{
-			"variant": bticino.DeviceVariant,
-			"model":   bticino.DeviceModelName(),
+			"variant":  bticino.DeviceVariant,
+			"model":    deviceModel(),
+			"firmware": firmwareStamp(),
 			// The web UI shows messages, notes and their storage only when true.
 			"answering_machine": hasAnsweringMachine,
 		},
 		"components": components,
+		"system":     systemMetrics(),
 	}
 	if hasAnsweringMachine {
 		status["storage_used"] = storageUsed
@@ -1275,7 +1277,10 @@ func (ws *WebServer) writeJSON(w http.ResponseWriter, data interface{}) {
 }
 
 func (ws *WebServer) getUptime() string {
-	d := time.Since(ws.startTime)
+	return formatUptime(time.Since(ws.startTime))
+}
+
+func formatUptime(d time.Duration) string {
 	days := int(d.Hours()) / 24
 	hours := int(d.Hours()) % 24
 	minutes := int(d.Minutes()) % 60
