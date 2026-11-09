@@ -1625,9 +1625,7 @@ func (b *MQTTBridge) refreshNetworkInfo() {
 	b.logger.WithField("ip", ip).Info("IP changed, system_info republished")
 }
 
-// handleRestartBridgeCommand restarts the bticino_bridge process itself: launches a
-// detached relaunch (setsid) after a brief pause and exits. There is a ~2s gap
-// with no instance (no overlap).
+// handleRestartBridgeCommand restarts the bridge process (see system.RestartBridgeAsync).
 func (b *MQTTBridge) handleRestartBridgeCommand(client pahomqtt.Client, msg pahomqtt.Message) {
 	if !b.config.MQTT.EnableSystemButtons {
 		return

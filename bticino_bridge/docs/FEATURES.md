@@ -300,7 +300,7 @@ Turn it on if the dashboard is reachable beyond a trusted network.
 | GET | `/api/logs` | Recent log entries (filterable) |
 | GET | `/api/logs/download` | Download full log file |
 | GET | `/api/events` | Server-Sent Events stream |
-| POST | `/api/system/restart-bridge` | Restart the bridge process (≈2s gap) |
+| POST | `/api/system/restart-bridge` | Restart the bridge process (graceful shutdown, then a fresh start) |
 | POST | `/api/system/reboot` | Reboot the whole device (`/sbin/reboot`) |
 
 #### Controls

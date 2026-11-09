@@ -60,7 +60,7 @@
   }
   
   async function restartBridge() {
-    // Double confirmation: the bridge is out of service for ~2s.
+    // Double confirmation: the bridge is out of service for a few seconds.
     if (!confirm('Restart the bridge service?\n\nWeb, MQTT and HomeKit will drop for a few seconds.')) return
     if (!confirm('Are you sure? This restarts the bridge NOW.')) return
     try {

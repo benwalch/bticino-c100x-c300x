@@ -25,7 +25,7 @@ func (ws *WebServer) rebootDevice() {
 }
 
 // @Summary Restart the bridge process
-// @Description Relaunches the bridge binary detached and exits (≈2s gap)
+// @Description Shuts the bridge down gracefully; a detached replacement starts once it has exited
 // @Tags System
 // @Produce json
 // @Success 200 {object} map[string]interface{}
@@ -39,7 +39,7 @@ func (ws *WebServer) handleAPISystemRestartBridge(w http.ResponseWriter, r *http
 	ws.restartBridge()
 	ws.writeJSON(w, map[string]interface{}{
 		"success": true,
-		"message": "Bridge restarting (≈2s gap)",
+		"message": "Bridge restarting",
 	})
 }
 
