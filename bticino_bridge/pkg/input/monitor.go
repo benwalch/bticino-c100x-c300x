@@ -443,17 +443,6 @@ func getKeyName(keyCode int) string {
 	return fmt.Sprintf("KEY_%d", keyCode)
 }
 
-// SetEventCallbacks sets callback functions for different event types
-func (im *InputMonitor) SetEventCallbacks(
-	onButton func(ButtonEvent),
-	onScreen func(ScreenEvent),
-	onTouch func(TouchEvent),
-) {
-	im.OnButtonPress = onButton
-	im.OnScreenChange = onScreen
-	im.OnTouchEvent = onTouch
-}
-
 // GetCurrentGPIOStates returns current state of all monitored GPIO pins
 func (im *InputMonitor) GetCurrentGPIOStates() map[int]bool {
 	im.mutex.RLock()
@@ -464,68 +453,4 @@ func (im *InputMonitor) GetCurrentGPIOStates() map[int]bool {
 		states[pin] = state
 	}
 	return states
-}
-
-// IsScreenActive checks if screen appears to be active based on GPIO states.
-// 300X: GPIO 12 (audio amplifier) or 180 (established communication).
-// 100X: GPIO 64 (amplifier, answered) or 77 (phone path, ring+call).
-func (im *InputMonitor) IsScreenActive() bool {
-	states := im.GetCurrentGPIOStates()
-
-	if bticino.DeviceVariant == bticino.DeviceVariant100X {
-		if state, exists := states[64]; exists && state {
-			return true
-		}
-		if state, exists := states[77]; exists && state {
-			return true
-		}
-		return false
-	}
-
-	// GPIO 12 (audio amplifier) ON indicates an active session
-	if state, exists := states[12]; exists && state {
-		return true
-	}
-	// GPIO 180 (established communication) ON indicates an active call
-	if state, exists := states[180]; exists && state {
-		return true
-	}
-
-	return false
-}
-
-// GetDeviceInfo returns information about available input devices
-func GetDeviceInfo() ([]string, error) {
-	devices := make([]string, 0)
-
-	// Check /proc/bus/input/devices for available devices
-	file, err := os.Open("/proc/bus/input/devices")
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	var currentDevice strings.Builder
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if strings.HasPrefix(line, "I:") {
-			// Start of new device info
-			if currentDevice.Len() > 0 {
-				devices = append(devices, currentDevice.String())
-				currentDevice.Reset()
-			}
-		}
-
-		currentDevice.WriteString(line + "\n")
-	}
-
-	// Add last device
-	if currentDevice.Len() > 0 {
-		devices = append(devices, currentDevice.String())
-	}
-
-	return devices, scanner.Err()
 }

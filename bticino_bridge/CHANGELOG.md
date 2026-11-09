@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Removed the unused input event bus with its button-to-command mapping
+  (it mapped KEY_1 to opening the door) and the unused GPIO manager.
+
 - Removed unused SIP code: the old RTSP server (replaced by the enhanced
   one), the go2rtc manager, the single-identity REGISTER helpers, and the
   video stream start/stop path, which opened and closed the shared
