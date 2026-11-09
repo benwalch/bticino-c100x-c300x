@@ -1,6 +1,26 @@
-# Changelog - BTicino Classe 300X Enhanced Bridge
+# Changelog - BTicino Bridge
 
-## [Unreleased]
+## [1.0.0] - 2026-11-09
+
+First release of this fork. From here on, MQTT topics, Home Assistant entity
+IDs, `config.yaml` keys and the `/api` endpoints count as stable: renaming or
+removing one of them needs a new major version.
+
+Breaking changes since 0.29.4 (details below):
+- MQTT topics v2.
+- Home Assistant unique_ids use a model-neutral prefix.
+- Home Assistant entities renamed from Spanish to English.
+- `sip.native_dev_addr` no longer falls back to a built-in unit address.
+
+Known limits:
+- Tested on a Classe 100X only. The Classe 300X paths (answering machine,
+  display, ringer) and the features merged from upstream are not verified on
+  a device.
+- The web UI has no HTTPS and no lockout after failed logins.
+- `GET /api/config` returns secrets to a logged-in user.
+- Saving settings from the web UI drops the comments in `config.yaml`.
+
+### Changes
 
 - Docs describe this fork: the READMEs say it is a fork of
   fquinto/bticinoClasse300x and tested on a Classe 100X, firmware build and
