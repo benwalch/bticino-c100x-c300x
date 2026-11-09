@@ -526,46 +526,47 @@ func (ws *WebServer) handleAPILogsDownload(w http.ResponseWriter, r *http.Reques
 // @Success 200 {object} map[string]interface{}
 // @Router /api/status [get]
 func (ws *WebServer) handleAPIStatus(w http.ResponseWriter, r *http.Request) {
-	// Get real message count from parser
-	messageCount := 0
-	newMessages := 0
+	components := map[string]interface{}{
+		"openwebnet": map[string]interface{}{
+			"status": "active",
+			"port":   bticino.OpenWebNetLocalPort,
+		},
+		"web_dashboard": map[string]interface{}{
+			"status": "active",
+			"port":   ws.config.Web.Port,
+		},
+	}
+	hasAnsweringMachine := bticino.AnsweringMachineAvailable()
 	storageUsed := "0%"
-	parserStatus := "unavailable"
-	if bticino.AnsweringMachineAvailable() {
-		parserStatus = "active"
-		amStatus, err := ws.messageParser.GetAnsweringMachineStatus()
-		if err == nil {
+	if hasAnsweringMachine {
+		messageCount, newMessages := 0, 0
+		if amStatus, err := ws.messageParser.GetAnsweringMachineStatus(); err == nil {
 			messageCount = amStatus.TotalMessages
 			newMessages = amStatus.NewMessages
 			storageUsed = amStatus.StorageUsed
 		}
+		components["message_parser"] = map[string]interface{}{
+			"status":         "active",
+			"messages_found": messageCount,
+			"new_messages":   newMessages,
+		}
 	}
 
 	status := map[string]interface{}{
-		"version":      version.GetVersion(),
-		"timestamp":    time.Now(),
-		"uptime":       ws.getUptime(),
-		"boot_time":    ws.startTime.Format(time.RFC3339), // allows verifying restarts even if the restart times out
-		"storage_used": storageUsed,
+		"version":   version.GetVersion(),
+		"timestamp": time.Now(),
+		"uptime":    ws.getUptime(),
+		"boot_time": ws.startTime.Format(time.RFC3339), // allows verifying restarts even if the restart times out
 		"device": map[string]interface{}{
 			"variant": bticino.DeviceVariant,
 			"model":   bticino.DeviceModelName(),
+			// The web UI shows messages, notes and their storage only when true.
+			"answering_machine": hasAnsweringMachine,
 		},
-		"components": map[string]interface{}{
-			"message_parser": map[string]interface{}{
-				"status":         parserStatus,
-				"messages_found": messageCount,
-				"new_messages":   newMessages,
-			},
-			"openwebnet": map[string]interface{}{
-				"status": "active",
-				"port":   bticino.OpenWebNetLocalPort,
-			},
-			"web_dashboard": map[string]interface{}{
-				"status": "active",
-				"port":   ws.config.Web.Port,
-			},
-		},
+		"components": components,
+	}
+	if hasAnsweringMachine {
+		status["storage_used"] = storageUsed
 	}
 
 	// Add MQTT status if provider available

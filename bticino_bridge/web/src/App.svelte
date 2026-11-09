@@ -46,8 +46,10 @@
       <a href="#dashboard" class={currentRoute === 'dashboard' ? 'active' : ''}>Dashboard</a>
       <a href="#settings" class={currentRoute === 'settings' ? 'active' : ''}>Settings</a>
       <a href="#controls" class={currentRoute === 'controls' ? 'active' : ''}>Controls</a>
+      {#if status?.device?.answering_machine}
       <a href="#messages" class={currentRoute === 'messages' ? 'active' : ''}>Messages</a>
       <a href="#memos" class={currentRoute === 'memos' ? 'active' : ''}>Notes</a>
+      {/if}
       <a href="#logs" class={currentRoute === 'logs' ? 'active' : ''}>Logs</a>
       <a href="/api/docs/" target="_blank" class="external-link">API Docs ↗</a>
     </div>
@@ -60,9 +62,9 @@
       <Settings />
     {:else if currentRoute === 'controls'}
       <Controls />
-    {:else if currentRoute === 'messages'}
+    {:else if currentRoute === 'messages' && status?.device?.answering_machine}
       <Messages />
-    {:else if currentRoute === 'memos'}
+    {:else if currentRoute === 'memos' && status?.device?.answering_machine}
       <Memos />
     {:else if currentRoute === 'logs'}
       <Logs />

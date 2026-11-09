@@ -140,10 +140,12 @@
           <p class="value">{status.uptime}</p>
         </div>
         
+        {#if status.device?.answering_machine}
         <div class="status-card">
           <h3>💾 Storage</h3>
           <p class="value">{status.storage_used}</p>
         </div>
+        {/if}
         
         {#if status.mqtt}
         <div class="status-card">

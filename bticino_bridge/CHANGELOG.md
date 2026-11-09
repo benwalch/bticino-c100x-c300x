@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- On the Classe 100X, which has no answering machine, the web UI no longer
+  shows the Messages and Notes pages, the `message_parser` component or the
+  Storage card. `/api/status` reports `device.answering_machine` and lists
+  `message_parser` (and `storage_used`) only where it is true.
+
 - The settings page no longer shows options the bridge never applied: the
   Network and Hardware tabs, HTTPS, API rate limit, config audit log, the
   privacy switches, Streaming Enabled, WebRTC, max duration, bridge name,

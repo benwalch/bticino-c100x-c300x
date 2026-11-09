@@ -27,7 +27,7 @@ A single ~15MB ARM binary provides:
 - **REST API** with 45+ endpoints and Swagger documentation
 - **Web dashboard** (Svelte SPA) for real-time monitoring and control
 - **Hardware monitoring** of physical buttons, GPIO pins, LEDs, and temperature
-- **Answering machine** management (messages and memos)
+- **Answering machine** management (messages and memos, Classe 300X only)
 - **Device configuration** management via web or MQTT
 
 All of this runs on the intercom's constrained ARM Cortex-A7 SoC with 512MB RAM.
@@ -247,8 +247,8 @@ hash-based routing and Server-Sent Events for real-time updates.
 |------|------|-------------|
 | Dashboard | `#dashboard` | System status, connection states, uptime, version, LED states, and GPIO states **with per-pin function tooltips** |
 | Controls | `#controls` | Door unlock, display, mute, doorbell, light, answering machine, raw OWN command, and a **System** section (Restart Bridge / Reboot Device, double-confirmed) |
-| Messages | `#messages` | Answering machine messages: list, play, download, mark read, delete |
-| Memos | `#memos` | Voice and text memos: list, play, download |
+| Messages | `#messages` | Answering machine messages: list, play, download, mark read, delete (Classe 300X only) |
+| Memos | `#memos` | Voice and text memos: list, play, download (Classe 300X only) |
 | Settings | `#settings` | YAML config editor (incl. `live_on_call`, `video_on_demand`, `video_backend`, web auth), device settings, backup/restore |
 | Logs | `#logs` | Live bridge log viewer |
 
@@ -451,6 +451,10 @@ States published to MQTT and SSE.
 ### 8. Answering Machine Management
 
 Full access to the intercom's built-in answering machine messages and memos.
+Classe 300X only: the Classe 100X has no answering machine
+(see [NATIVE_FIRMWARE.md](NATIVE_FIRMWARE.md) §6), so its web UI hides the
+Messages and Notes pages, the `message_parser` component and the Storage card.
+`/api/status` reports this as `device.answering_machine`.
 
 **Messages**: Stored in `/home/bticino/cfg/extra/47/messages/`. Each message
 includes metadata (`msg_info.ini`), audio recording, and a snapshot image.
