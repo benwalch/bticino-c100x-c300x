@@ -137,10 +137,3 @@ func (p *UDPProxy) Stop() error {
 	p.logger.Info("UDP Proxy stopped")
 	return nil
 }
-
-// IsRunning returns whether the proxy is running.
-func (p *UDPProxy) IsRunning() bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.running
-}

@@ -80,10 +80,3 @@ func (s *SnapshotService) Capture(timeout, maxAge time.Duration) ([]byte, error)
 	s.logger.Infof("Snapshot captured: %d bytes (%d frames)", len(res.jpeg), res.frames)
 	return res.jpeg, nil
 }
-
-// LastSnapshot returns the last capture and its age (nil if none).
-func (s *SnapshotService) LastSnapshot() ([]byte, time.Time) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.lastJPEG, s.lastTime
-}

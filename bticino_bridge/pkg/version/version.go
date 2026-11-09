@@ -2,7 +2,6 @@
 package version
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -27,11 +26,6 @@ func GetVersion() string {
 		return v
 	}
 	return Version
-}
-
-// GetFullVersion returns version with build info
-func GetFullVersion() string {
-	return fmt.Sprintf("%s (commit: %s, built: %s)", GetVersion(), GitCommit, BuildDate)
 }
 
 // GetVersionFromFile reads version from VERSION file
@@ -75,14 +69,4 @@ func InitVersion() {
 	if BuildDate == "unknown" {
 		BuildDate = time.Now().Format("2006-01-02T15:04:05Z")
 	}
-}
-
-// BinaryName returns the standard binary name
-func BinaryName() string {
-	return "bticino-bridge"
-}
-
-// BinaryNameArm returns the standard ARM binary name
-func BinaryNameArm() string {
-	return "bticino-bridge-arm"
 }

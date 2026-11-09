@@ -70,12 +70,6 @@ func (w *FileWatcher) Start() {
 	go w.pollLoop()
 }
 
-// Stop stops the watcher
-func (w *FileWatcher) Stop() {
-	w.stopCh <- true
-	w.logger.Info("Device config file watcher stopped")
-}
-
 // pollLoop checks for changes periodically
 func (w *FileWatcher) pollLoop() {
 	ticker := time.NewTicker(2 * time.Second) // Check every 2 seconds
@@ -182,22 +176,4 @@ func (w *FileWatcher) publishAudioChange(cfg *Config) {
 func (w *FileWatcher) publishDisplayChange(cfg *Config) {
 	prefix := w.topicPrefix + "/display"
 	w.publisher.Publish(prefix+"/settings", fmt.Sprintf(`{"brightness":%d,"clean_time":%d}`, cfg.Display.Brightness, cfg.Display.CleanTime), false)
-}
-
-// GetWatchedFiles returns the files being watched
-func (w *FileWatcher) GetWatchedFiles() []string {
-	return w.watchPaths
-}
-
-// VerifyFileWatcher verifies the watcher structure (for testing)
-func VerifyFileWatcher() {
-	fmt.Println("Device Config File Watcher")
-	fmt.Println("- Watch interval: 2 seconds")
-	fmt.Println("- Throttle: 2 seconds")
-	fmt.Println("- Watched files:")
-	fmt.Println("  * /var/tmp/conf.xml")
-	fmt.Println("  * /home/bticino/cfg/extra/47/aswm_settings.ini")
-	fmt.Println("  * /home/bticino/cfg/extra/47/tvcc_settings.ini")
-	fmt.Println("  * /home/bticino/cfg/extra/0/settings.xml")
-	fmt.Println("- Change notification topic: bticino/system/config_changed")
 }

@@ -3,8 +3,6 @@ package deviceconfig
 
 import (
 	"fmt"
-	"os"
-	"strings"
 	"time"
 )
 
@@ -91,71 +89,6 @@ var DevicePaths = struct {
 	SettingsXML:  "/home/bticino/cfg/extra/0/settings.xml",
 }
 
-// ReadConfig reads the whole device configuration
-func ReadConfig(ip string) (*Config, error) {
-	cfg := &Config{
-		DeviceInfo: DeviceInfo{
-			Model:   "Classe 300 X13E",
-			IP:      ip,
-			Version: "1.7.17",
-		},
-		Timestamp: time.Now(),
-	}
-
-	// Read conf.xml (Language, Timezone, NTP)
-	confXML, err := ReadConfXML(DevicePaths.ConfXML)
-	if err != nil {
-		return nil, fmt.Errorf("error reading conf.xml: %w", err)
-	}
-	cfg.Language = confXML.Language
-	cfg.Timezone = confXML.Town
-	cfg.NTPServer = confXML.NTPServer
-	cfg.NTPAlgo = confXML.NTPalgo
-
-	// Try to get system datetime (if available)
-	// For now we use the read timestamp
-	cfg.DateTime = time.Now()
-
-	// Read aswm_settings.ini (Answering Machine)
-	aswm, err := ReadASWMSettings(DevicePaths.ASWMSettings)
-	if err != nil {
-		return nil, fmt.Errorf("error reading aswm_settings.ini: %w", err)
-	}
-	cfg.Answering = Answering{
-		Activated:  aswm.Activated == 1,
-		RingEnable: aswm.RingEnable == 1,
-		LedEnable:  aswm.LedEnable == 1,
-		MemoryUsed: aswm.Memused,
-	}
-
-	// Read tvcc_settings.ini (Cameras)
-	tvcc, err := ReadTVCCSettings(DevicePaths.TVCCSettings)
-	if err != nil {
-		return nil, fmt.Errorf("error reading tvcc_settings.ini: %w", err)
-	}
-	// Convert TVCCSettings to Cameras
-	cfg.Cameras = make(Cameras, len(tvcc))
-	for k, v := range tvcc {
-		cfg.Cameras[k] = CameraConfig{
-			Brightness: v.Brightness,
-			Contrast:   v.Contrast,
-			Saturation: v.Saturation,
-			Quality:    v.Quality,
-		}
-	}
-
-	// Read settings.xml (Ringtones, Volumes, Display)
-	settings, err := ReadSettingsXML(DevicePaths.SettingsXML)
-	if err != nil {
-		return nil, fmt.Errorf("error reading settings.xml: %w", err)
-	}
-	cfg.Ringtones = settings.Ringtones
-	cfg.Volumes = settings.Volumes
-	cfg.Display = settings.Display
-
-	return cfg, nil
-}
-
 // ReadConfigFromPaths reads the configuration using custom paths
 func ReadConfigFromPaths(paths struct {
 	ConfXML      string
@@ -229,34 +162,4 @@ func ReadConfigFromPaths(paths struct {
 	}
 
 	return cfg, nil
-}
-
-// FileExists checks whether a file exists
-func FileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
-
-// GetBaseDir returns the device base directory
-func GetBaseDir() string {
-	return "/home/bticino"
-}
-
-// GetConfigDir returns the configuration directory
-func GetConfigDir() string {
-	return "/home/bticino/cfg"
-}
-
-// GetExtraConfigDir returns the extra configuration directory
-func GetExtraConfigDir() string {
-	return "/home/bticino/cfg/extra"
-}
-
-// NormalizePath normalizes a device path (removes /home/bticino/ if needed)
-func NormalizePath(path string) string {
-	homeDir := GetBaseDir()
-	if strings.HasPrefix(path, homeDir+"/") {
-		return path[len(homeDir)+1:]
-	}
-	return path
 }

@@ -380,16 +380,3 @@ func (b *BticinoBridge) GetAccessoryByType(accessoryType string) interface{} {
 		return nil
 	}
 }
-
-// DefaultConfig returns a default HomeKit configuration
-func DefaultConfig() *Config {
-	return &Config{
-		Name:         "BTicino Bridge",
-		Manufacturer: "BTicino",
-		Model:        "Class 300X",
-		Port:         "8080",
-		Pin:          "12345678",
-		StoragePath:  "./homekit_data",
-		Enabled:      true,
-	}
-}

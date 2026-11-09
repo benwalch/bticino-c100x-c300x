@@ -2,7 +2,6 @@ package openwebnet
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -202,54 +201,4 @@ func (sm *SafetyManager) GetCommandSafety(cmdStr string, db *CommandDatabase) Sa
 		return SafetyMedium // Unknown commands default to medium risk
 	}
 	return cmdInfo.Safety
-}
-
-// IsDoorControlCommand checks if command controls physical doors
-func IsDoorControlCommand(cmdStr string) bool {
-	// Check for door control patterns
-	doorPatterns := []string{
-		"*8*19*20##", // Main door open
-		"*8*19*11##", // Secondary door open
-		"*8*20*20##", // Main door close
-		"*8*20*11##", // Secondary door close
-	}
-
-	for _, pattern := range doorPatterns {
-		if strings.EqualFold(cmdStr, pattern) {
-			return true
-		}
-	}
-	return false
-}
-
-// IsUserEnumerationCommand checks if command attempts user enumeration
-func IsUserEnumerationCommand(cmdStr string) bool {
-	return strings.Contains(cmdStr, "*#8**37*") || strings.Contains(cmdStr, "*13*35*")
-}
-
-// IsVideoManipulationCommand checks if command manipulates video system
-func IsVideoManipulationCommand(cmdStr string) bool {
-	return strings.Contains(cmdStr, "*7*77#") ||
-		strings.Contains(cmdStr, "*7*300#") ||
-		strings.Contains(cmdStr, "*7*220#")
-}
-
-// GetSecurityWarning returns appropriate security warning for command
-func GetSecurityWarning(cmdStr string, safety SafetyLevel) string {
-	switch {
-	case IsDoorControlCommand(cmdStr):
-		return "⚠️  PHYSICAL SECURITY: This command controls door locks"
-	case IsUserEnumerationCommand(cmdStr):
-		return "🔍 PRIVACY RISK: This command may expose user account information"
-	case IsVideoManipulationCommand(cmdStr):
-		return "📹 VIDEO SYSTEM: This command modifies video stream parameters"
-	case safety == SafetyCritical:
-		return "🚨 CRITICAL: This command poses significant security risks"
-	case safety == SafetyHigh:
-		return "⚡ HIGH RISK: This command affects sensitive system functions"
-	case safety == SafetyMedium:
-		return "⚠️  CAUTION: This command modifies system settings"
-	default:
-		return ""
-	}
 }

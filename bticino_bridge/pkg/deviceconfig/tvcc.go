@@ -77,21 +77,6 @@ func ReadTVCCSettings(path string) (TVCCSettings, error) {
 	return settings, nil
 }
 
-// GetCameraConfig returns the configuration of a specific camera
-func GetCameraConfig(path, cameraID string) (TVCCConfig, error) {
-	settings, err := ReadTVCCSettings(path)
-	if err != nil {
-		return TVCCConfig{}, err
-	}
-
-	cameraKey := fmt.Sprintf("TVCC %s", cameraID)
-	if cfg, ok := settings[cameraKey]; ok {
-		return cfg, nil
-	}
-
-	return TVCCConfig{}, fmt.Errorf("camera %s not found", cameraID)
-}
-
 // GetAllCameraIDs returns all configured camera IDs
 func GetAllCameraIDs(path string) ([]string, error) {
 	settings, err := ReadTVCCSettings(path)
@@ -113,69 +98,4 @@ func GetAllCameraIDs(path string) ([]string, error) {
 // TVCCGlobalSettings global TVCC configuration
 type TVCCGlobalSettings struct {
 	Settings TVCCSettings `json:"settings"`
-}
-
-// ReadTVCCSettingsWithGlobal reads the file with the [Settings] section
-func ReadTVCCSettingsWithGlobal(path string) (*TVCCGlobalSettings, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-
-	content := string(data)
-	lines := strings.Split(content, "\n")
-
-	result := &TVCCGlobalSettings{
-		Settings: make(TVCCSettings),
-	}
-
-	currentSection := "global"
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		if strings.HasPrefix(line, "[") {
-			section := strings.Trim(line, "[]")
-			if section == "Settings" {
-				currentSection = "global"
-			} else if strings.HasPrefix(section, "TVCC") {
-				currentSection = section
-				result.Settings[currentSection] = TVCCConfig{
-					Brightness: 50,
-					Contrast:   50,
-					Saturation: 50,
-					Quality:    75,
-				}
-			}
-			continue
-		}
-
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value, _ := strconv.Atoi(strings.TrimSpace(parts[1]))
-
-		if currentSection != "global" {
-			cfg := result.Settings[currentSection]
-			switch key {
-			case "Brightness":
-				cfg.Brightness = value
-			case "Contrast":
-				cfg.Contrast = value
-			case "Saturation":
-				cfg.Saturation = value
-			case "Quality":
-				cfg.Quality = value
-			}
-			result.Settings[currentSection] = cfg
-		}
-	}
-
-	return result, nil
 }

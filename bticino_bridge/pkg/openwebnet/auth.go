@@ -173,8 +173,3 @@ func HMACAuth(reader *bufio.Reader, writer func([]byte) error, password string, 
 
 	return nil
 }
-
-// IsLocalhost determines whether the host is localhost (no HMAC auth required).
-func IsLocalhost(host string) bool {
-	return host == "127.0.0.1" || host == "localhost" || host == "::1" || host == "0" || host == "0.0.0.0"
-}

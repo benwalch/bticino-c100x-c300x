@@ -3,7 +3,6 @@ package deviceconfig
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
@@ -58,19 +57,6 @@ func (p *DeviceMQTTPublisher) Start(interval time.Duration) {
 			}
 		}
 	}()
-}
-
-// Stop stops publishing
-func (p *DeviceMQTTPublisher) Stop() {
-	if p.ticker != nil {
-		p.ticker.Stop()
-	}
-	p.stopCh <- true
-}
-
-// PublishAll publishes the whole device configuration
-func (p *DeviceMQTTPublisher) PublishAll() {
-	p.publishAll()
 }
 
 func (p *DeviceMQTTPublisher) publishAll() {
@@ -205,44 +191,4 @@ func (p *DeviceMQTTPublisher) publishJSON(topic string, data map[string]interfac
 		return
 	}
 	p.publisher.Publish(topic, string(jsonBytes), retain)
-}
-
-// GetAllTopics returns all published topics
-func (p *DeviceMQTTPublisher) GetAllTopics() []string {
-	return []string{
-		p.topicPrefix + "/system/device",
-		p.topicPrefix + "/answering",
-		p.topicPrefix + "/audio/ringtone",
-		p.topicPrefix + "/audio/volume",
-		p.topicPrefix + "/display/settings",
-		// Dynamic cameras: <prefix>/camera/<id>/settings
-	}
-}
-
-// VerifyTopicos verifies that topics are being published (for testing)
-func VerifyTopicos() {
-	fmt.Println("Device Config MQTT Topics:")
-	fmt.Println("- bticino/system/device")
-	fmt.Println("- bticino/answering")
-	fmt.Println("- bticino/audio/ringtone")
-	fmt.Println("- bticino/audio/volume")
-	fmt.Println("- bticino/display/settings")
-	fmt.Println("- bticino/camera/<id>/settings")
-}
-
-// Ensure we implement the interface
-var _ MQTTPublisherInterface = (*DeviceMQTTPublisher)(nil)
-
-// Dummy implementation to satisfy the interface (actual implementation via real publisher)
-func (p *DeviceMQTTPublisher) Publish(topic, payload string, retain bool) {
-	if p.publisher != nil {
-		p.publisher.Publish(topic, payload, retain)
-	}
-}
-
-func (p *DeviceMQTTPublisher) IsConnected() bool {
-	if p.publisher == nil {
-		return false
-	}
-	return p.publisher.IsConnected()
 }

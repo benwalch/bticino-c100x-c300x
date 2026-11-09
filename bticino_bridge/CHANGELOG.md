@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Removed further unused helpers in `deviceconfig`, `openwebnet`, `version`
+  and others, including `homekit.DefaultConfig` with its fixed default PIN.
+
 - Removed the unused input event bus with its button-to-command mapping
   (it mapped KEY_1 to opening the door) and the unused GPIO manager.
 

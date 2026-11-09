@@ -299,11 +299,6 @@ func (bch *BTicinoCommandHandler) isACK(response string) bool {
 	return strings.TrimSpace(response) == bticino.CmdACK
 }
 
-// isNACK checks if response is a negative acknowledgment
-func (bch *BTicinoCommandHandler) isNACK(response string) bool {
-	return strings.TrimSpace(response) == bticino.CmdNACK
-}
-
 // CommandBuilder provides fluent interface for building complex command sequences
 
 // CommandBuilder helps build complex command sequences
