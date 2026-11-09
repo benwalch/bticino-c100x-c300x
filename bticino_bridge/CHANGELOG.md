@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- The settings page no longer shows options the bridge never applied: the
+  Network and Hardware tabs, HTTPS, API rate limit, config audit log, the
+  privacy switches, Streaming Enabled, WebRTC, max duration, bridge name,
+  OpenWebNet port and MQTT client ID. The values stay in `config.yaml`, and
+  saving no longer fails on them. `network.firewall` (a duplicate of
+  `privacy`) is no longer read; an existing section is ignored and dropped
+  on the next save from the web UI.
+
 - The restart action (web and MQTT) shuts the bridge down gracefully with
   SIGTERM instead of `os.Exit`, so calls end with a BYE and MQTT reports
   offline. The replacement starts once the old process has exited.

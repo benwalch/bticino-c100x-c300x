@@ -139,13 +139,16 @@ func TestValidateMQTTPortRange(t *testing.T) {
 	}
 }
 
-func TestValidateRTSPPortZeroWhenStreamingEnabled(t *testing.T) {
+func TestValidateRTSPPort(t *testing.T) {
 	cm := newTestCM(t)
 	cfg := baseValidConfig()
-	cfg.Streaming.Enabled = true
-	cfg.Streaming.RTSPPort = 0
+	cfg.Streaming.RTSPPort = 0 // the bridge then uses 6554
+	if r := cm.ValidateConfig(cfg); !r.Valid {
+		t.Fatalf("RTSPPort=0 must be valid: %v", r.Errors)
+	}
+	cfg.Streaming.RTSPPort = 70000
 	if r := cm.ValidateConfig(cfg); r.Valid || !hasErrorContaining(r, "RTSP port") {
-		t.Fatalf("RTSPPort=0 with streaming enabled must be an error, got %+v", r)
+		t.Fatalf("expected RTSP port error, got %+v", r)
 	}
 }
 
@@ -162,12 +165,17 @@ func TestValidateVideoBackendEnum(t *testing.T) {
 	}
 }
 
-func TestValidateDNSServersMustBeIPs(t *testing.T) {
+// Fields the bridge never reads are not in the settings page, so they must not
+// block saving there.
+func TestValidateIgnoresFieldsWithoutEffect(t *testing.T) {
 	cm := newTestCM(t)
 	cfg := baseValidConfig()
-	cfg.Network.DNS.Servers = []string{"1.1.1.1", "not-an-ip"}
-	if r := cm.ValidateConfig(cfg); r.Valid || !hasErrorContaining(r, "DNS") {
-		t.Fatalf("expected DNS error, got %+v", r)
+	cfg.Bridge.Name = ""
+	cfg.OpenWebNet.Port = 0
+	cfg.Network.DNS.Servers = []string{"not-an-ip"}
+	cfg.Streaming.Enabled = true
+	if r := cm.ValidateConfig(cfg); !r.Valid {
+		t.Fatalf("fields without effect blocked saving: %v", r.Errors)
 	}
 }
 
@@ -221,5 +229,22 @@ func TestRestoreBackupRejectsPathOutsideBackupDir(t *testing.T) {
 	}
 	if err := cm.RestoreBackup(outside); err == nil {
 		t.Fatal("RestoreBackup must reject paths outside the backups directory")
+	}
+}
+
+// The settings page loads through the ConfigManager; an old network.firewall
+// section must not break that either.
+func TestConfigManagerLoadsDroppedFirewallSection(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	data := "network:\n  firewall:\n    block_cloud: true\nweb:\n  port: 8082\n"
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := NewConfigManager(path, logrus.New()).LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Web.Port != 8082 {
+		t.Fatalf("web.port = %d, want 8082", cfg.Web.Port)
 	}
 }

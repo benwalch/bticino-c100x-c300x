@@ -260,9 +260,8 @@ func GetStreamingConfig() StreamingConfig {
 
 // NetworkConfig configures networking and external servers
 type NetworkConfig struct {
-	NTP      NTPConfig      `yaml:"ntp"`
-	DNS      DNSConfig      `yaml:"dns"`
-	Firewall FirewallConfig `yaml:"firewall"`
+	NTP NTPConfig `yaml:"ntp"`
+	DNS DNSConfig `yaml:"dns"`
 }
 
 type NTPConfig struct {
@@ -273,12 +272,6 @@ type NTPConfig struct {
 
 type DNSConfig struct {
 	Servers []string `yaml:"servers"`
-}
-
-type FirewallConfig struct {
-	BlockTelemetry bool `yaml:"block_telemetry"`
-	BlockCloud     bool `yaml:"block_cloud"`
-	AllowUpdates   bool `yaml:"allow_updates"`
 }
 
 // ServersConfig configures the official external servers

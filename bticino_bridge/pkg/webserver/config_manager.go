@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -151,26 +150,9 @@ func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResu
 		Warnings: make([]string, 0),
 	}
 
-	// Validate basic configuration
-	if cfg.Bridge.Name == "" {
-		result.Errors = append(result.Errors, "Bridge name is required")
-		result.Valid = false
-	}
-
-	// Validate OpenWebNet
-	if cfg.OpenWebNet.Port <= 0 || cfg.OpenWebNet.Port > 65535 {
-		result.Errors = append(result.Errors, "OpenWebNet port must be between 1-65535")
-		result.Valid = false
-	}
-
 	// Validate Web
 	if cfg.Web.Port <= 0 || cfg.Web.Port > 65535 {
 		result.Errors = append(result.Errors, "Web port must be between 1-65535")
-		result.Valid = false
-	}
-
-	if cfg.Web.Port == cfg.OpenWebNet.Port {
-		result.Errors = append(result.Errors, "Web port and OpenWebNet port cannot be the same")
 		result.Valid = false
 	}
 
@@ -228,9 +210,8 @@ func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResu
 		}
 	}
 
-	// Validate Streaming: with streaming enabled the RTSP port is required
-	// (0 no longer skips the check); when disabled, only the range is validated.
-	if cfg.Streaming.Enabled || cfg.Streaming.RTSPPort != 0 {
+	// RTSP port 0 means the default (6554).
+	if cfg.Streaming.RTSPPort != 0 {
 		if cfg.Streaming.RTSPPort <= 0 || cfg.Streaming.RTSPPort > 65535 {
 			result.Errors = append(result.Errors, "RTSP port must be between 1-65535")
 			result.Valid = false
@@ -250,14 +231,6 @@ func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResu
 	if cfg.Streaming.CameraSessionDuration < 0 {
 		result.Errors = append(result.Errors, "Camera session duration must not be negative")
 		result.Valid = false
-	}
-
-	// Validate DNS (must be IPs)
-	for _, s := range cfg.Network.DNS.Servers {
-		if net.ParseIP(strings.TrimSpace(s)) == nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("Invalid DNS server %q (must be an IP address)", s))
-			result.Valid = false
-		}
 	}
 
 	// Validate HomeKit
@@ -472,13 +445,7 @@ func (cm *ConfigManager) detectChanges(old, new *config.Config) []string {
 		return []string{"unknown"}
 	}
 
-	// Compare main sections
-	if old.Bridge.Name != new.Bridge.Name {
-		sections = append(sections, "bridge")
-	}
-
-	if old.OpenWebNet.Port != new.OpenWebNet.Port ||
-		old.OpenWebNet.Host != new.OpenWebNet.Host {
+	if old.OpenWebNet.Host != new.OpenWebNet.Host {
 		sections = append(sections, "openwebnet")
 	}
 

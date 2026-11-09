@@ -9,12 +9,10 @@
   
   const tabs = [
     { id: 'bridge', label: '🌉 Bridge' },
-    { id: 'network', label: '🌐 Network' },
     { id: 'sip', label: '📞 SIP' },
     { id: 'mqtt', label: '📡 MQTT' },
     { id: 'homekit', label: '🏠 HomeKit' },
     { id: 'streaming', label: '📹 Streaming' },
-    { id: 'hardware', label: '🔧 Hardware' },
     { id: 'security', label: '🔒 Security' },
     { id: 'openwebnet', label: '🔌 OpenWebNet' }
   ]
@@ -209,10 +207,6 @@
           <h2>🌉 Bridge Configuration</h2>
           <div class="form-grid">
             <div class="form-group">
-              <label for="bridge_name">Bridge Name</label>
-              <input type="text" id="bridge_name" bind:value={config.config.Bridge.Name} />
-            </div>
-            <div class="form-group">
               <label for="bridge_log_level">Log Level</label>
               <select id="bridge_log_level" bind:value={config.config.Logging.Level}>
                 <option value="debug">Debug</option>
@@ -229,55 +223,6 @@
               <label for="log_size">Max Log Size</label>
               <input type="text" id="log_size" bind:value={config.config.Logging.MaxSize} />
               <small>Max 48 MB across all log files, at most 16 files. Log file must be in /var/log or /tmp. Log settings apply after a bridge restart.</small>
-            </div>
-          </div>
-        </div>
-        {/if}
-
-        <!-- NETWORK -->
-        {#if activeTab === 'network'}
-        <div class="section">
-          <h2>🌐 Network Configuration</h2>
-          <h3>NTP</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.Network.NTP.Enabled} />
-                NTP Enabled
-              </label>
-            </div>
-            <div class="form-group">
-              <label for="ntp_server">NTP Server</label>
-              <input type="text" id="ntp_server" bind:value={config.config.Network.NTP.Server} />
-            </div>
-          </div>
-          <h3>DNS</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="dns_servers">DNS Servers (comma separated)</label>
-              <input type="text" id="dns_servers" value={(config.config.Network.DNS.Servers || []).join(', ')}
-                on:change={(e) => config.config.Network.DNS.Servers = e.target.value.split(',').map(s => s.trim()).filter(s => s !== '')} />
-            </div>
-          </div>
-          <h3>Firewall</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.Network.Firewall.BlockTelemetry} />
-                Block Telemetry
-              </label>
-            </div>
-            <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.Network.Firewall.BlockCloud} />
-                Block Cloud
-              </label>
-            </div>
-            <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.Network.Firewall.AllowUpdates} />
-                Allow Updates
-              </label>
             </div>
           </div>
         </div>
@@ -370,10 +315,6 @@
               <input type="password" id="mqtt_password" bind:value={config.config.MQTT.Password} />
             </div>
             <div class="form-group">
-              <label for="mqtt_client_id">Client ID</label>
-              <input type="text" id="mqtt_client_id" bind:value={config.config.MQTT.ClientID} />
-            </div>
-            <div class="form-group">
               <label for="mqtt_prefix">Topic Prefix</label>
               <input type="text" id="mqtt_prefix" bind:value={config.config.MQTT.TopicPrefix} />
             </div>
@@ -424,32 +365,12 @@
           <h2>📹 Streaming Configuration</h2>
           <div class="form-grid">
             <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.Streaming.Enabled} />
-                Streaming Enabled
-              </label>
-            </div>
-            <div class="form-group">
               <label for="rtsp_port">RTSP Port</label>
               <input type="number" id="rtsp_port" bind:value={config.config.Streaming.RTSPPort} />
             </div>
             <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.Streaming.WebRTCEnabled} />
-                WebRTC Enabled
-              </label>
-            </div>
-            <div class="form-group">
-              <label for="webrtc_port">WebRTC Port</label>
-              <input type="number" id="webrtc_port" bind:value={config.config.Streaming.WebRCTPPort} />
-            </div>
-            <div class="form-group">
               <label for="recording_path">Recording Path</label>
               <input type="text" id="recording_path" bind:value={config.config.Streaming.RecordingPath} />
-            </div>
-            <div class="form-group">
-              <label for="max_duration">Max Duration (seconds)</label>
-              <input type="number" id="max_duration" bind:value={config.config.Streaming.MaxDuration} />
             </div>
           </div>
 
@@ -489,35 +410,6 @@
         </div>
         {/if}
 
-        <!-- HARDWARE -->
-        {#if activeTab === 'hardware'}
-        <div class="section">
-          <h2>🔧 Hardware Configuration</h2>
-          <div class="form-grid">
-            <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.Hardware.Enabled} />
-                Hardware Monitoring Enabled
-              </label>
-            </div>
-            <div class="form-group">
-              <label for="input_device">Input Device</label>
-              <input type="text" id="input_device" bind:value={config.config.Hardware.InputDevice} />
-            </div>
-            <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.Hardware.GPIOMonitoring} />
-                GPIO Monitoring
-              </label>
-            </div>
-            <div class="form-group">
-              <label for="poll_interval">Polling Interval (ns)</label>
-              <input type="number" id="poll_interval" bind:value={config.config.Hardware.PollingInterval} />
-            </div>
-          </div>
-        </div>
-        {/if}
-
         <!-- SECURITY -->
         {#if activeTab === 'security'}
         <div class="section">
@@ -537,49 +429,6 @@
               <label for="web_password">Web Password</label>
               <input type="password" id="web_password" bind:value={config.config.Security.WebPassword} />
             </div>
-            <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.Security.WebHTTPSEnabled} />
-                Web HTTPS Enabled
-              </label>
-            </div>
-            <div class="form-group">
-              <label for="rate_limit">API Rate Limit</label>
-              <input type="number" id="rate_limit" bind:value={config.config.Security.APIRateLimit} />
-            </div>
-            <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.Security.ConfigAuditLog} />
-                Config Audit Log
-              </label>
-            </div>
-          </div>
-          <h3>Privacy</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.Privacy.BlockExternalTelemetry} />
-                Block External Telemetry
-              </label>
-            </div>
-            <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.Privacy.BlockLogServer} />
-                Block Log Server
-              </label>
-            </div>
-            <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.Privacy.DisableAutoUpdates} />
-                Disable Auto Updates
-              </label>
-            </div>
-            <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.Privacy.LocalLogging} />
-                Local Logging Only
-              </label>
-            </div>
           </div>
         </div>
         {/if}
@@ -592,10 +441,6 @@
             <div class="form-group">
               <label for="own_host">OpenWebNet Host</label>
               <input type="text" id="own_host" bind:value={config.config.OpenWebNet.Host} />
-            </div>
-            <div class="form-group">
-              <label for="own_port">OpenWebNet Port</label>
-              <input type="number" id="own_port" bind:value={config.config.OpenWebNet.Port} />
             </div>
             <div class="form-group">
               <label for="own_timeout">Timeout (ns)</label>
