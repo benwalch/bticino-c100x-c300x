@@ -152,57 +152,7 @@ func (c *Client) Connect() error {
 				connectedPorts++
 				c.logger.Infof("Connected to port %d", port)
 
-				// Read the initial ACK from the server
-				conn.SetReadDeadline(time.Now().Add(c.timeout))
-				initReader := bufio.NewReader(conn)
-				ack, _ := readOWNMessage(initReader)
-				c.logger.Debugf("Initial ACK from port %d: %s", port, strings.TrimSpace(ack))
-
-				// Open an EVENT session so the server keeps the connection
-				// alive and sends us real-time events (doorbell, etc.)
-				if port == c.mainPort {
-					c.logger.Infof("Opening EVENT session on port %d...", port)
-					_, writeErr := conn.Write([]byte("*99*1##"))
-					if writeErr != nil {
-						c.logger.Errorf("Failed to send event session request on port %d: %v", port, writeErr)
-					} else {
-						conn.SetReadDeadline(time.Now().Add(c.timeout))
-						sessResp, sessErr := readOWNMessage(initReader)
-						if sessErr != nil {
-							c.logger.Warnf("No response to event session request on port %d: %v", port, sessErr)
-						} else {
-							sessResp = strings.TrimSpace(sessResp)
-							c.logger.Infof("Event session response on port %d: %s", port, sessResp)
-
-							// If the server requires HMAC-SHA256 authentication
-							if sessResp == CMD_AUTH_HMAC {
-								c.logger.Info("Server requires HMAC-SHA256 authentication")
-								if c.password == "" {
-									c.logger.Warn("HMAC required but no password configured, continuing without auth")
-								} else {
-									writer := func(data []byte) error {
-										conn.SetWriteDeadline(time.Now().Add(c.timeout))
-										_, err := conn.Write(data)
-										return err
-									}
-									conn.SetReadDeadline(time.Now().Add(c.timeout))
-									if authErr := HMACAuth(initReader, writer, c.password, c.timeout); authErr != nil {
-										c.logger.WithError(authErr).Error("HMAC authentication failed")
-									} else {
-										c.logger.Infof("HMAC-SHA256 authentication successful on port %d", port)
-									}
-								}
-							}
-						}
-					}
-				}
-
-				if c.onConnected != nil {
-					go c.onConnected(port)
-				}
-
-				// Start reading messages in background
-				go c.readMessages(port, initReader)
+				c.startSession(port, conn)
 				break
 			}
 
@@ -564,58 +514,66 @@ func (c *Client) reconnectPort(port int) {
 
 			c.logger.Infof("Reconnected to port %d successfully", port)
 
-			// Read the initial ACK from the server
-			conn.SetReadDeadline(time.Now().Add(c.timeout))
-			initReader := bufio.NewReader(conn)
-			ack, _ := readOWNMessage(initReader)
-			c.logger.Debugf("Initial ACK from port %d: %s", port, strings.TrimSpace(ack))
-
-			// Open an EVENT session on the main monitoring port
-			if port == c.mainPort {
-				c.logger.Infof("Opening EVENT session on port %d...", port)
-				_, writeErr := conn.Write([]byte("*99*1##"))
-				if writeErr != nil {
-					c.logger.Errorf("Failed to send event session request on port %d: %v", port, writeErr)
-				} else {
-					conn.SetReadDeadline(time.Now().Add(c.timeout))
-					sessResp, sessErr := readOWNMessage(initReader)
-					if sessErr != nil {
-						c.logger.Warnf("No response to event session request on port %d: %v", port, sessErr)
-					} else {
-						sessResp = strings.TrimSpace(sessResp)
-						c.logger.Infof("Event session response on port %d: %s", port, sessResp)
-
-						// HMAC-SHA256 authentication if required
-						if sessResp == CMD_AUTH_HMAC {
-							c.logger.Info("Reconnect: server requires HMAC-SHA256 authentication")
-							if c.password != "" {
-								writer := func(data []byte) error {
-									conn.SetWriteDeadline(time.Now().Add(c.timeout))
-									_, err := conn.Write(data)
-									return err
-								}
-								conn.SetReadDeadline(time.Now().Add(c.timeout))
-								if authErr := HMACAuth(initReader, writer, c.password, c.timeout); authErr != nil {
-									c.logger.WithError(authErr).Error("Reconnect: HMAC authentication failed")
-								} else {
-									c.logger.Infof("Reconnect: HMAC-SHA256 authentication successful on port %d", port)
-								}
-							}
-						}
-					}
-				}
-			}
-
-			if c.onConnected != nil {
-				go c.onConnected(port)
-			}
-
-			// Restart message reader for this port
-			go c.readMessages(port, initReader)
+			c.startSession(port, conn)
 			return
 		}
 
 		c.logger.Errorf("Reconnection attempt %d to port %d failed: %v", attempt, port, err)
+	}
+}
+
+// startSession completes the handshake on a fresh connection and starts its
+// reader. The reader keeps the handshake buffer: frames may follow the ACK.
+func (c *Client) startSession(port int, conn net.Conn) {
+	reader := bufio.NewReader(conn)
+	conn.SetReadDeadline(time.Now().Add(c.timeout))
+	ack, _ := readOWNMessage(reader)
+	c.logger.Debugf("Initial ACK from port %d: %s", port, strings.TrimSpace(ack))
+
+	if port == c.mainPort {
+		c.openEventSession(port, conn, reader)
+	}
+	if c.onConnected != nil {
+		go c.onConnected(port)
+	}
+	go c.readMessages(port, reader)
+}
+
+// openEventSession asks the server to push bus events on this connection,
+// authenticating with HMAC-SHA256 when the server requires it.
+func (c *Client) openEventSession(port int, conn net.Conn, reader *bufio.Reader) {
+	c.logger.Infof("Opening EVENT session on port %d...", port)
+	if _, err := conn.Write([]byte("*99*1##")); err != nil {
+		c.logger.Errorf("Failed to send event session request on port %d: %v", port, err)
+		return
+	}
+	conn.SetReadDeadline(time.Now().Add(c.timeout))
+	resp, err := readOWNMessage(reader)
+	if err != nil {
+		c.logger.Warnf("No response to event session request on port %d: %v", port, err)
+		return
+	}
+	resp = strings.TrimSpace(resp)
+	c.logger.Infof("Event session response on port %d: %s", port, resp)
+	if resp != CMD_AUTH_HMAC {
+		return
+	}
+
+	c.logger.Info("Server requires HMAC-SHA256 authentication")
+	if c.password == "" {
+		c.logger.Warn("HMAC required but no password configured, continuing without auth")
+		return
+	}
+	writer := func(data []byte) error {
+		conn.SetWriteDeadline(time.Now().Add(c.timeout))
+		_, err := conn.Write(data)
+		return err
+	}
+	conn.SetReadDeadline(time.Now().Add(c.timeout))
+	if err := HMACAuth(reader, writer, c.password, c.timeout); err != nil {
+		c.logger.WithError(err).Error("HMAC authentication failed")
+	} else {
+		c.logger.Infof("HMAC-SHA256 authentication successful on port %d", port)
 	}
 }
 
