@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- The Controls page hides display, doorbell sound and voicemail on the
+  Classe 100X, which ignores those commands or has no answering machine
+  (as MQTT already did). `/api/status` reports `device.remote_set_commands`.
+
 - On the Classe 100X, which has no answering machine, the web UI no longer
   shows the Messages and Notes pages, the `message_parser` component or the
   Storage card. `/api/status` reports `device.answering_machine` and lists

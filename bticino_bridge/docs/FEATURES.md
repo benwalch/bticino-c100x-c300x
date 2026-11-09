@@ -246,7 +246,7 @@ hash-based routing and Server-Sent Events for real-time updates.
 | Page | Path | Description |
 |------|------|-------------|
 | Dashboard | `#dashboard` | System status, connection states, uptime, version, LED states, and GPIO states **with per-pin function tooltips** |
-| Controls | `#controls` | Door unlock, display, mute, doorbell, light, answering machine, raw OWN command, and a **System** section (Restart Bridge / Reboot Device, double-confirmed) |
+| Controls | `#controls` | Door unlock, display, mute, doorbell, light, answering machine, raw OWN command, and a **System** section (Restart Bridge / Reboot Device, double-confirmed). On the Classe 100X only door unlock, light and System: it ignores display and doorbell-sound commands and has no answering machine |
 | Messages | `#messages` | Answering machine messages: list, play, download, mark read, delete (Classe 300X only) |
 | Memos | `#memos` | Voice and text memos: list, play, download (Classe 300X only) |
 | Settings | `#settings` | YAML config editor (incl. `live_on_call`, `video_on_demand`, `video_backend`, web auth), device settings, backup/restore |

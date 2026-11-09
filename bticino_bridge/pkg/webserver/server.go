@@ -561,8 +561,11 @@ func (ws *WebServer) handleAPIStatus(w http.ResponseWriter, r *http.Request) {
 			"variant":  bticino.DeviceVariant,
 			"model":    deviceModel(),
 			"firmware": firmwareStamp(),
-			// The web UI shows messages, notes and their storage only when true.
+			// The web UI shows messages, notes, their storage and the voicemail
+			// control only when true.
 			"answering_machine": hasAnsweringMachine,
+			// Display and doorbell-sound controls only when true.
+			"remote_set_commands": bticino.RemoteSetCommandsWork(),
 		},
 		"components": components,
 		"system":     systemMetrics(),

@@ -13,6 +13,9 @@
   let loading = true
   let error = null
   let success = null
+  // From /api/status: which controls the unit supports (Classe 100X ignores
+  // display and doorbell-sound SETs and has no answering machine).
+  let device = {}
   
   let system = {
     restart: { loading: false },
@@ -34,6 +37,7 @@
       
       const deviceData = await deviceRes.json()
       const statusData = await statusRes.json()
+      device = statusData.device || {}
       
       if (deviceData.success && deviceData.config) {
         const answering = deviceData.config.answering || {}
@@ -251,6 +255,7 @@
           </button>
         </div>
 
+        {#if device.answering_machine}
         <div class="control-card">
           <div class="control-icon">📼</div>
           <h3>Voicemail</h3>
@@ -259,7 +264,9 @@
             {controls.voicemail.loading ? '⏳...' : (controls.voicemail.enabled ? 'Disable' : 'Enable')}
           </button>
         </div>
+        {/if}
 
+        {#if device.remote_set_commands}
         <div class="control-card">
           <div class="control-icon">📱</div>
           <h3>Display</h3>
@@ -268,6 +275,7 @@
             {controls.display.loading ? '⏳...' : (controls.display.on ? 'Turn Off' : 'Turn On')}
           </button>
         </div>
+        {/if}
 
         <!-- Mute removed - integrated into doorbell_sound -->
         <!--
@@ -281,6 +289,7 @@
         </div>
         -->
 
+        {#if device.remote_set_commands}
         <div class="control-card">
           <div class="control-icon">🔔</div>
           <h3>Doorbell Sound</h3>
@@ -289,6 +298,7 @@
             {controls.doorbell_sound.loading ? '⏳...' : (controls.doorbell_sound.on ? 'Disable' : 'Enable')}
           </button>
         </div>
+        {/if}
 
         <div class="control-card">
           <div class="control-icon">💡</div>
