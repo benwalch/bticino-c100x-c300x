@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- `deploy.sh` restarts the bridge as soon as the old process has exited
+  (at most 15 s, then `kill -9`) instead of always waiting 15 s.
+
 - When the native unit ends a camera session (after about 30 s), the bridge
   no longer sends a BYE of its own, which was answered with 481.
 

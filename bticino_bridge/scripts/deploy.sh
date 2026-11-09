@@ -276,20 +276,17 @@ else
     log "Skipping docs deploy (--skip-docs)"
 fi
 
-# Restart service (TERM first so in-dialog sessions get their BYE instead
-# of orphaning the native dialog (grace covers frame grab + BYE), then -9
-# only if it hangs)
+# Restart service: TERM first so in-dialog sessions get their BYE, wait up to
+# 15 s for the exit (grace covers frame grab + BYE), -9 only if it hangs.
+# pidof, because the remote shell has the bridge's name in its command line.
 log "Restarting service..."
-ssh "$REMOTE" "cd $REMOTE_DIR && (pkill bticino_bridge || true) && sleep 15 && (pkill -9 bticino_bridge || true) && sleep 2 && nohup ./bticino_bridge -config config.yaml > /dev/null 2>&1 &"
-sleep 5
+ssh "$REMOTE" "cd $REMOTE_DIR && (pkill bticino_bridge || true); i=0; while pidof bticino_bridge > /dev/null && [ \$i -lt 15 ]; do sleep 1; i=\$((i + 1)); done; (pkill -9 bticino_bridge || true); sleep 2; nohup ./bticino_bridge -config config.yaml > /dev/null 2>&1 &"
 log_success "Service restarted"
 
 # Verify
 log "Verifying..."
-# The bridge starts about 17 s after the restart command, so this checks it about
-# 10 s into its run, which also catches an early crash. pidof, because the remote
-# shell that started the bridge also has its name in the process list.
-sleep 22
+# Checks the bridge about 10 s into its run, which also catches an early crash.
+sleep 12
 if ssh "$REMOTE" "pidof bticino_bridge > /dev/null"; then
     log_success "Service running"
 else
