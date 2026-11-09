@@ -1,6 +1,7 @@
 package sip
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -141,9 +142,11 @@ func (v *VideoStreamManager) handleRTPPackets() {
 				// Timeout is expected, continue
 				continue
 			}
-			if v.running {
-				v.logger.WithError(err).Error("Error reading RTP packet")
+			if errors.Is(err, net.ErrClosed) {
+				v.logger.Info("RTP packet handler stopping")
+				return
 			}
+			v.logger.WithError(err).Error("Error reading RTP packet")
 			continue
 		}
 

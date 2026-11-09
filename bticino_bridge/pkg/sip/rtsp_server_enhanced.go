@@ -3,6 +3,7 @@ package sip
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -301,14 +302,12 @@ func (r *EnhancedRTSPServer) acceptConnections() {
 	for {
 		conn, err := r.listener.Accept()
 		if err != nil {
-			select {
-			case <-r.stopCh:
+			if errors.Is(err, net.ErrClosed) {
 				r.logger.Info("RTSP acceptConnections stopping")
 				return
-			default:
-				r.logger.WithError(err).Error("Failed to accept RTSP connection")
-				continue
 			}
+			r.logger.WithError(err).Error("Failed to accept RTSP connection")
+			continue
 		}
 
 		r.logger.Infof("RTSP: Accepted connection from %s", conn.RemoteAddr())

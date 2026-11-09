@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- On shutdown the RTSP accept loop and the RTP reader no longer spin on their
+  closed sockets, which logged dozens of `use of closed network connection`
+  errors per stop.
+
 - `deploy.sh` shows the device's address from the SSH config in its closing
   hints instead of a hard-coded old IP.
 
