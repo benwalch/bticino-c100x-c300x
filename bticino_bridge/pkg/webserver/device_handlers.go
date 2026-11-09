@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 )
@@ -223,14 +222,4 @@ func (ws *WebServer) handleAPIDeviceSave(w http.ResponseWriter, r *http.Request)
 		"success": true,
 		"message": "Device configuration saved",
 	})
-}
-
-// execSSHCommand executes an SSH command on the device
-func (ws *WebServer) execSSHCommand(command string) (string, error) {
-	cmd := exec.Command("ssh", "bticino", command)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(output)), nil
 }

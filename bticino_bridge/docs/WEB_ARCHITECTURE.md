@@ -4,6 +4,10 @@
 **Version**: 0.14.3  
 **Status**: ⚠️ **TRANSITION** (embedded HTML → Svelte)
 
+> **Historical.** This describes the state during the migration. The embedded
+> HTML, CSS and JS in `server.go` were removed later; the Svelte app in `web/`
+> is the only web UI. See [SVELTE_MIGRATION_COMPLETE.md](SVELTE_MIGRATION_COMPLETE.md).
+
 ---
 
 ## 📊 **Current Architecture (v0.14.3)**

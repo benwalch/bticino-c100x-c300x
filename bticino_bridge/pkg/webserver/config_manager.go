@@ -294,13 +294,6 @@ func (cm *ConfigManager) ValidateConfig(cfg *config.Config) ConfigValidationResu
 	return result
 }
 
-// CreateBackup creates a backup of the current configuration
-func (cm *ConfigManager) CreateBackup() (string, error) {
-	cm.configMutex.RLock()
-	defer cm.configMutex.RUnlock()
-	return cm.createBackup()
-}
-
 func (cm *ConfigManager) createBackup() (string, error) {
 	// Create backup directory if it does not exist
 	if err := os.MkdirAll(cm.backupDir, 0755); err != nil {
@@ -438,16 +431,6 @@ func (cm *ConfigManager) RequestReload() {
 	}
 }
 
-// GetReloadChannel returns the reload channel
-func (cm *ConfigManager) GetReloadChannel() <-chan bool {
-	return cm.reloadChan
-}
-
-// EnableAutoReload enables automatic hot reload
-func (cm *ConfigManager) EnableAutoReload() {
-	cm.autoReload = true
-}
-
 // CleanupOldBackups removes old backups keeping only the last maxBackups
 func (cm *ConfigManager) cleanupOldBackups() {
 	backups, err := cm.GetBackups()
@@ -527,14 +510,6 @@ func (cm *ConfigManager) detectChanges(old, new *config.Config) []string {
 	}
 
 	return sections
-}
-
-// ToJSON serializes the configuration to JSON
-func (cm *ConfigManager) ToJSON() ([]byte, error) {
-	cm.configMutex.RLock()
-	defer cm.configMutex.RUnlock()
-
-	return json.MarshalIndent(cm.config, "", "  ")
 }
 
 // FromJSON deserializes the configuration from JSON. The candidate starts from a

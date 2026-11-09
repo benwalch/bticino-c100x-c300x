@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Removed the legacy web UI that was embedded in `server.go` (HTML, CSS, JS
+  and page handlers). It was no longer served; the Svelte app is the web UI.
+
 - A camera session is no longer ended by a late BYE of an earlier dialog; such
   a BYE is answered with 200 and the running session continues.
 - The answer to a re-INVITE during a camera session now carries the request's
