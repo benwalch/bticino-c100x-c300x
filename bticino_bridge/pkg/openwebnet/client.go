@@ -717,7 +717,7 @@ func (c *Client) QueryVideoStatus() (*Command, error) {
 // ActivateVideoStream sends *7*300 command to bt_av_media on port 30007
 // to start an unencrypted RTP video stream to the specified IP and port.
 // streamType: 0=high-res video, 1=low-res video, 2=audio
-// IP is encoded as hash: 192.168.1.38 -> 192#168#1#38
+// IP is encoded as hash: 192.0.2.10 -> 192#0#2#10
 func (c *Client) ActivateVideoStream(targetIP string, rtpPort int, highRes bool) error {
 	ipHash := strings.ReplaceAll(targetIP, ".", "#")
 	streamType := 0

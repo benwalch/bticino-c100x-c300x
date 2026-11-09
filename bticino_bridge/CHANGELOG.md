@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- `deploy.sh` shows the device's address from the SSH config in its closing
+  hints instead of a hard-coded old IP.
+
 - Removed further unused helpers in `deviceconfig`, `openwebnet`, `version`
   and others, including `homekit.DefaultConfig` with its fixed default PIN.
 

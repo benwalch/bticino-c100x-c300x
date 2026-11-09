@@ -505,8 +505,8 @@ func TestLimitsAreCapped(t *testing.T) {
 		{"100GB", 1, DefaultMaxSize, false},
 		{"1KB", 16, 1 << 10, true},
 		{"1KB", 17, DefaultMaxSize, false},
-		{"1KB", 1 << 40, DefaultMaxSize, false},
-		{"9000000000GB", 1 << 40, DefaultMaxSize, false},
+		{"1KB", 1 << 30, DefaultMaxSize, false},
+		{"9000000000GB", 1 << 30, DefaultMaxSize, false},
 	}
 	for _, c := range cases {
 		size, files, errs := resolveLimits(c.size, c.files)

@@ -68,7 +68,7 @@ func NewCommandDatabase() *CommandDatabase {
 
 	// SISTEMA 13 - GATEWAY MANAGEMENT (NEWLY DISCOVERED)
 	db.Commands["*#13**10*192*168*1*38##"] = CommandInfo{
-		Description: "Gateway IP Configuration (192.168.1.38)",
+		Description: "Gateway IP Configuration",
 		WHO:         "13",
 		System:      "Gateway Management",
 		Type:        CommandTypeStatus,

@@ -2,7 +2,7 @@
 // derived from real analysis of the Classe 300X device (ARM7 firmware).
 //
 // All information in this file was verified through physical testing
-// on the device (192.168.1.38) during March 2026. OWN patterns,
+// on the device during March 2026. OWN patterns,
 // GPIO functions, button mappings and LED meanings were confirmed
 // by observing real events on the OpenWebNet bus (port 20000) and on
 // /dev/input/event0-2.
@@ -292,7 +292,6 @@ const (
 
 	// Network settings
 	DefaultNetworkInterface = "lo"
-	DefaultGateway          = "192.168.1.1"
 
 	// SIP Configuration
 	SIPDomain = "bs.iotleg.com"

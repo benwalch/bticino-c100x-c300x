@@ -312,8 +312,7 @@ func main() {
 	logger.Info("🔧 Enhanced BTicino Components initialization complete")
 
 	// ==================== COMPONENT 2: Web Dashboard ====================
-	// LAN IP for user-facing log URLs (auto-detected; the old 300X IP
-	// 192.168.1.38 must not be hardcoded — DHCP changes it).
+	// LAN IP for user-facing log URLs, auto-detected because DHCP changes it.
 	deviceIP := bticino.LocalOutboundIP()
 
 	if cfg.Web.Enabled {

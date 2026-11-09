@@ -131,48 +131,10 @@ func (a *AudioListenOnCall) Start(reason string) {
 		if err := a.tap.Start(); err != nil {
 			a.logger.WithError(err).Warn("audio-listen: tap no disponible — degradando sin audio")
 		} else {
-			// tap.Start() se llama DELIBERADAMENTE fuera del lock (puede
-			// bloquear: apertura de socket AF_PACKET). En esa ventana un
-			// Stop() concurrente (guard, sip.call.ended) puede haber corrido
-			// entero su beginTeardown/teardown ANTES de que este tap.Start()
-			// vuelva. Su propio tap.Stop() en ese teardown no hizo nada útil
-			// porque el tap todavía no había arrancado. Sin esta
-			// comprobación, el tap quedaría arrancado con active=false y
-			// ningún desarme posterior lo pararía: el decoder se autodesarma
-			// solo en su tope duro (SetTimeout arriba), pero el tap (socket
-			// AF_PACKET + goroutine) no tiene mecanismo de autodesarme propio
-			// — quedaría filtrado (leaked) para siempre.
-			//
-			// OJO: la comprobación es SOLO `!a.active`, NUNCA `generation`.
-			// `a.tap`/`a.decoder` son instancias ÚNICAS compartidas por TODAS
-			// las generaciones (se construyen una vez en cmd/main.go), no una
-			// por sesión. Si en la ventana se coló un Stop()+Start() completo
-			// (sesión B, generación distinta de la nuestra) y B ya está
-			// activa, `a.active` es true: el tap compartido pertenece
-			// LEGÍTIMAMENTE a B (LoopbackRTPTap.Start es idempotente — el
-			// tap.Start() de B ya lo dejó corriendo, y este tap.Start()
-			// tardío de A no hace nada nuevo sobre el mismo tap). Pararlo
-			// aquí cortaría el audio de una llamada EN VIVO (B) de forma
-			// silenciosa, porque IsActive() seguiría devolviendo true (lo
-			// puso B) — una regresión peor que la fuga original. Por eso NO
-			// se comprueba `generation` aquí (a diferencia de
-			// beginTeardown/selfStopIfCurrent, donde si corresponde: allí se
-			// decide si TERMINAR la sesión activa, aquí solo si limpiar un
-			// tap que quedó huérfano porque NADIE lo reclamó).
-			//
-			// Residual aceptado: en el caso de generación distinta, la
-			// goroutine del decoder de la sesión A (ya lanzada en este mismo
-			// Start()) queda huérfana — se autodesarma sola en su propio tope
-			// duro (ctx timeout). El decoder compartido no es seguro para dos
-			// Decode() realmente concurrentes, pero requiere la misma ventana
-			// de descheduling improbable que el resto de esta carrera; fuera
-			// de alcance aquí (solo se corrige la condición de Stop tap/decoder).
-			//
-			// NOTA: LiveVideoOnCall (live_video.go) tiene exactamente el
-			// mismo patrón (active=true bajo lock, tap.Start() fuera del
-			// lock) y por tanto la misma fuga latente. Queda fuera de alcance
-			// de esta rama — se corrige solo aquí (revisión de rama
-			// feat/audio-tap-5000, hallazgo 1; el vídeo se trata aparte).
+			// tap.Start runs outside the lock because it can block. A Stop()
+			// in that window found no tap to stop, so stop it here unless a
+			// session owns it. Check `active`, not `generation`: tap and
+			// decoder are shared, and a newer active session owns them now.
 			a.mu.Lock()
 			orphaned := !a.active
 			a.mu.Unlock()

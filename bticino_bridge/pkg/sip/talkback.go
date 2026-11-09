@@ -17,7 +17,8 @@ import (
 // is PLAIN RTP. Talk-back consists of sending RTP Speex/8000 (payload type
 // 110, the c300x audio codec) to the door station's audio receive port,
 // with the bidirectional audio session ARMED via the OpenWebNet command
-//   *8*2#5#4*16##  (CmdAnswerPickup — "enable bidirectional audio").
+//
+//	*8*2#5#4*16##  (CmdAnswerPickup — "enable bidirectional audio").
 //
 // This component handles ONLY the media pipeline (GStreamer). The arming
 // command is sent by the caller (webserver / bridge) through the OWN client.

@@ -309,8 +309,9 @@ echo -e "${GREEN}╔════════════════════
 echo -e "${GREEN}║              ✅ Deploy completed successfully!             ║${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════════════════════════╝${NC}"
 echo
+HOST=$(ssh -G "$REMOTE" | awk '/^hostname /{print $2}')
 echo "Next steps:"
-echo "  1. Check: curl http://192.168.1.38:8082/api/status"
-echo "  2. Logs: ssh bticino 'tail -f /var/log/bticino_bridge.log'"
-echo "  3. Web UI: http://192.168.1.38:8082/"
+echo "  1. Check: curl http://$HOST:8082/api/status"
+echo "  2. Logs: ssh $REMOTE 'tail -f /var/log/bticino_bridge.log'"
+echo "  3. Web UI: http://$HOST:8082/"
 echo
