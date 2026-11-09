@@ -1,5 +1,12 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
+  import Icon from '../lib/Icon.svelte'
+  import {
+    MonitorSpeaker, Clock, HardDrive, MemoryStick, Thermometer, Voicemail,
+    Network, Radio, Globe, Activity, ChevronDown, Circle,
+    Lock, Lightbulb, BellOff, PhoneOff, Phone, WifiOff, Wifi, Repeat,
+    Video, VideoOff, Mail, PhoneMissed
+  } from 'lucide'
   
   let status = null
   let loading = true
@@ -57,10 +64,10 @@
     led_star:      { label: 'Staircase light', desc: 'ON while the staircase-light (star) key is active' },
     led_horn_r:    { label: 'Phone red',       desc: 'ON while the red (hangup) phone key is active' },
     led_horn_g:    { label: 'Phone green',     desc: 'Likely the green (answer) phone key' },
-    led_p1:        { label: 'Programmable Button 1',      desc: 'Programmable Button 1' },
-    led_p2:        { label: 'Programmable Button 2',      desc: 'Programmable Button 2 — unconfirmed' },
-    led_p3:        { label: 'Programmable Button 3',      desc: 'Programmable Button 3 — unconfirmed' },
-    led_p4:        { label: 'Programmable Button 4',      desc: 'Programmable Button 4 — unconfirmed' },
+    led_p1:        { label: 'Button P1',                desc: 'Programmable Button 1' },
+    led_p2:        { label: 'Button P2',                desc: 'Programmable Button 2 — unconfirmed' },
+    led_p3:        { label: 'Button P3',                desc: 'Programmable Button 3 — unconfirmed' },
+    led_p4:        { label: 'Button P4',                desc: 'Programmable Button 4 — unconfirmed' },
     led_autosw:    { label: 'Autoswitch',      desc: 'Function not identified' },
     led_wifi:      { label: 'WiFi',            desc: 'ON while no WiFi connection' },
     // --- Classe 300X ---
@@ -118,208 +125,412 @@
       loading = false
     }
   }
+
+  // Programmable buttons: one dot per button number.
+  function dots(n) {
+    const xs = { 1: [12], 2: [8, 16], 3: [6, 12, 18], 4: [4.5, 9.5, 14.5, 19.5] }[n]
+    return xs.map(x => ['circle', { cx: String(x), cy: '12', r: '1' }])
+  }
+
+  const LED_ICON = {
+    led_call_exp: BellOff, led_door_lock: Lock, led_star: Lightbulb,
+    led_horn_r: PhoneOff, led_horn_g: Phone, led_autosw: Repeat, led_wifi: WifiOff,
+    led_p1: dots(1), led_p2: dots(2), led_p3: dots(3), led_p4: dots(4),
+    led_lock: Lock, led_vct_green: Video, led_vct_red: VideoOff, led_memo: Mail,
+    led_exc_call: PhoneMissed, led_gwifi: Wifi, led_ans_machine: Voicemail
+  }
+
+  const MB = 1024 * 1024
+
+  function percent(used, total) {
+    return total ? Math.round((used * 100) / total) : 0
+  }
+
+  // /etc/version is a build stamp like 20250522064330.
+  function firmwareDate(stamp) {
+    return /^\d{14}$/.test(stamp) ? `${stamp.slice(0, 4)}-${stamp.slice(4, 6)}-${stamp.slice(6, 8)}` : stamp
+  }
+
+  function since(iso) {
+    return new Date(iso).toLocaleString(undefined, {
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    })
+  }
+
+  function connectionsOf(s) {
+    const c = s.components || {}
+    const list = []
+    if (c.openwebnet) {
+      list.push({ name: 'OpenWebNet', detail: `Port ${c.openwebnet.port}`, icon: Network,
+        ok: c.openwebnet.status === 'active', state: c.openwebnet.status === 'active' ? 'Active' : c.openwebnet.status })
+    }
+    if (s.mqtt) {
+      list.push({ name: 'MQTT', detail: `Broker ${s.mqtt.broker}`, icon: Radio,
+        ok: s.mqtt.connected, state: s.mqtt.connected ? 'Connected' : 'Disconnected' })
+    }
+    if (c.web_dashboard) {
+      list.push({ name: 'Web dashboard', detail: `Port ${c.web_dashboard.port}`, icon: Globe,
+        ok: c.web_dashboard.status === 'active', state: c.web_dashboard.status === 'active' ? 'Active' : c.web_dashboard.status })
+    }
+    if (c.message_parser) {
+      list.push({ name: 'Message parser', icon: Voicemail,
+        detail: `${c.message_parser.messages_found} messages, ${c.message_parser.new_messages} new`,
+        ok: c.message_parser.status === 'active', state: c.message_parser.status === 'active' ? 'Active' : c.message_parser.status })
+    }
+    return list
+  }
+
+  $: connections = status ? connectionsOf(status) : []
+  $: sys = status?.system || {}
 </script>
 
 <div class="dashboard">
-  <div class="container">
-    {#if loading}
-      <div class="loading">Loading...</div>
-    {:else if error}
-      <div class="error">Error: {error}</div>
-    {:else if status}
-      <h2>System Status</h2>
-      
-      <div class="status-grid">
-        <div class="status-card">
-          <h3>📊 Version</h3>
-          <p class="value">{status.version}</p>
-        </div>
-        
-        <div class="status-card">
-          <h3>⏱️ Uptime</h3>
-          <p class="value">{status.uptime}</p>
-        </div>
-        
-        {#if status.device?.answering_machine}
-        <div class="status-card">
-          <h3>💾 Storage</h3>
-          <p class="value">{status.storage_used}</p>
-        </div>
-        {/if}
-        
-        {#if status.mqtt}
-        <div class="status-card">
-          <h3>📡 MQTT</h3>
-          <p class="value">
-            {#if status.mqtt.connected}
-              ✅ {status.mqtt.broker}
-            {:else}
-              ❌ Disconnected
+  {#if loading}
+    <div class="loading">Loading...</div>
+  {:else if error}
+    <div class="error">Error: {error}</div>
+  {:else if status}
+    <section class="card device" aria-label="Device">
+      <div class="device-main">
+        <div class="device-icon"><Icon icon={MonitorSpeaker} size={26} /></div>
+        <div class="device-text">
+          <div class="eyebrow">Device</div>
+          <div class="device-title">
+            <h1>{status.device?.model}</h1>
+            {#if status.device?.variant}
+            <span class="variant">{status.device.variant.toUpperCase()}</span>
             {/if}
-          </p>
+          </div>
+          <div class="muted">
+            BTicino indoor unit
+            {#if status.device?.firmware} · firmware {firmwareDate(status.device.firmware)}{/if}
+            {#if status.boot_time} · bridge running since {since(status.boot_time)}{/if}
+          </div>
+        </div>
+      </div>
+      <div class="online"><span class="dot"></span>Bridge online</div>
+    </section>
+
+    <section class="block" aria-labelledby="h-system">
+      <h2 id="h-system">System</h2>
+      <div class="grid tiles">
+        <div class="card tile">
+          <div class="tile-label"><Icon icon={Clock} />Uptime</div>
+          <div class="tile-value">{status.uptime}</div>
+          {#if sys.device_uptime}
+          <div class="muted small">Device up {sys.device_uptime}</div>
+          {/if}
+        </div>
+
+        {#if sys.flash}
+        <div class="card tile">
+          <div class="tile-label"><Icon icon={HardDrive} />Flash storage</div>
+          <div class="tile-row">
+            <span class="tile-value">{percent(sys.flash.used_bytes, sys.flash.total_bytes)} %</span>
+            <span class="muted small">{Math.round(sys.flash.used_bytes / MB)} of {Math.round(sys.flash.total_bytes / MB)} MB</span>
+          </div>
+          <div class="bar" role="img" aria-label="Flash usage {percent(sys.flash.used_bytes, sys.flash.total_bytes)} percent">
+            <div style="width: {percent(sys.flash.used_bytes, sys.flash.total_bytes)}%"></div>
+          </div>
+        </div>
+        {/if}
+
+        {#if sys.memory}
+        <div class="card tile">
+          <div class="tile-label"><Icon icon={MemoryStick} />Memory</div>
+          <div class="tile-row">
+            <span class="tile-value">{percent(sys.memory.used_bytes, sys.memory.total_bytes)} %</span>
+            <span class="muted small">{Math.round(sys.memory.used_bytes / MB)} of {Math.round(sys.memory.total_bytes / MB)} MB</span>
+          </div>
+          <div class="bar" role="img" aria-label="Memory usage {percent(sys.memory.used_bytes, sys.memory.total_bytes)} percent">
+            <div style="width: {percent(sys.memory.used_bytes, sys.memory.total_bytes)}%"></div>
+          </div>
+        </div>
+        {/if}
+
+        {#if sys.temperature_c !== undefined}
+        <div class="card tile">
+          <div class="tile-label"><Icon icon={Thermometer} />CPU temperature</div>
+          <div class="tile-value">{sys.temperature_c.toFixed(1)} °C</div>
+          <div class="muted small">SoC sensor</div>
+        </div>
+        {/if}
+
+        {#if status.device?.answering_machine}
+        <div class="card tile">
+          <div class="tile-label"><Icon icon={Voicemail} />Message storage</div>
+          <div class="tile-value">{status.storage_used}</div>
         </div>
         {/if}
       </div>
-      
-      {#if status.components}
-      <h3>Components</h3>
-      <div class="components">
-        {#each Object.entries(status.components) as [name, info]}
-        <div class="component">
-          <strong>{name}</strong>
-          <span class="status">{info.status}</span>
+    </section>
+
+    <section class="block" aria-labelledby="h-connections">
+      <h2 id="h-connections">Connections</h2>
+      <div class="grid tiles">
+        {#each connections as c}
+        <div class="card connection">
+          <div class="connection-main">
+            <span class="connection-icon"><Icon icon={c.icon} size={20} /></span>
+            <div class="stack">
+              <span class="connection-name">{c.name}</span>
+              <span class="muted small">{c.detail}</span>
+            </div>
+          </div>
+          <span class="pill" class:ok={c.ok} class:bad={!c.ok}>{c.state}</span>
         </div>
         {/each}
       </div>
-      {/if}
-      
-      {#if status.leds}
-      <h3>LEDs Status</h3>
-      <div class="leds">
+    </section>
+
+    {#if status.leds}
+    <section class="block" aria-labelledby="h-leds">
+      <div class="block-head">
+        <h2 id="h-leds">LEDs</h2>
+        <span class="muted small">Live via events</span>
+      </div>
+      <div class="grid leds">
         {#each Object.entries(status.leds) as [name, on]}
-        <div class="led {on ? 'on' : 'off'}" title={LED_INFO[name]?.desc || 'Function unknown'}>
-          <span class="led-name">{LED_INFO[name]?.label || name}</span>
-          <span class="led-status">{on ? '✅ On' : '❌ Off'}</span>
+        <div class="led" class:on title={LED_INFO[name]?.desc || 'Function unknown'}>
+          <div class="led-icon"><Icon icon={LED_ICON[name] || Circle} /></div>
+          <div class="stack">
+            <span class="led-name">{LED_INFO[name]?.label || name}</span>
+            <span class="led-state">{on ? 'On' : 'Off'}</span>
+          </div>
         </div>
         {/each}
       </div>
-      {/if}
-      
-      {#if status.gpio}
-      <h3>GPIO Status</h3>
-      <div class="gpios">
-        {#each Object.entries(status.gpio) as [pin, on]}
-        <div class="gpio {on ? 'on' : 'off'}" title={gpioInfo(pin)?.desc || 'Function unknown'}>
-          <span class="gpio-pin">GPIO {pin}</span>
-          {#if gpioInfo(pin)}
-          <span class="gpio-label">{gpioInfo(pin).label}</span>
-          {/if}
-          <span class="gpio-status">{on ? '✅ High' : '❌ Low'}</span>
-        </div>
-        {/each}
-      </div>
-      {/if}
+    </section>
     {/if}
-  </div>
+
+    {#if status.gpio}
+    <section class="card gpio-card" aria-labelledby="h-gpio">
+      <details>
+        <summary>
+          <span class="gpio-title">
+            <Icon icon={Activity} />
+            <span id="h-gpio">GPIO</span>
+            <span class="muted small">{Object.keys(status.gpio).length} pins · technical</span>
+          </span>
+          <span class="chevron"><Icon icon={ChevronDown} /></span>
+        </summary>
+        <div class="gpios">
+          {#each Object.entries(status.gpio) as [pin, on]}
+          <div class="gpio" title={gpioInfo(pin)?.desc || 'Function unknown'}>
+            <span class="gpio-name">
+              <span class="gpio-pin">{pin}</span>
+              <span>{gpioInfo(pin)?.label || 'Unknown'}</span>
+            </span>
+            <span class="pill small-pill" class:ok={on}>{on ? 'High' : 'Low'}</span>
+          </div>
+          {/each}
+        </div>
+      </details>
+    </section>
+    {/if}
+  {/if}
 </div>
 
 <style>
-  .dashboard { padding: 2rem; }
-  .container { max-width: 1200px; margin: 0 auto; }
-  h2 { color: #333; margin-bottom: 1.5rem; }
-  h3 { color: #666; margin-top: 2rem; margin-bottom: 1rem; }
-  
-  .status-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
+  .dashboard {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px 22px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
   }
-  
-  .status-card {
-    background: white;
-    padding: 1.5rem;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    transition: transform 0.3s, box-shadow 0.3s;
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
   }
-  
-  .status-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 12px rgba(0,0,0,0.15);
-  }
-  
-  .status-card h3 {
-    margin: 0 0 1rem 0;
-    color: #666;
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  
-  .value {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: #2196F3;
+
+  .muted { color: var(--text-muted); font-size: 14px; }
+  .small { font-size: 13px; }
+  .stack { display: flex; flex-direction: column; }
+
+  h2 {
     margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-label);
   }
-  
-  .components {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-  }
-  
-  .component {
-    background: white;
-    padding: 1rem;
-    border-radius: 8px;
+
+  .block { display: flex; flex-direction: column; gap: 12px; }
+  .block-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+
+  .grid { display: grid; }
+  .tiles { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+  .leds { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+
+  /* Device */
+  .device {
+    border-radius: var(--radius-lg);
+    padding: 20px 22px;
     display: flex;
-    justify-content: space-between;
+    flex-wrap: wrap;
     align-items: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    justify-content: space-between;
+    gap: 20px;
   }
-  
-  .status {
-    color: #4CAF50;
-    font-weight: bold;
-    padding: 0.25rem 0.75rem;
-    background: #E8F5E9;
-    border-radius: 12px;
-    font-size: 0.85rem;
+  .device-main { display: flex; align-items: center; gap: 18px; }
+  .device-icon {
+    width: 50px;
+    height: 50px;
+    flex-shrink: 0;
+    border-radius: 13px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  
-  .leds {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1rem;
+  .device-text { display: flex; flex-direction: column; gap: 4px; }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
   }
-  
+  .device-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .device-title h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+  .variant {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 999px;
+    padding: 4px 10px;
+  }
+  .online {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ok);
+    background: var(--ok-soft);
+    border-radius: 999px;
+    padding: 8px 14px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok-dot); }
+
+  /* System tiles */
+  .tile { padding: 17px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .tile-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .tile-row { display: flex; align-items: baseline; gap: 8px; }
+  .tile-value { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+  .bar { height: 8px; border-radius: 999px; background: var(--chip); overflow: hidden; }
+  .bar div { height: 8px; border-radius: 999px; background: var(--accent); }
+
+  /* Connections */
+  .connection {
+    padding: 13px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .connection-main { display: flex; align-items: center; gap: 12px; }
+  .connection-icon { color: var(--text-muted); display: flex; }
+  .connection-name { font-size: 15px; font-weight: 600; }
+  .pill {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-label);
+    background: var(--chip);
+    border-radius: 999px;
+    padding: 4px 10px;
+    white-space: nowrap;
+  }
+  .pill.ok { color: var(--ok); background: var(--ok-soft); }
+  .pill.bad { color: var(--warn); background: var(--warn-icon-bg); }
+  .small-pill { padding: 2px 8px; }
+
+  /* LEDs */
   .led {
-    background: white;
-    padding: 1rem;
-    border-radius: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 11px 14px;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    gap: 12px;
   }
-  
-  .led.on .led-status { color: #4CAF50; }
-  .led.off .led-status { color: #999; }
-  .led-name { color: #666; font-size: 0.9rem; }
-  
+  .led-icon {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 9px;
+    background: var(--chip);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .led-name { font-size: 14px; font-weight: 600; }
+  .led-state { font-size: 13px; color: var(--text-muted); }
+  .led.on { background: var(--warn-soft); border-color: var(--warn-border); }
+  .led.on .led-icon { background: var(--warn-icon-bg); color: var(--warn-icon); }
+  .led.on .led-state { color: var(--warn); font-weight: 600; }
+
+  /* GPIO */
+  .gpio-card { margin-top: 13px; }
+  summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 44px;
+    padding: 10px 18px;
+    box-sizing: border-box;
+    cursor: pointer;
+    list-style: none;
+    color: var(--text-muted);
+  }
+  summary::-webkit-details-marker { display: none; }
+  .gpio-title { display: flex; align-items: center; gap: 10px; }
+  #h-gpio { font-size: 15px; font-weight: 600; color: var(--text-label); }
+  .chevron { display: flex; transition: transform 0.2s; }
+  details[open] .chevron { transform: rotate(180deg); }
   .gpios {
+    border-top: 1px solid var(--border);
+    padding: 12px 18px 16px;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 4px 24px;
   }
-  
   .gpio {
-    background: white;
-    padding: 0.75rem;
-    border-radius: 6px;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--divider);
+    font-size: 14px;
   }
-  
-  .gpio.on .gpio-status { color: #4CAF50; }
-  .gpio.off .gpio-status { color: #999; }
-  .gpio-pin { color: #666; font-size: 0.85rem; }
-  .gpio-label { color: #2196F3; font-size: 0.8rem; font-weight: 600; display: block; }
-  
+  .gpio-name { display: flex; gap: 12px; align-items: baseline; }
+  .gpio-pin { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); width: 34px; }
+
   .loading, .error {
     text-align: center;
     padding: 3rem;
     font-size: 1.2rem;
   }
-  
   .error {
-    color: #f44336;
-    background: #FFEBEE;
-    border-radius: 8px;
-    border: 1px solid #f44336;
+    color: #B91C1C;
+    background: #FEF2F2;
+    border-radius: var(--radius);
+    border: 1px solid #FCA5A5;
   }
 </style>

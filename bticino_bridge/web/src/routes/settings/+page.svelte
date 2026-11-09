@@ -1,5 +1,7 @@
 <script>
   import { onMount } from 'svelte'
+  import Icon from '../../lib/Icon.svelte'
+  import { ScrollText, Phone, Radio, House, Video, Shield, Network, RefreshCw, Save, Search, CircleCheck, TriangleExclamationPoint } from 'lucide'
   
   let config = null
   let loading = true
@@ -8,16 +10,17 @@
   let success = null
   
   const tabs = [
-    { id: 'bridge', label: '🌉 Bridge' },
-    { id: 'sip', label: '📞 SIP' },
-    { id: 'mqtt', label: '📡 MQTT' },
-    { id: 'homekit', label: '🏠 HomeKit' },
-    { id: 'streaming', label: '📹 Streaming' },
-    { id: 'security', label: '🔒 Security' },
-    { id: 'openwebnet', label: '🔌 OpenWebNet' }
+    { id: 'bridge', label: 'Bridge', icon: ScrollText, desc: 'Logging of the bridge.' },
+    { id: 'sip', label: 'SIP', icon: Phone, desc: 'Connection to the local Flexisip server of the intercom.' },
+    { id: 'mqtt', label: 'MQTT', icon: Radio, desc: 'Broker connection for Home Assistant.' },
+    { id: 'homekit', label: 'HomeKit', icon: House, desc: 'HomeKit bridge accessory.' },
+    { id: 'streaming', label: 'Streaming', icon: Video, desc: 'RTSP server and video activation.' },
+    { id: 'security', label: 'Security', icon: Shield, desc: 'Access to this dashboard and the API.' },
+    { id: 'openwebnet', label: 'OpenWebNet', icon: Network, desc: "Connection to the intercom's OpenWebNet server." }
   ]
   
   let activeTab = 'bridge'
+  $: tab = tabs.find(t => t.id === activeTab)
   
   onMount(async () => {
     await loadConfig()
@@ -47,7 +50,7 @@
       })
       const result = await response.json()
       if (result.success) {
-        success = '✅ Configuration saved! Restart required.'
+        success = 'Configuration saved. Restart required.'
         error = null
         setTimeout(() => success = null, 5000)
       } else {
@@ -61,10 +64,6 @@
     }
   }
   
-  function hasChanges() {
-    return config && config.config
-  }
-
   // native dev addr discovery wizard state
   let showWizard = false
   let wizardStep = 1
@@ -163,7 +162,7 @@
       const result = await response.json()
       if (!result.value) throw new Error(result.error || 'no domain found')
       config.config.SIP.Domain = result.value
-      success = '✅ Domain filled from ' + (result.source || 'Flexisip') + ' — press Save.'
+      success = 'Domain filled from ' + (result.source || 'Flexisip') + ' — press Save.'
       setTimeout(() => success = null, 5000)
     } catch (e) {
       error = e.message
@@ -171,307 +170,257 @@
   }
 </script>
 
-<div class="settings-page">
-  <div class="page-header">
-    <h1>⚙️ Settings</h1>
-    {#if success}
-      <div class="success-banner">{success}</div>
+<div class="page">
+  <div class="page-head">
+    <div class="stack">
+      <h1>Settings</h1>
+      <span class="muted">Saved to config.yaml. Log settings apply after a bridge restart.</span>
+    </div>
+    {#if config}
+    <div class="actions">
+      <button type="button" class="btn" on:click={loadConfig}><Icon icon={RefreshCw} size={16} />Reload</button>
+      <button type="button" class="btn primary" on:click={saveConfig} disabled={saving}>
+        <Icon icon={Save} size={16} />{saving ? 'Saving…' : 'Save'}
+      </button>
+    </div>
     {/if}
   </div>
 
-  <div class="container">
-    {#if loading}
-      <div class="loading">Loading configuration...</div>
-    {:else if error && !config}
-      <div class="error">Error: {error}</div>
-    {:else if config}
-      {#if error}
-      <div class="error-banner">{error}</div>
-      {/if}
-      
-      <div class="tabs">
-        {#each tabs as tab}
-        <button 
-          class="tab {activeTab === tab.id ? 'active' : ''}"
-          on:click={() => activeTab = tab.id}
-        >
-          {tab.label}
+  {#if success}
+  <div class="banner ok" role="status"><Icon icon={CircleCheck} />{success}</div>
+  {/if}
+
+  {#if loading}
+    <div class="loading">Loading configuration...</div>
+  {:else if error && !config}
+    <div class="banner bad">Error: {error}</div>
+  {:else if config}
+    {#if error}
+    <div class="banner bad" role="alert">{error}</div>
+    {/if}
+
+    <div class="layout">
+      <nav class="card side" aria-label="Settings sections">
+        {#each tabs as t}
+        <button type="button" class:active={activeTab === t.id} aria-current={activeTab === t.id ? 'true' : undefined}
+          on:click={() => activeTab = t.id}>
+          <Icon icon={t.icon} />{t.label}
         </button>
         {/each}
-      </div>
+      </nav>
 
-      <div class="tab-content">
-        <!-- BRIDGE -->
+      <section class="card section" aria-labelledby="section-title">
+        <div class="stack gap4">
+          <h2 id="section-title">{tab.label}</h2>
+          <span class="muted">{tab.desc}</span>
+        </div>
+
         {#if activeTab === 'bridge'}
-        <div class="section">
-          <h2>🌉 Bridge Configuration</h2>
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="bridge_log_level">Log Level</label>
-              <select id="bridge_log_level" bind:value={config.config.Logging.Level}>
-                <option value="debug">Debug</option>
-                <option value="info">Info</option>
-                <option value="warn">Warning</option>
-                <option value="error">Error</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="log_file">Log File</label>
-              <input type="text" id="log_file" bind:value={config.config.Logging.File} />
-            </div>
-            <div class="form-group">
-              <label for="log_size">Max Log Size</label>
-              <input type="text" id="log_size" bind:value={config.config.Logging.MaxSize} />
-              <small>Max 48 MB across all log files, at most 16 files. Log file must be in /var/log or /tmp. Log settings apply after a bridge restart.</small>
-            </div>
-          </div>
+        <div class="fields">
+          <label class="field">Log level
+            <select bind:value={config.config.Logging.Level}>
+              <option value="debug">Debug</option>
+              <option value="info">Info</option>
+              <option value="warn">Warning</option>
+              <option value="error">Error</option>
+            </select>
+          </label>
+          <label class="field">Log file
+            <input type="text" bind:value={config.config.Logging.File} />
+          </label>
+          <label class="field">Max log size
+            <input type="text" bind:value={config.config.Logging.MaxSize} />
+            <small>Max 48 MB across all log files, at most 16 files. Log file must be in /var/log or /tmp.</small>
+          </label>
         </div>
         {/if}
 
-        <!-- SIP -->
         {#if activeTab === 'sip'}
-        <div class="section">
-          <h2>📞 SIP Configuration</h2>
-          <div class="form-grid">
-            <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.SIP.Enabled} />
-                SIP Enabled
-              </label>
+        <label class="toggle">
+          <span class="stack"><span class="toggle-title">SIP enabled</span></span>
+          <input type="checkbox" bind:checked={config.config.SIP.Enabled} />
+        </label>
+        <div class="fields">
+          <label class="field">Server host
+            <input type="text" bind:value={config.config.SIP.ServerHost} />
+          </label>
+          <label class="field">Server port
+            <input type="number" bind:value={config.config.SIP.ServerPort} />
+          </label>
+          <label class="field">Transport
+            <select bind:value={config.config.SIP.Transport}>
+              <option value="tcp">TCP</option>
+              <option value="udp">UDP</option>
+              <option value="tls">TLS</option>
+            </select>
+          </label>
+          <div class="field">
+            <label for="sip_domain">Domain</label>
+            <div class="input-row">
+              <input type="text" id="sip_domain" bind:value={config.config.SIP.Domain} />
+              <button type="button" class="icon-btn" aria-label="Discover domain from Flexisip" title="Discover domain from Flexisip" on:click={discoverDomain}><Icon icon={Search} size={16} /></button>
             </div>
-            <div class="form-group">
-              <label for="sip_server">Server Host</label>
-              <input type="text" id="sip_server" bind:value={config.config.SIP.ServerHost} />
-            </div>
-            <div class="form-group">
-              <label for="sip_port">Server Port</label>
-              <input type="number" id="sip_port" bind:value={config.config.SIP.ServerPort} />
-            </div>
-            <div class="form-group">
-              <label for="sip_transport">Transport</label>
-              <select id="sip_transport" bind:value={config.config.SIP.Transport}>
-                <option value="tcp">TCP</option>
-                <option value="udp">UDP</option>
-                <option value="tls">TLS</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="sip_domain">Domain</label>
-              <div class="input-row">
-                <input type="text" id="sip_domain" bind:value={config.config.SIP.Domain} />
-                <button class="btn btn-secondary btn-icon" title="Discover domain from Flexisip" on:click={discoverDomain}>🔍</button>
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="sip_username">Username</label>
-              <input type="text" id="sip_username" bind:value={config.config.SIP.Username} />
-            </div>
-            <div class="form-group">
-              <label for="sip_password">Password</label>
-              <input type="password" id="sip_password" bind:value={config.config.SIP.Password} />
-            </div>
-            <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.SIP.InsecureTLS} />
-                Insecure TLS
-              </label>
-            </div>
-            <div class="form-group">
-              <label for="sip_native_dev_addr">Native Dev Addr</label>
-              <div class="input-row">
-                <input type="text" id="sip_native_dev_addr" bind:value={config.config.SIP.NativeDevAddr} placeholder="auto (validated default)" />
-                <button class="btn btn-secondary btn-icon" title="Discover native dev addr" on:click={openWizard}>🔍</button>
-              </div>
+          </div>
+          <label class="field">Username
+            <input type="text" bind:value={config.config.SIP.Username} />
+          </label>
+          <label class="field">Password
+            <input type="password" bind:value={config.config.SIP.Password} />
+          </label>
+          <div class="field">
+            <label for="sip_native_dev_addr">Native dev addr</label>
+            <div class="input-row">
+              <input type="text" id="sip_native_dev_addr" bind:value={config.config.SIP.NativeDevAddr} placeholder="auto (validated default)" />
+              <button type="button" class="icon-btn" aria-label="Discover native dev addr" title="Discover native dev addr" on:click={openWizard}><Icon icon={Search} size={16} /></button>
             </div>
           </div>
         </div>
+        <label class="toggle">
+          <span class="stack">
+            <span class="toggle-title">Insecure TLS</span>
+            <span class="muted small">Skips certificate checks.</span>
+          </span>
+          <input type="checkbox" bind:checked={config.config.SIP.InsecureTLS} />
+        </label>
         {/if}
 
-        <!-- MQTT -->
         {#if activeTab === 'mqtt'}
-        <div class="section">
-          <h2>📡 MQTT Configuration</h2>
-          <div class="form-grid">
-            <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.MQTT.Enabled} />
-                MQTT Enabled
-              </label>
-            </div>
-            <div class="form-group">
-              <label for="mqtt_host">Broker Host</label>
-              <input type="text" id="mqtt_host" bind:value={config.config.MQTT.Host} />
-            </div>
-            <div class="form-group">
-              <label for="mqtt_port">Broker Port</label>
-              <input type="number" id="mqtt_port" bind:value={config.config.MQTT.Port} />
-            </div>
-            <div class="form-group">
-              <label for="mqtt_username">Username</label>
-              <input type="text" id="mqtt_username" bind:value={config.config.MQTT.Username} />
-            </div>
-            <div class="form-group">
-              <label for="mqtt_password">Password</label>
-              <input type="password" id="mqtt_password" bind:value={config.config.MQTT.Password} />
-            </div>
-            <div class="form-group">
-              <label for="mqtt_prefix">Topic Prefix</label>
-              <input type="text" id="mqtt_prefix" bind:value={config.config.MQTT.TopicPrefix} />
-            </div>
-          </div>
+        <label class="toggle">
+          <span class="stack"><span class="toggle-title">MQTT enabled</span></span>
+          <input type="checkbox" bind:checked={config.config.MQTT.Enabled} />
+        </label>
+        <div class="fields">
+          <label class="field">Broker host
+            <input type="text" bind:value={config.config.MQTT.Host} />
+          </label>
+          <label class="field">Broker port
+            <input type="number" bind:value={config.config.MQTT.Port} />
+          </label>
+          <label class="field">Username
+            <input type="text" bind:value={config.config.MQTT.Username} />
+          </label>
+          <label class="field">Password
+            <input type="password" bind:value={config.config.MQTT.Password} />
+          </label>
+          <label class="field">Topic prefix
+            <input type="text" bind:value={config.config.MQTT.TopicPrefix} />
+          </label>
         </div>
         {/if}
 
-        <!-- HOMEKIT -->
         {#if activeTab === 'homekit'}
-        <div class="section">
-          <h2>🏠 HomeKit Configuration</h2>
-          <div class="form-grid">
-            <div class="form-group">
-              <label>
-                <input type="checkbox" bind:checked={config.config.HomeKit.Enabled} />
-                HomeKit Enabled
-              </label>
-            </div>
-            <div class="form-group">
-              <label for="hk_name">Bridge Name</label>
-              <input type="text" id="hk_name" bind:value={config.config.HomeKit.Name} />
-            </div>
-            <div class="form-group">
-              <label for="hk_port">Port</label>
-              <!-- text on purpose: HomeKit.Port is a string in the backend; a
-                   type="number" would send a number and break saving -->
-              <input type="text" id="hk_port" inputmode="numeric" bind:value={config.config.HomeKit.Port} />
-            </div>
-            <div class="form-group">
-              <label for="hk_pin">PIN</label>
-              <input type="text" id="hk_pin" bind:value={config.config.HomeKit.Pin} />
-            </div>
-            <div class="form-group">
-              <label for="hk_model">Model</label>
-              <input type="text" id="hk_model" bind:value={config.config.HomeKit.Model} />
-            </div>
-            <div class="form-group">
-              <label for="hk_manufacturer">Manufacturer</label>
-              <input type="text" id="hk_manufacturer" bind:value={config.config.HomeKit.Manufacturer} />
-            </div>
-          </div>
+        <label class="toggle">
+          <span class="stack"><span class="toggle-title">HomeKit enabled</span></span>
+          <input type="checkbox" bind:checked={config.config.HomeKit.Enabled} />
+        </label>
+        <div class="fields">
+          <label class="field">Bridge name
+            <input type="text" bind:value={config.config.HomeKit.Name} />
+          </label>
+          <label class="field">Port
+            <!-- text on purpose: HomeKit.Port is a string in the backend; a
+                 type="number" would send a number and break saving -->
+            <input type="text" inputmode="numeric" bind:value={config.config.HomeKit.Port} />
+          </label>
+          <label class="field">PIN
+            <input type="text" bind:value={config.config.HomeKit.Pin} />
+          </label>
+          <label class="field">Model
+            <input type="text" bind:value={config.config.HomeKit.Model} />
+          </label>
+          <label class="field">Manufacturer
+            <input type="text" bind:value={config.config.HomeKit.Manufacturer} />
+          </label>
         </div>
         {/if}
 
-        <!-- STREAMING -->
         {#if activeTab === 'streaming'}
-        <div class="section">
-          <h2>📹 Streaming Configuration</h2>
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="rtsp_port">RTSP Port</label>
-              <input type="number" id="rtsp_port" bind:value={config.config.Streaming.RTSPPort} />
-            </div>
-            <div class="form-group">
-              <label for="recording_path">Recording Path</label>
-              <input type="text" id="recording_path" bind:value={config.config.Streaming.RecordingPath} />
-            </div>
-          </div>
-
-          <h3>Video activation (safety)</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label title="Passive mirror of the native video during an incoming call. Sends no commands to the device bus.">
-                <input type="checkbox" bind:checked={config.config.Streaming.LiveOnCall} />
-                Live video on call
-              </label>
-            </div>
-            <div class="form-group">
-              <label title="⚠️ Self-INVITE / on-demand activation competes with the native firmware and may reboot the device. Enable only on a validated setup.">
-                <input type="checkbox" bind:checked={config.config.Streaming.VideoOnDemand} />
-                Video on demand ⚠️
-              </label>
-            </div>
-            <div class="form-group">
-              <label title="Bridge-initiated headless video (loopback self-call answered natively, display stays off) as an HA switch. Zero bus commands.">
-                <input type="checkbox" bind:checked={config.config.Streaming.CameraSession} />
-                Camera session
-              </label>
-            </div>
-            <div class="form-group">
-              <label for="camera_session_duration">Camera Session Duration (seconds)</label>
-              <input type="number" id="camera_session_duration" bind:value={config.config.Streaming.CameraSessionDuration} />
-            </div>
-            <div class="form-group">
-              <label for="video_backend">Video Backend</label>
-              <select id="video_backend" bind:value={config.config.Streaming.VideoBackend}>
-                <option value="avmedia">avmedia (cooperative, recommended)</option>
-                <option value="gstreamer">gstreamer (competes with native)</option>
-                <option value="auto">auto</option>
-              </select>
-            </div>
-          </div>
+        <div class="fields">
+          <label class="field">RTSP port
+            <input type="number" bind:value={config.config.Streaming.RTSPPort} />
+          </label>
+          <label class="field">Recording path
+            <input type="text" bind:value={config.config.Streaming.RecordingPath} />
+          </label>
+        </div>
+        <h3>Video activation (safety)</h3>
+        <label class="toggle">
+          <span class="stack">
+            <span class="toggle-title">Live video on call</span>
+            <span class="muted small">Passive mirror of the native video during an incoming call. Sends no commands to the device bus.</span>
+          </span>
+          <input type="checkbox" bind:checked={config.config.Streaming.LiveOnCall} />
+        </label>
+        <label class="toggle warn">
+          <span class="stack">
+            <span class="toggle-title"><Icon icon={TriangleExclamationPoint} size={16} />Video on demand</span>
+            <span class="muted small">Self-INVITE / on-demand activation competes with the native firmware and may reboot the device. Enable only on a validated setup.</span>
+          </span>
+          <input type="checkbox" bind:checked={config.config.Streaming.VideoOnDemand} />
+        </label>
+        <label class="toggle">
+          <span class="stack">
+            <span class="toggle-title">Camera session</span>
+            <span class="muted small">Bridge-initiated headless video (loopback self-call answered natively, display stays off) as an HA switch. Zero bus commands.</span>
+          </span>
+          <input type="checkbox" bind:checked={config.config.Streaming.CameraSession} />
+        </label>
+        <div class="fields">
+          <label class="field">Camera session duration (seconds)
+            <input type="number" bind:value={config.config.Streaming.CameraSessionDuration} />
+          </label>
+          <label class="field">Video backend
+            <select bind:value={config.config.Streaming.VideoBackend}>
+              <option value="avmedia">avmedia (cooperative, recommended)</option>
+              <option value="gstreamer">gstreamer (competes with native)</option>
+              <option value="auto">auto</option>
+            </select>
+          </label>
         </div>
         {/if}
 
-        <!-- SECURITY -->
         {#if activeTab === 'security'}
-        <div class="section">
-          <h2>🔒 Security</h2>
-          <div class="form-grid">
-            <div class="form-group">
-              <label title="Protects the whole dashboard and API with HTTP Basic Auth. Requires a password below.">
-                <input type="checkbox" bind:checked={config.config.Security.WebAuthRequired} />
-                Web Auth Required
-              </label>
-            </div>
-            <div class="form-group">
-              <label for="web_username">Web Username</label>
-              <input type="text" id="web_username" bind:value={config.config.Security.WebUsername} />
-            </div>
-            <div class="form-group">
-              <label for="web_password">Web Password</label>
-              <input type="password" id="web_password" bind:value={config.config.Security.WebPassword} />
-            </div>
-          </div>
+        <label class="toggle">
+          <span class="stack">
+            <span class="toggle-title">Web auth required</span>
+            <span class="muted small">Protects the whole dashboard and API with HTTP Basic Auth. Requires a password below.</span>
+          </span>
+          <input type="checkbox" bind:checked={config.config.Security.WebAuthRequired} />
+        </label>
+        <div class="fields">
+          <label class="field">Web username
+            <input type="text" bind:value={config.config.Security.WebUsername} />
+          </label>
+          <label class="field">Web password
+            <input type="password" bind:value={config.config.Security.WebPassword} />
+          </label>
         </div>
         {/if}
 
-        <!-- OPENWEBNET -->
         {#if activeTab === 'openwebnet'}
-        <div class="section">
-          <h2>🔌 OpenWebNet Configuration</h2>
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="own_host">OpenWebNet Host</label>
-              <input type="text" id="own_host" bind:value={config.config.OpenWebNet.Host} />
-            </div>
-            <div class="form-group">
-              <label for="own_timeout">Timeout (ns)</label>
-              <input type="number" id="own_timeout" bind:value={config.config.OpenWebNet.Timeout} />
-            </div>
-            <div class="form-group">
-              <label for="retry_attempts">Retry Attempts</label>
-              <input type="number" id="retry_attempts" bind:value={config.config.OpenWebNet.RetryAttempts} />
-            </div>
-            <div class="form-group">
-              <label for="retry_delay">Retry Delay (ns)</label>
-              <input type="number" id="retry_delay" bind:value={config.config.OpenWebNet.RetryDelay} />
-            </div>
-          </div>
+        <div class="fields">
+          <label class="field">OpenWebNet host
+            <input type="text" bind:value={config.config.OpenWebNet.Host} />
+          </label>
+          <label class="field">Timeout (ns)
+            <input type="number" bind:value={config.config.OpenWebNet.Timeout} />
+          </label>
+          <label class="field">Retry attempts
+            <input type="number" bind:value={config.config.OpenWebNet.RetryAttempts} />
+          </label>
+          <label class="field">Retry delay (ns)
+            <input type="number" bind:value={config.config.OpenWebNet.RetryDelay} />
+          </label>
         </div>
         {/if}
-      </div>
-
-      <div class="actions">
-        <button class="btn btn-primary" on:click={saveConfig} disabled={saving}>
-          {#if saving}⏳ Saving...{:else}💾 Save Configuration{/if}
-        </button>
-        <button class="btn btn-secondary" on:click={loadConfig}>🔄 Reload</button>
-      </div>
-    {/if}
-  </div>
+      </section>
+    </div>
+  {/if}
 
   {#if showWizard}
   <div class="modal-overlay">
-    <div class="modal">
-      <h2>🔍 Discover Unit Address</h2>
+    <div class="modal card" role="dialog" aria-modal="true" aria-labelledby="wizard-title">
+      <h2 id="wizard-title"><Icon icon={Search} />Discover unit address</h2>
       {#if wizardStep === 1}
         <p>The bridge listens passively for your next app call and reads its unit address. Nothing is sent until verification.</p>
         <p><strong>Requirements</strong></p>
@@ -479,36 +428,36 @@
           <li>Door Entry app connected with your device</li>
           <li>Camera session working from the app</li>
         </ul>
-        <label>
+        <label class="check">
           <input type="checkbox" bind:checked={wizardReady} />
           I have the app open, ready to start a camera view
         </label>
-        {#if wizardError}<div class="error-banner">{wizardError}</div>{/if}
+        {#if wizardError}<div class="banner bad">{wizardError}</div>{/if}
         <div class="modal-actions">
-          <button class="btn btn-secondary" on:click={closeWizard}>Cancel</button>
-          <button class="btn btn-primary" on:click={startDiscover} disabled={!wizardReady || wizardBusy}>
-            {#if wizardBusy}⏳ Arming...{:else}Start discovery{/if}
+          <button type="button" class="btn" on:click={closeWizard}>Cancel</button>
+          <button type="button" class="btn primary" on:click={startDiscover} disabled={!wizardReady || wizardBusy}>
+            {wizardBusy ? 'Arming…' : 'Start discovery'}
           </button>
         </div>
       {:else if wizardStep === 2}
-        <p>🎧 Listening… <strong>start a camera view in your app now</strong> (30s window).</p>
-        {#if wizardError}<div class="error-banner">{wizardError}</div>{/if}
+        <p>Listening… <strong>start a camera view in your app now</strong> (30 s window).</p>
+        {#if wizardError}<div class="banner bad">{wizardError}</div>{/if}
         <div class="modal-actions">
-          <button class="btn btn-secondary" on:click={closeWizard}>Cancel</button>
+          <button type="button" class="btn" on:click={closeWizard}>Cancel</button>
         </div>
       {:else}
         <p>Found unit address:</p>
         <code>{discoverValue}</code>
         {#if verifyResult && verifyResult.valid}
-          <div class="success-banner">✅ Verified — the unit answers this address</div>
+          <div class="banner ok"><Icon icon={CircleCheck} />Verified — the unit answers this address</div>
         {:else if verifyResult && verifyResult.busy}
-          <div class="error-banner">⏳ Unit busy — retry when no session is running</div>
+          <div class="banner warn">Unit busy — retry when no session is running</div>
         {:else if verifyResult}
-          <div class="error-banner">⚠️ Unverified ({verifyResult.error || 'rejected'}) — you can still apply it manually</div>
+          <div class="banner warn">Unverified ({verifyResult.error || 'rejected'}) — you can still apply it manually</div>
         {/if}
         <div class="modal-actions">
-          <button class="btn btn-secondary" on:click={closeWizard}>Keep current</button>
-          <button class="btn btn-primary" on:click={applyValue} disabled={saving}>Use this value</button>
+          <button type="button" class="btn" on:click={closeWizard}>Keep current</button>
+          <button type="button" class="btn primary" on:click={applyValue} disabled={saving}>Use this value</button>
         </div>
       {/if}
     </div>
@@ -517,230 +466,203 @@
 </div>
 
 <style>
-  :global(body) {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #f5f5f5;
+  .page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px 22px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
   }
-  
-  .page-header {
-    background: linear-gradient(135deg, #2196F3, #1976D2);
-    color: white;
-    padding: 1rem 2rem;
-    position: relative;
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
   }
-  
-  .page-header h1 {
-    margin: 0;
-    font-size: 1.5rem;
+
+  .stack { display: flex; flex-direction: column; }
+  .gap4 { gap: 4px; }
+  .muted { color: var(--text-muted); font-size: 14px; }
+  .small { font-size: 13px; }
+
+  .page-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
   }
-  
-  .success-banner {
-    position: absolute;
-    right: 2rem;
-    top: 50%;
-    transform: translateY(-50%);
-    background: #4CAF50;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
+  .page-head .stack { gap: 4px; }
+  h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+  .actions { display: flex; gap: 8px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
   }
+  .btn:hover { background: var(--chip); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #FFFFFF; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.1); }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 11px;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: pre-line;
+  }
+  .banner.ok { background: var(--ok-soft); color: var(--ok); }
+  .banner.bad { background: #FEF2F2; color: #B91C1C; }
+  .banner.warn { background: var(--warn-soft); color: var(--warn); }
+
+  .layout { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+
+  .side {
+    flex: 1 1 220px;
+    max-width: 260px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .side button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--text-label);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+  }
+  .side button:hover { background: var(--chip); }
+  .side button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+  .section {
+    flex: 999 1 560px;
+    min-width: 0;
+    padding: 20px 22px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  h2 { margin: 0; font-size: 18px; font-weight: 700; }
+  h3 { margin: 4px 0 -8px; font-size: 15px; font-weight: 600; color: var(--text-label); }
+
+  .fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px 18px;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-label);
+  }
+  .field small { font-weight: 400; color: var(--text-muted); }
+  input[type="text"], input[type="number"], input[type="password"], select {
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid #D5D9E0;
+    border-radius: 9px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text);
+    background: var(--surface);
+    box-sizing: border-box;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .input-row { display: flex; gap: 8px; }
+  .input-row input { flex: 1; min-width: 0; }
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface);
+    color: var(--text-label);
+    cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--chip); }
+
+  .toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+  .toggle .stack { gap: 2px; }
+  .toggle-title { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
+  .toggle.warn { border-color: var(--warn-border); background: var(--warn-soft); }
+  .toggle.warn .toggle-title { color: var(--warn); }
+  input[type="checkbox"] { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--accent); }
+
+  .loading { text-align: center; padding: 3rem; font-size: 1.2rem; }
 
   .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(20, 23, 28, 0.45);
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    padding: 16px;
+    z-index: 200;
   }
-
   .modal {
-    background: white;
-    padding: 1.5rem 2rem;
-    border-radius: 8px;
     max-width: 520px;
-    width: 90%;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
-  }
-
-  .modal h2 {
-    margin-top: 0;
-  }
-
-  .modal-actions {
-    display: flex;
-    gap: 0.5rem;
-    justify-content: flex-end;
-    margin-top: 1rem;
-  }
-
-  .modal code {
-    display: block;
-    background: #f5f5f5;
-    padding: 0.5rem;
-    border-radius: 4px;
-    word-break: break-all;
-    margin: 0.5rem 0;
-  }
-
-  .error-banner {
-    background: #ffebee;
-    color: #c62828;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    margin-top: 0.5rem;
-  }
-
-  .input-row {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .input-row input {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .input-row .btn-icon {
-    flex: 0 0 auto;
-    padding-left: 0.6rem;
-    padding-right: 0.6rem;
-  }
-  
-  .container {
-    max-width: 1000px;
-    margin: 0 auto;
-    padding: 1rem 2rem 2rem;
-  }
-  
-  .tabs {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-    border-bottom: 2px solid #ddd;
-    padding-bottom: 0.5rem;
-    overflow-x: auto;
-    flex-wrap: wrap;
-  }
-  
-  .tab {
-    padding: 0.5rem 1rem;
-    border: none;
-    background: #e0e0e0;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    white-space: nowrap;
-  }
-  
-  .tab.active {
-    background: #2196F3;
-    color: white;
-  }
-  
-  .tab-content {
-    background: white;
-    padding: 1.5rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-  
-  .section h2 {
-    margin: 0 0 1rem 0;
-    color: #333;
-    border-bottom: 2px solid #2196F3;
-    padding-bottom: 0.5rem;
-  }
-  
-  .section h3 {
-    margin: 1.5rem 0 1rem 0;
-    color: #666;
-    font-size: 1rem;
-  }
-  
-  .form-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 1rem;
-  }
-  
-  .form-group {
-    margin-bottom: 0.5rem;
-  }
-  
-  .form-group label {
-    display: block;
-    margin-bottom: 0.25rem;
-    font-weight: 600;
-    color: #555;
-    font-size: 0.9rem;
-  }
-  
-  .form-group input[type="text"],
-  .form-group input[type="number"],
-  .form-group input[type="password"],
-  .form-group select {
     width: 100%;
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 0.95rem;
-    box-sizing: border-box;
-  }
-  
-  .form-group input[type="checkbox"] {
-    width: auto;
-    margin-right: 0.5rem;
-  }
-  
-  .error-banner {
-    background: #FFEBEE;
-    color: #f44336;
-    padding: 1rem;
-    border-radius: 4px;
-    margin-bottom: 1rem;
-    white-space: pre-wrap;
-  }
-  
-  .actions {
-    margin-top: 1.5rem;
+    padding: 22px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
     display: flex;
-    gap: 1rem;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 14px;
   }
-  
-  .btn {
-    padding: 0.75rem 2rem;
-    border: none;
-    border-radius: 4px;
-    font-size: 1rem;
-    cursor: pointer;
-  }
-  
-  .btn-primary {
-    background: #2196F3;
-    color: white;
-  }
-  
-  .btn-secondary {
-    background: #e0e0e0;
-    color: #333;
-  }
-  
-  .btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-  
-  .loading, .error {
-    text-align: center;
-    padding: 3rem;
-    font-size: 1.2rem;
+  .modal h2 { display: flex; align-items: center; gap: 10px; }
+  .modal p, .modal ul { margin: 0; }
+  .modal code {
+    font-family: var(--font-mono);
+    background: var(--chip);
+    padding: 8px 12px;
     border-radius: 8px;
+    word-break: break-all;
   }
-  
-  .error {
-    background: #FFEBEE;
-    color: #f44336;
-  }
+  .check { display: flex; align-items: center; gap: 10px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 </style>

@@ -6,6 +6,8 @@
   import Messages from './routes/messages/+page.svelte'
   import Memos from './routes/memos/+page.svelte'
   import Logs from './routes/logs/+page.svelte'
+  import Icon from './lib/Icon.svelte'
+  import { Server, LayoutDashboard, Settings as SettingsIcon, SlidersHorizontal, Voicemail, StickyNote, ScrollText } from 'lucide'
   
   let currentRoute = 'dashboard'
   let status = null
@@ -35,25 +37,27 @@
 </script>
 
 <main class="app">
-  <nav class="navbar">
-    <h1>
-      🚀 BTicino Bridge
-      {#if status?.version}
-      <span class="version">{status.version}</span>
-      {/if}
-    </h1>
-    <div class="nav-links">
-      <a href="#dashboard" class={currentRoute === 'dashboard' ? 'active' : ''}>Dashboard</a>
-      <a href="#settings" class={currentRoute === 'settings' ? 'active' : ''}>Settings</a>
-      <a href="#controls" class={currentRoute === 'controls' ? 'active' : ''}>Controls</a>
-      {#if status?.device?.answering_machine}
-      <a href="#messages" class={currentRoute === 'messages' ? 'active' : ''}>Messages</a>
-      <a href="#memos" class={currentRoute === 'memos' ? 'active' : ''}>Notes</a>
-      {/if}
-      <a href="#logs" class={currentRoute === 'logs' ? 'active' : ''}>Logs</a>
-      <a href="/api/docs/" target="_blank" class="external-link">API Docs ↗</a>
+  <header class="navbar">
+    <div class="navbar-inner">
+      <div class="brand">
+        <span class="brand-icon"><Icon icon={Server} size={20} /></span>
+        <span class="brand-name">BTicino Bridge</span>
+        {#if status?.version}
+        <span class="version">{status.version}</span>
+        {/if}
+      </div>
+      <nav class="nav-links" aria-label="Main">
+        <a href="#dashboard" class:active={currentRoute === 'dashboard'}><Icon icon={LayoutDashboard} />Dashboard</a>
+        <a href="#settings" class:active={currentRoute === 'settings'}><Icon icon={SettingsIcon} />Settings</a>
+        <a href="#controls" class:active={currentRoute === 'controls'}><Icon icon={SlidersHorizontal} />Controls</a>
+        {#if status?.device?.answering_machine}
+        <a href="#messages" class:active={currentRoute === 'messages'}><Icon icon={Voicemail} />Messages</a>
+        <a href="#memos" class:active={currentRoute === 'memos'}><Icon icon={StickyNote} />Notes</a>
+        {/if}
+        <a href="#logs" class:active={currentRoute === 'logs'}><Icon icon={ScrollText} />Logs</a>
+      </nav>
     </div>
-  </nav>
+  </header>
 
   <div class="content">
     {#if currentRoute === 'dashboard'}
@@ -78,99 +82,140 @@
 </main>
 
 <style>
+  /* Design tokens. The dashboard uses them; other pages can follow. */
+  :global(:root) {
+    --bg: #F4F5F7;
+    --surface: #FFFFFF;
+    --border: #E3E6EB;
+    --divider: #F0F1F4;
+    --text: #14171C;
+    --text-muted: #5B6370;
+    --text-label: #4B5361;
+    --chip: #EEF0F3;
+    --accent: #0E7490;
+    --accent-strong: #155E75;
+    --accent-soft: #E6F4F7;
+    --ok: #166534;
+    --ok-soft: #DCFCE7;
+    --ok-dot: #16A34A;
+    --warn: #9A3412;
+    --warn-icon: #C2410C;
+    --warn-soft: #FFF7ED;
+    --warn-icon-bg: #FFEDD5;
+    --warn-border: #FDBA74;
+    --radius-sm: 11px;
+    --radius: 13px;
+    --radius-lg: 15px;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
   :global(body) {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #f5f5f5;
+    background: var(--bg);
+    color: var(--text);
   }
-  
+
   .app {
     min-height: 100vh;
   }
-  
+
   .navbar {
-    background: linear-gradient(135deg, #2196F3, #1976D2);
-    color: white;
-    padding: 1rem 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
     position: sticky;
     top: 0;
     z-index: 100;
   }
-  
-  .navbar h1 {
-    margin: 0;
-    font-size: 1.5rem;
+
+  .navbar-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 12px 22px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .brand {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 10px;
   }
-  
+
+  .brand-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .brand-name {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
   .version {
-    font-size: 0.8rem;
-    opacity: 0.8;
-    font-weight: normal;
-    background: rgba(255,255,255,0.2);
-    padding: 0.25rem 0.75rem;
-    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-label);
+    background: var(--chip);
+    border-radius: 999px;
+    padding: 3px 10px;
   }
-  
+
   .nav-links {
     display: flex;
-    gap: 0.5rem;
+    flex-wrap: wrap;
+    gap: 4px;
   }
-  
+
   .nav-links a {
-    color: white;
-    text-decoration: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 14px;
+    border-radius: 10px;
+    color: var(--text-label);
+    font-size: 14px;
     font-weight: 500;
+    text-decoration: none;
   }
-  
+
   .nav-links a:hover {
-    background: rgba(255,255,255,0.2);
+    background: var(--chip);
   }
-  
+
   .nav-links a.active {
-    background: rgba(255,255,255,0.3);
+    background: var(--accent-soft);
+    color: var(--accent);
     font-weight: 600;
   }
-  
-  .nav-links a.external-link {
-    background: rgba(255,255,255,0.15);
-    border: 1px solid rgba(255,255,255,0.3);
-  }
-  
-  .nav-links a.external-link:hover {
-    background: rgba(255,255,255,0.3);
-  }
-  
-  .content {
-    padding: 0;
-  }
-  
+
   .not-found {
     text-align: center;
     padding: 4rem 2rem;
   }
-  
+
   .not-found h2 {
-    color: #333;
     font-size: 2rem;
     margin-bottom: 1rem;
   }
-  
+
   .not-found a {
-    color: #2196F3;
+    color: var(--accent);
     text-decoration: none;
     font-weight: 600;
   }
-  
+
   .not-found a:hover {
     text-decoration: underline;
   }

@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+- Web UI redesign with Lucide icons and shared design tokens:
+  - Dashboard: a device card with the exact model (`<modello>` from
+    `/var/tmp/conf.xml`, e.g. "Classe 100 X16E"), variant and firmware stamp;
+    system tiles for uptime (bridge and device), flash usage of
+    `/home/bticino/cfg/extra`, memory and CPU temperature; MQTT moved to the
+    connections; GPIO collapsed by default. `/api/status` adds
+    `device.firmware` and a `system` block; a value that cannot be read is
+    left out. The API Docs link left the navigation; `/api/docs/` still works.
+  - Settings: sections in a side menu, on/off options as rows with their
+    explanation shown instead of a tooltip, Save and Reload in the page
+    header. The fields are unchanged.
+  - Controls: cards with icon and state, restart and reboot in a red System
+    section. An error shows as a line above the controls instead of
+    replacing the page. The unused mute control code is gone.
+  - Logs: log fields shown under each message. Fixed: the Warn filter and the
+    warning count never matched (logrus reports `warning`, the page looked
+    for `warn`), unticking Auto-refresh did not stop it, and Clear is now
+    Clear view, as it only empties the view.
+
 - The Controls page hides display, doorbell sound and voicemail on the
   Classe 100X, which ignores those commands or has no answering machine
   (as MQTT already did). `/api/status` reports `device.remote_set_commands`.

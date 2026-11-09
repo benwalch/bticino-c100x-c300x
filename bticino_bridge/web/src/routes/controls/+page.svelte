@@ -1,11 +1,12 @@
 <script>
   import { onMount } from 'svelte'
+  import Icon from '../../lib/Icon.svelte'
+  import { Lock, LockOpen, Lightbulb, Bell, Monitor, Voicemail, RotateCcw, Power, RefreshCw, CircleCheck } from 'lucide'
   
   let controls = {
     door: { locked: true, loading: false },
     voicemail: { enabled: false, loading: false },
     display: { on: true, loading: false },
-    mute: { on: false, loading: false },
     doorbell_sound: { on: true, loading: false },
     light: { on: false, loading: false }
   }
@@ -42,9 +43,6 @@
       if (deviceData.success && deviceData.config) {
         const answering = deviceData.config.answering || {}
         controls.voicemail.enabled = answering.activated === true || answering.activated === 1
-        
-        const volumes = deviceData.config.volumes || {}
-        controls.mute.on = volumes.s0 === 0 && volumes.s1 === 0
       }
       
       if (statusData.leds) {
@@ -72,7 +70,8 @@
       const response = await fetch('/api/system/restart-bridge', { method: 'POST' })
       const result = await response.json()
       if (result.success) {
-        success = '🔄 Bridge restarting… this page will reconnect in ~10s'
+        error = null
+        success = 'Bridge restarting… this page will reconnect in about 10 s'
         setTimeout(() => location.reload(), 12000)
       } else {
         error = result.message || 'Failed'
@@ -93,7 +92,8 @@
       const response = await fetch('/api/system/reboot', { method: 'POST' })
       const result = await response.json()
       if (result.success) {
-        success = '♻️ Device rebooting — back in 1-2 minutes'
+        error = null
+        success = 'Device rebooting — back in 1–2 minutes'
       } else {
         error = result.message || 'Failed'
       }
@@ -112,6 +112,7 @@
       const result = await response.json()
       
       if (result.success) {
+        error = null
         controls.voicemail.enabled = !controls.voicemail.enabled
         success = `Voicemail ${action === 'enable' ? 'enabled' : 'disabled'}`
         setTimeout(() => success = null, 3000)
@@ -125,27 +126,6 @@
     }
   }
   
-  async function toggleMute() {
-    const action = controls.mute.on ? 'off' : 'on'
-    try {
-      controls.mute.loading = true
-      const response = await fetch(`/api/controls/mute/${action}`, { method: 'POST' })
-      const result = await response.json()
-      
-      if (result.success) {
-        controls.mute.on = !controls.mute.on
-        success = `Mute ${action === 'on' ? 'activated' : 'deactivated'}`
-        setTimeout(() => success = null, 3000)
-      } else {
-        error = result.message || 'Failed'
-      }
-    } catch (e) {
-      error = e.message
-    } finally {
-      controls.mute.loading = false
-    }
-  }
-  
   async function toggleDoorbellSound() {
     const action = controls.doorbell_sound.on ? 'off' : 'on'
     try {
@@ -154,6 +134,7 @@
       const result = await response.json()
       
       if (result.success) {
+        error = null
         controls.doorbell_sound.on = !controls.doorbell_sound.on
         success = `Doorbell sound ${action === 'on' ? 'enabled' : 'disabled'}`
         setTimeout(() => success = null, 3000)
@@ -175,6 +156,7 @@
       const result = await response.json()
       
       if (result.success) {
+        error = null
         controls.display.on = !controls.display.on
         success = `Display ${action === 'on' ? 'turned on' : 'turned off'}`
         setTimeout(() => success = null, 3000)
@@ -195,7 +177,8 @@
       const result = await response.json()
       
       if (result.success) {
-        success = '🚪 Door unlocked!'
+        error = null
+        success = 'Door unlocked'
         setTimeout(() => success = null, 3000)
       } else {
         error = result.message || 'Failed'
@@ -214,7 +197,8 @@
       const result = await response.json()
       
       if (result.success) {
-        success = '💡 Staircase light activated'
+        error = null
+        success = 'Staircase light activated'
         setTimeout(() => success = null, 3000)
       } else {
         error = result.message || 'Failed'
@@ -227,195 +211,208 @@
   }
 </script>
 
-<div class="controls-page">
-  <div class="page-header">
-    <h1>🎮 Controls</h1>
-    <button class="refresh-btn" on:click={loadControls}>🔄</button>
+<div class="page">
+  <div class="page-head">
+    <div class="stack gap4">
+      <h1>Controls</h1>
+      <span class="muted">Commands go to the intercom over OpenWebNet.</span>
+    </div>
+    <button type="button" class="btn" on:click={loadControls}><Icon icon={RefreshCw} size={16} />Refresh</button>
   </div>
 
-  <div class="container">
-    {#if loading}
-      <div class="loading">Loading controls...</div>
-    {:else if error}
-      <div class="error">Error: {error}</div>
-    {:else}
-      {#if success}
-      <div class="success">✅ {success}</div>
-      {/if}
-      
-      <h2>Quick Controls</h2>
-      
-      <div class="controls-grid">
-        <div class="control-card">
-          <div class="control-icon">🚪</div>
-          <h3>Door Lock</h3>
-          <p class="status">🔒 Locked</p>
-          <button class="btn btn-primary" on:click={unlockDoor} disabled={controls.door.loading}>
-            {controls.door.loading ? '⏳ Opening...' : '🔓 Unlock Door'}
+  {#if success}
+  <div class="banner ok" role="status"><Icon icon={CircleCheck} />{success}</div>
+  {/if}
+  {#if error}
+  <div class="banner bad" role="alert">Error: {error}</div>
+  {/if}
+
+  {#if loading}
+    <div class="loading">Loading controls...</div>
+  {:else}
+    <section class="block" aria-labelledby="h-quick">
+      <h2 id="h-quick">Quick controls</h2>
+      <div class="grid">
+        <div class="card control">
+          <div class="control-head">
+            <div class="control-icon accent"><Icon icon={Lock} size={20} /></div>
+            <div class="stack"><span class="control-name">Door lock</span><span class="muted small">Locked</span></div>
+          </div>
+          <button type="button" class="btn primary" on:click={unlockDoor} disabled={controls.door.loading}>
+            <Icon icon={LockOpen} size={16} />{controls.door.loading ? 'Opening…' : 'Unlock door'}
           </button>
         </div>
+
+        <div class="card control">
+          <div class="control-head">
+            <div class="control-icon"><Icon icon={Lightbulb} size={20} /></div>
+            <div class="stack"><span class="control-name">Staircase light</span><span class="muted small">{controls.light.on ? 'On' : 'Off'}</span></div>
+          </div>
+          <button type="button" class="btn primary" on:click={toggleLight} disabled={controls.light.loading}>
+            {controls.light.loading ? 'Switching…' : 'Turn on'}
+          </button>
+        </div>
+
+        {#if device.remote_set_commands}
+        <div class="card control">
+          <div class="control-head">
+            <div class="control-icon"><Icon icon={Bell} size={20} /></div>
+            <div class="stack"><span class="control-name">Doorbell sound</span><span class="muted small">{controls.doorbell_sound.on ? 'Enabled' : 'Disabled'}</span></div>
+          </div>
+          <button type="button" class="btn" on:click={toggleDoorbellSound} disabled={controls.doorbell_sound.loading}>
+            {controls.doorbell_sound.loading ? '…' : (controls.doorbell_sound.on ? 'Disable' : 'Enable')}
+          </button>
+        </div>
+
+        <div class="card control">
+          <div class="control-head">
+            <div class="control-icon"><Icon icon={Monitor} size={20} /></div>
+            <div class="stack"><span class="control-name">Display</span><span class="muted small">{controls.display.on ? 'On' : 'Off'}</span></div>
+          </div>
+          <button type="button" class="btn" on:click={toggleDisplay} disabled={controls.display.loading}>
+            {controls.display.loading ? '…' : (controls.display.on ? 'Turn off' : 'Turn on')}
+          </button>
+        </div>
+        {/if}
 
         {#if device.answering_machine}
-        <div class="control-card">
-          <div class="control-icon">📼</div>
-          <h3>Voicemail</h3>
-          <p class="status">{controls.voicemail.enabled ? '✅ Enabled' : '❌ Disabled'}</p>
-          <button class="btn btn-secondary" on:click={toggleVoicemail} disabled={controls.voicemail.loading}>
-            {controls.voicemail.loading ? '⏳...' : (controls.voicemail.enabled ? 'Disable' : 'Enable')}
+        <div class="card control">
+          <div class="control-head">
+            <div class="control-icon"><Icon icon={Voicemail} size={20} /></div>
+            <div class="stack"><span class="control-name">Voicemail</span><span class="muted small">{controls.voicemail.enabled ? 'Enabled' : 'Disabled'}</span></div>
+          </div>
+          <button type="button" class="btn" on:click={toggleVoicemail} disabled={controls.voicemail.loading}>
+            {controls.voicemail.loading ? '…' : (controls.voicemail.enabled ? 'Disable' : 'Enable')}
           </button>
         </div>
         {/if}
+      </div>
+    </section>
 
-        {#if device.remote_set_commands}
-        <div class="control-card">
-          <div class="control-icon">📱</div>
-          <h3>Display</h3>
-          <p class="status">{controls.display.on ? '✅ On' : '⬛ Off'}</p>
-          <button class="btn btn-secondary" on:click={toggleDisplay} disabled={controls.display.loading}>
-            {controls.display.loading ? '⏳...' : (controls.display.on ? 'Turn Off' : 'Turn On')}
+    <section class="block" aria-labelledby="h-system">
+      <h2 id="h-system">System</h2>
+      <div class="grid wide">
+        <div class="card danger">
+          <div class="control-head">
+            <div class="control-icon red"><Icon icon={RotateCcw} size={20} /></div>
+            <div class="stack"><span class="control-name">Restart bridge</span><span class="muted small">Web, MQTT and HomeKit drop for about 5 s</span></div>
+          </div>
+          <button type="button" class="btn danger-outline" on:click={restartBridge} disabled={system.restart.loading}>
+            {system.restart.loading ? '…' : 'Restart'}
           </button>
         </div>
-        {/if}
 
-        <!-- Mute removed - integrated into doorbell_sound -->
-        <!--
-        <div class="control-card">
-          <div class="control-icon">🔇</div>
-          <h3>Mute</h3>
-          <p class="status">{controls.mute.on ? '🔇 Muted' : '🔊 Unmuted'}</p>
-          <button class="btn btn-secondary" on:click={toggleMute} disabled={controls.mute.loading}>
-            {controls.mute.loading ? '⏳...' : (controls.mute.on ? 'Unmute' : 'Mute')}
-          </button>
-        </div>
-        -->
-
-        {#if device.remote_set_commands}
-        <div class="control-card">
-          <div class="control-icon">🔔</div>
-          <h3>Doorbell Sound</h3>
-          <p class="status">{controls.doorbell_sound.on ? '🔔 Enabled' : '🔕 Disabled'}</p>
-          <button class="btn btn-secondary" on:click={toggleDoorbellSound} disabled={controls.doorbell_sound.loading}>
-            {controls.doorbell_sound.loading ? '⏳...' : (controls.doorbell_sound.on ? 'Disable' : 'Enable')}
-          </button>
-        </div>
-        {/if}
-
-        <div class="control-card">
-          <div class="control-icon">💡</div>
-          <h3>Staircase Light</h3>
-          <p class="status">{controls.light.on ? '💡 On' : '⚫ Off'}</p>
-          <button class="btn btn-primary" on:click={toggleLight} disabled={controls.light.loading}>
-            {controls.light.loading ? '⏳...' : 'Turn On'}
+        <div class="card danger">
+          <div class="control-head">
+            <div class="control-icon red"><Icon icon={Power} size={20} /></div>
+            <div class="stack"><span class="control-name">Reboot device</span><span class="muted small">Whole intercom offline for 1–2 min</span></div>
+          </div>
+          <button type="button" class="btn danger-solid" on:click={rebootDevice} disabled={system.reboot.loading}>
+            {system.reboot.loading ? '…' : 'Reboot'}
           </button>
         </div>
       </div>
-
-      <h2>System</h2>
-      <div class="controls-grid">
-        <div class="control-card danger-card">
-          <div class="control-icon">🔄</div>
-          <h3>Restart Bridge</h3>
-          <p class="status">Web, MQTT & HomeKit drop for ~5s</p>
-          <button class="btn btn-danger" on:click={restartBridge} disabled={system.restart.loading}>
-            {system.restart.loading ? '⏳...' : 'Restart Bridge'}
-          </button>
-        </div>
-
-        <div class="control-card danger-card">
-          <div class="control-icon">♻️</div>
-          <h3>Reboot Device</h3>
-          <p class="status">Whole intercom offline 1-2 min</p>
-          <button class="btn btn-danger" on:click={rebootDevice} disabled={system.reboot.loading}>
-            {system.reboot.loading ? '⏳...' : 'Reboot Device'}
-          </button>
-        </div>
-      </div>
-    {/if}
-  </div>
+    </section>
+  {/if}
 </div>
 
 <style>
-  .controls-page { min-height: 100vh; }
-  
-  .page-header {
-    background: linear-gradient(135deg, #2196F3, #1976D2);
-    color: white;
-    padding: 1rem 2rem;
+  .page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px 22px 40px;
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 26px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .stack { display: flex; flex-direction: column; }
+  .gap4 { gap: 4px; }
+  .muted { color: var(--text-muted); font-size: 14px; }
+  .small { font-size: 13px; }
+
+  .page-head {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: space-between;
+    gap: 12px;
   }
-  
-  .page-header h1 { margin: 0; font-size: 1.5rem; }
-  
-  .refresh-btn {
-    background: rgba(255,255,255,0.2);
-    border: none;
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 1.2rem;
+  h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+  h2 { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-label); }
+
+  .block { display: flex; flex-direction: column; gap: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .grid.wide { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+
+  .control { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .danger {
+    border-color: #FECACA;
+    padding: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
   }
-  
-  .container { max-width: 1200px; margin: 0 auto; padding: 1rem 2rem 2rem; }
-  
-  h2 {
-    color: #333;
-    margin-bottom: 1rem;
-    border-bottom: 2px solid #2196F3;
-    padding-bottom: 0.5rem;
+  .control-head { display: flex; align-items: center; gap: 12px; }
+  .control-name { font-size: 15px; font-weight: 600; }
+  .control-icon {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: 11px;
+    background: var(--chip);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  
-  .controls-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-  }
-  
-  .control-card {
-    background: white;
-    padding: 1.5rem;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    text-align: center;
-    transition: transform 0.3s;
-  }
-  
-  .control-card:hover { transform: translateY(-4px); }
-  .control-icon { font-size: 3rem; margin-bottom: 0.5rem; }
-  .control-card h3 { margin: 0.5rem 0; color: #333; }
-  .status { color: #666; margin-bottom: 1rem; font-weight: 600; }
-  
+  .control-icon.accent { background: var(--accent-soft); color: var(--accent); }
+  .control-icon.red { background: #FEF2F2; color: #B91C1C; }
+
   .btn {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 6px;
-    font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 42px;
+    padding: 0 16px;
+    border-radius: 10px;
+    border: 1px solid #D5D9E0;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s;
-    width: 100%;
   }
-  
-  .btn-primary { background: #2196F3; color: white; }
-  .btn-primary:hover { background: #1976D2; }
-  .btn-secondary { background: #4CAF50; color: white; }
-  .btn-secondary:hover { background: #388E3C; }
-  .btn-danger { background: #f44336; color: white; }
-  .btn-danger:hover { background: #d32f2f; }
+  .btn:hover { background: var(--chip); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #FFFFFF; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.1); }
+  .btn.danger-outline { border-color: #B91C1C; color: #B91C1C; font-weight: 600; }
+  .btn.danger-outline:hover { background: #FEF2F2; }
+  .btn.danger-solid { background: #B91C1C; border-color: #B91C1C; color: #FFFFFF; font-weight: 600; }
+  .btn.danger-solid:hover { filter: brightness(1.1); }
   .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-  .danger-card { border: 1px solid #ffcdd2; }
-  
-  .loading, .error, .success {
-    text-align: center;
-    padding: 2rem;
-    font-size: 1.2rem;
-    border-radius: 8px;
-    margin-bottom: 1.5rem;
+  .banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 11px;
+    font-size: 14px;
+    font-weight: 600;
   }
-  
-  .error { background: #FFEBEE; color: #f44336; border: 1px solid #f44336; }
-  .success { background: #E8F5E9; color: #2E7D32; border: 1px solid #4CAF50; }
+  .banner.ok { background: var(--ok-soft); color: var(--ok); }
+  .banner.bad { background: #FEF2F2; color: #B91C1C; }
+
+  .loading { text-align: center; padding: 3rem; font-size: 1.2rem; }
 </style>

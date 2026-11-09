@@ -244,7 +244,7 @@
   .messages-page { min-height: 100vh; }
   
   .page-header {
-    background: linear-gradient(135deg, #2196F3, #1976D2);
+    background: var(--accent);
     color: white;
     padding: 1rem 2rem;
     display: flex;
@@ -309,11 +309,11 @@
   .btn-secondary { background: #e0e0e0; color: #333; }
   .btn-danger { background: #f44336; color: white; }
   
-  .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; }
+  .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; background: var(--accent); color: white; border: none; border-radius: 4px; cursor: pointer; }
   .btn-sm.btn-danger { background: #f44336; }
   
   .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem; }
-  .pagination button { padding: 0.5rem 1rem; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; }
+  .pagination button { padding: 0.5rem 1rem; background: var(--accent); color: white; border: none; border-radius: 4px; cursor: pointer; }
   .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
   
   .loading, .error, .empty { text-align: center; padding: 3rem; font-size: 1.2rem; border-radius: 8px; }

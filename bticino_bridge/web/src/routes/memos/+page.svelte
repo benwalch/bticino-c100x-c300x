@@ -205,7 +205,7 @@
   }
   
   .filter-btn:hover { background: #f5f5f5; }
-  .filter-btn.active { background: #2196F3; color: white; border-color: #2196F3; }
+  .filter-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
   
   .loading, .error, .empty {
     text-align: center;
@@ -233,7 +233,7 @@
   
   .memo-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
   
-  .memo-card.unread { border-left: 4px solid #2196F3; }
+  .memo-card.unread { border-left: 4px solid var(--accent); }
   
   .memo-header {
     display: flex;
@@ -246,7 +246,7 @@
   .memo-type { text-transform: uppercase; font-size: 0.8rem; color: #666; }
   
   .unread-badge {
-    background: #2196F3;
+    background: var(--accent);
     color: white;
     font-size: 0.7rem;
     padding: 0.2rem 0.5rem;
@@ -300,10 +300,10 @@
     gap: 0.5rem;
   }
   
-  .detail-row .unread { color: #2196F3; font-weight: bold; }
+  .detail-row .unread { color: var(--accent); font-weight: bold; }
   
   .toggle-read-btn {
-    background: #2196F3;
+    background: var(--accent);
     color: white;
     border: none;
     padding: 0.4rem 0.8rem;
@@ -312,7 +312,7 @@
     font-size: 0.85rem;
   }
   
-  .toggle-read-btn:hover { background: #1976D2; }
+  .toggle-read-btn:hover { background: var(--accent-strong); }
   
   .text-content, .audio-section { margin-top: 1rem; }
   .text-content h3, .audio-section h3 { margin: 0 0 0.5rem; color: #666; }

@@ -245,7 +245,7 @@ hash-based routing and Server-Sent Events for real-time updates.
 
 | Page | Path | Description |
 |------|------|-------------|
-| Dashboard | `#dashboard` | System status, connection states, uptime, version, LED states, and GPIO states **with per-pin function tooltips** |
+| Dashboard | `#dashboard` | Device (exact model, variant, firmware), system tiles (uptime, flash, memory, CPU temperature), connections (OpenWebNet, MQTT, web), LED states and a collapsible GPIO list **with per-pin function tooltips** |
 | Controls | `#controls` | Door unlock, display, mute, doorbell, light, answering machine, raw OWN command, and a **System** section (Restart Bridge / Reboot Device, double-confirmed). On the Classe 100X only door unlock, light and System: it ignores display and doorbell-sound commands and has no answering machine |
 | Messages | `#messages` | Answering machine messages: list, play, download, mark read, delete (Classe 300X only) |
 | Memos | `#memos` | Voice and text memos: list, play, download (Classe 300X only) |
@@ -295,7 +295,7 @@ Turn it on if the dashboard is reachable beyond a trusted network.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/status` | Bridge status (uptime, connections, versions) |
+| GET | `/api/status` | Bridge status (uptime, connections, versions); `device.model`/`firmware` from `conf.xml` and `/etc/version`; `system` with device uptime, memory, CPU temperature and flash usage |
 | GET | `/api/system` | System information |
 | GET | `/api/logs` | Recent log entries (filterable) |
 | GET | `/api/logs/download` | Download full log file |
