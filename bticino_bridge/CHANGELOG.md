@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- The restart action (web and MQTT) shuts the bridge down gracefully with
+  SIGTERM instead of `os.Exit`, so calls end with a BYE and MQTT reports
+  offline. The replacement starts once the old process has exited.
+
 - `deploy.sh` restarts the bridge as soon as the old process has exited
   (at most 15 s, then `kill -9`) instead of always waiting 15 s.
 
