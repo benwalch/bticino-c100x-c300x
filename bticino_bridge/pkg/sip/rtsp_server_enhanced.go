@@ -38,7 +38,6 @@ type EnhancedRTSPServer struct {
 	externalCall    bool // callActive set by SetCallActive (NATIVE call, not ours)
 	activeClients   int
 	recordingPath   string
-	recordingActive bool
 	recorder        *RTSPRecorder
 	streams         map[string]*StreamConfig // Configured streams
 	videoBackend    string                   // "avmedia" | "gstreamer" | "auto"

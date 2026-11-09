@@ -721,7 +721,7 @@ func main() {
 		// enabled. This component auto-starts video (*7*32) on doorbell press,
 		// so for safety it is NOT created when video_on_demand is disabled.
 		if sipStarted && sipClient != nil && cfg.Streaming.VideoOnDemand {
-			videoManager = sip.NewVideoStreamManager(sipClient, owClient, eventBus, logger)
+			videoManager = sip.NewVideoStreamManager(sipClient, eventBus, logger)
 
 			if err := videoManager.Start(); err != nil {
 				logger.WithError(err).Warn("Failed to start video manager")

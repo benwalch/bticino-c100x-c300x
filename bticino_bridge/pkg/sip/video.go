@@ -3,22 +3,19 @@ package sip
 import (
 	"fmt"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
 
 	"bticino_bridge/pkg/events"
-	"bticino_bridge/pkg/openwebnet"
 )
 
 // VideoStreamManager handles H.264 video streaming for BTicino
 type VideoStreamManager struct {
-	sipClient     *BTicinoSIPClient
-	openWebClient *openwebnet.Client
-	eventBus      events.EventBus
-	logger        *logrus.Logger
+	sipClient *BTicinoSIPClient
+	eventBus  events.EventBus
+	logger    *logrus.Logger
 
 	// Stream management
 	activeStreams map[string]*VideoStreamInfo
@@ -29,16 +26,13 @@ type VideoStreamManager struct {
 }
 
 // NewVideoStreamManager creates a new video stream manager
-func NewVideoStreamManager(sipClient *BTicinoSIPClient, openWebClient *openwebnet.Client,
-	eventBus events.EventBus, logger *logrus.Logger) *VideoStreamManager {
-
+func NewVideoStreamManager(sipClient *BTicinoSIPClient, eventBus events.EventBus, logger *logrus.Logger) *VideoStreamManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
 
 	return &VideoStreamManager{
 		sipClient:     sipClient,
-		openWebClient: openWebClient,
 		eventBus:      eventBus,
 		logger:        logger,
 		activeStreams: make(map[string]*VideoStreamInfo),
@@ -95,13 +89,6 @@ func (v *VideoStreamManager) Stop() error {
 
 	v.logger.Info("Stopping video stream manager")
 
-	// Stop all active streams
-	for streamID, stream := range v.activeStreams {
-		v.stopVideoStream(streamID)
-		v.logger.Infof("Stopped video stream: %s", streamID)
-		_ = stream // avoid unused variable
-	}
-
 	// Close RTP listener
 	if v.rtpListener != nil {
 		v.rtpListener.Close()
@@ -112,124 +99,6 @@ func (v *VideoStreamManager) Stop() error {
 
 	v.running = false
 	v.logger.Info("Video stream manager stopped")
-
-	return nil
-}
-
-// StartVideoStream initiates a video stream using OpenWebNet commands
-func (v *VideoStreamManager) StartVideoStream(reason string) (*VideoStreamInfo, error) {
-	v.mutex.Lock()
-	defer v.mutex.Unlock()
-
-	config := v.sipClient.GetConfig()
-	streamID := fmt.Sprintf("stream_%d", time.Now().Unix())
-
-	// Create stream info
-	streamInfo := &VideoStreamInfo{
-		LocalIP:   config.LocalIP,
-		LocalPort: config.MediaPorts.VideoRTP,
-		Codec:     "H264",
-		StartTime: time.Now(),
-		RTSPUrl:   fmt.Sprintf("rtsp://%s:%d/%s", config.LocalIP, config.RTSPPort, streamID),
-		Active:    false,
-	}
-
-	// Connect to OpenWebNet
-	if err := v.openWebClient.Connect(); err != nil {
-		return nil, fmt.Errorf("failed to connect to OpenWebNet: %v", err)
-	}
-	defer v.openWebClient.Disconnect()
-
-	// Send OpenWebNet command to start video stream
-	// Format: *7*32#<ip_with_dots_as_hash>#<port>*##
-	ipFormatted := strings.Replace(config.LocalIP, ".", "#", -1)
-	videoCmd := fmt.Sprintf("*7*32#%s#%d*##", ipFormatted, config.MediaPorts.VideoRTP)
-
-	v.logger.Infof("Sending OpenWebNet video command: %s (reason: %s)", videoCmd, reason)
-
-	response, err := v.openWebClient.SendCommand(videoCmd)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send video command: %v", err)
-	}
-
-	// Check response
-	if response.Raw == "*#*1##" { // ACK
-		streamInfo.Active = true
-		v.activeStreams[streamID] = streamInfo
-
-		// Publish event
-		v.eventBus.PublishWithSource("video.stream.started", map[string]interface{}{
-			"stream_id":  streamID,
-			"reason":     reason,
-			"rtsp_url":   streamInfo.RTSPUrl,
-			"local_ip":   streamInfo.LocalIP,
-			"local_port": streamInfo.LocalPort,
-			"codec":      streamInfo.Codec,
-		}, "video")
-
-		v.logger.Infof("Video stream started successfully: %s", streamID)
-		return streamInfo, nil
-	} else {
-		return nil, fmt.Errorf("video command failed with response: %s", response.Raw)
-	}
-}
-
-// StopVideoStream stops a specific video stream
-func (v *VideoStreamManager) StopVideoStream(streamID string) error {
-	v.mutex.Lock()
-	defer v.mutex.Unlock()
-
-	return v.stopVideoStream(streamID)
-}
-
-// stopVideoStream internal method (assumes mutex is held)
-func (v *VideoStreamManager) stopVideoStream(streamID string) error {
-	stream, exists := v.activeStreams[streamID]
-	if !exists {
-		return fmt.Errorf("stream not found: %s", streamID)
-	}
-
-	// Connect to OpenWebNet
-	if err := v.openWebClient.Connect(); err != nil {
-		v.logger.WithError(err).Error("Failed to connect to OpenWebNet for stream stop")
-		return err
-	}
-	defer v.openWebClient.Disconnect()
-
-	// Send stop command
-	stopCmd := "*7*0*##"
-	v.logger.Infof("Sending OpenWebNet stop video command: %s", stopCmd)
-
-	response, err := v.openWebClient.SendCommand(stopCmd)
-	if err != nil {
-		v.logger.WithError(err).Error("Failed to send stop video command")
-	} else if response.Raw == "*#*1##" {
-		v.logger.Info("Video stream stop command acknowledged")
-	}
-
-	// Mark stream as inactive
-	stream.Active = false
-	delete(v.activeStreams, streamID)
-
-	// Publish event
-	v.eventBus.PublishWithSource("video.stream.stopped", map[string]interface{}{
-		"stream_id": streamID,
-		"duration":  time.Since(stream.StartTime).Seconds(),
-	}, "video")
-
-	return nil
-}
-
-// StopAllVideoStreams stops all active video streams
-func (v *VideoStreamManager) StopAllVideoStreams() error {
-	v.mutex.Lock()
-	defer v.mutex.Unlock()
-
-	for streamID := range v.activeStreams {
-		if err := v.stopVideoStream(streamID); err != nil {
-			v.logger.WithError(err).WithField("stream_id", streamID).Error("Failed to stop video stream")
-		}
-	}
 
 	return nil
 }
@@ -315,40 +184,6 @@ func (v *VideoStreamManager) processRTPPacket(packet []byte, addr net.Addr) {
 }
 
 // Event handlers
-
-func (v *VideoStreamManager) onDoorbellPressed(event *events.Event) {
-	v.logger.Info("Doorbell pressed - starting video stream")
-
-	stream, err := v.StartVideoStream("doorbell_press")
-	if err != nil {
-		v.logger.WithError(err).Error("Failed to start video stream on doorbell press")
-		return
-	}
-
-	v.logger.Infof("Video stream started for doorbell: %s", stream.RTSPUrl)
-
-	// Auto-stop after 60 seconds
-	go func() {
-		time.Sleep(60 * time.Second)
-		v.mutex.RLock()
-		streamID := ""
-		for id, s := range v.activeStreams {
-			if s == stream {
-				streamID = id
-				break
-			}
-		}
-		v.mutex.RUnlock()
-
-		if streamID != "" {
-			if err := v.StopVideoStream(streamID); err != nil {
-				v.logger.WithError(err).Error("Failed to auto-stop video stream")
-			} else {
-				v.logger.Info("Auto-stopped video stream after 60 seconds")
-			}
-		}
-	}()
-}
 
 func (v *VideoStreamManager) onDoorUnlocked(event *events.Event) {
 	v.logger.Info("Door unlocked - extending video stream if active")

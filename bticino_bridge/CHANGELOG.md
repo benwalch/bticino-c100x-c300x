@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Removed unused SIP code: the old RTSP server (replaced by the enhanced
+  one), the go2rtc manager, the single-identity REGISTER helpers, and the
+  video stream start/stop path, which opened and closed the shared
+  OpenWebNet connection.
+
 - Removed the legacy web UI that was embedded in `server.go` (HTML, CSS, JS
   and page handlers). It was no longer served; the Svelte app is the web UI.
 

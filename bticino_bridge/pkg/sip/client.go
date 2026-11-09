@@ -2163,17 +2163,6 @@ func (c *BTicinoSIPClient) readSIPMessageFrom(conn net.Conn, timeout time.Durati
 	return messages[0], nil
 }
 
-// Legacy readSIPMessage for backward compatibility
-func (c *BTicinoSIPClient) readSIPMessage() (*SIPMessage, error) {
-	if c.conn != nil {
-		return c.readSIPMessageFrom(c.conn, 10*time.Second)
-	}
-	if c.webrtcID != nil && c.webrtcID.conn != nil {
-		return c.readSIPMessageFrom(c.webrtcID.conn, 10*time.Second)
-	}
-	return nil, fmt.Errorf("no connection available")
-}
-
 func (c *BTicinoSIPClient) GetCallState() CallState {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
@@ -2246,45 +2235,3 @@ func (c *BTicinoSIPClient) extractAuthParam(authHeader, param string) string {
 }
 
 // Legacy methods kept for backward compatibility
-
-func (c *BTicinoSIPClient) register() error {
-	if c.webrtcID != nil {
-		return c.registerIdentity(c.webrtcID)
-	}
-	return fmt.Errorf("no webrtc identity configured")
-}
-
-func (c *BTicinoSIPClient) unregister() error {
-	if c.webrtcID != nil {
-		c.unregisterIdentity(c.webrtcID)
-	}
-	return nil
-}
-
-func (c *BTicinoSIPClient) buildRegisterRequest() string {
-	if c.webrtcID != nil {
-		return c.buildRegisterRequestForIdentity(c.webrtcID)
-	}
-	return ""
-}
-
-func (c *BTicinoSIPClient) buildUnregisterRequest() string {
-	if c.webrtcID != nil {
-		return c.buildUnregisterRequestForIdentity(c.webrtcID)
-	}
-	return ""
-}
-
-func (c *BTicinoSIPClient) handleAuthChallenge(response *SIPMessage) error {
-	if c.webrtcID != nil {
-		return c.handleAuthChallengeForIdentity(c.webrtcID, response)
-	}
-	return fmt.Errorf("no webrtc identity")
-}
-
-func (c *BTicinoSIPClient) buildAuthenticatedRegisterRequest(realm, nonce, qop string) string {
-	if c.webrtcID != nil {
-		return c.buildAuthenticatedRegisterForIdentity(c.webrtcID, realm, nonce, qop)
-	}
-	return ""
-}
