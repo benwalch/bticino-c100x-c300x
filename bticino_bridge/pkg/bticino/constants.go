@@ -278,8 +278,6 @@ const (
 // BTicino Device Information
 const (
 	DeviceManufacturer = "Bticino-Legrand"
-	DeviceModel        = "Classe 100 X16E"
-	DeviceModelShort   = "C100X"
 
 	// DeviceVariant selects which indoor unit this bridge runs on.
 	// Change to "c300x" for a Classe 300X, "c100x" for a Classe 100X,
@@ -813,6 +811,15 @@ func DeviceModelName() string {
 		return "BTicino Classe 100X"
 	}
 	return "BTicino Classe 300X"
+}
+
+// DeviceModelCode returns the model as the unit names it in conf.xml
+// <modello>. The 300X value is the one upstream used.
+func DeviceModelCode() string {
+	if DeviceVariant == DeviceVariant100X {
+		return "Classe 100 X16E"
+	}
+	return "Classe 300 X13E"
 }
 
 // SIPUsernameForVariant returns the intercom's SIP identity (INVITE target,

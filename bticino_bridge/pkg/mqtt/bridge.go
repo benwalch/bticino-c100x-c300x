@@ -414,8 +414,8 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	device := map[string]interface{}{
 		"identifiers":  []string{"bticlasse100x"},
-		"name":         "BTicino Classe 100X",
-		"model":        bticino.DeviceModel,
+		"name":         bticino.DeviceModelName(),
+		"model":        bticino.DeviceModelCode(),
 		"manufacturer": bticino.DeviceManufacturer,
 		"sw_version":   "Bridge v" + version.GetVersion(),
 	}

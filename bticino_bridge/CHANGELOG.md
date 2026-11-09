@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- MQTT discovery names the device after `DeviceVariant`: "BTicino Classe 100X"
+  with model "Classe 100 X16E", or "BTicino Classe 300X" with model
+  "Classe 300 X13E". Before, a 300X build also reported itself as a Classe
+  100X.
+
 - Web UI redesign with Lucide icons and shared design tokens:
   - Dashboard: a device card with the exact model (`<modello>` from
     `/var/tmp/conf.xml`, e.g. "Classe 100 X16E"), variant and firmware stamp;
