@@ -1,29 +1,29 @@
 # BTicino Bridge - Features and Architecture
 
-**Version**: 0.24.0
 **Language**: Go 1.25 + Svelte 4
-**Target**: Linux ARM7 (NXP i.MX6ULL, BTicino Classe 300X)
+**Target**: Linux ARM7 (NXP i.MX6ULL), BTicino Classe 100X or 300X, chosen at
+build time with `DeviceVariant` in `pkg/bticino/constants.go`
 
 ---
 
 ## What is BTicino Bridge?
 
 BTicino Bridge is a lightweight, self-contained Go application that runs directly
-on the BTicino Classe 300X video intercom. It acts as a protocol translator
+on a BTicino Classe 100X or 300X video intercom. It acts as a protocol translator
 between the device's proprietary OpenWebNet (OWN) bus and modern smart home
 ecosystems.
 
 The bridge coexists with the device's native processes (`bt_vct`, `openserver`,
 `btvideophone`, `bt_av_media`) without modifying or interfering with them. It
 reads events from the OWN bus in monitor mode and sends commands through
-non-persistent netcat connections, ensuring the original firmware continues
+one short connection per command, ensuring the original firmware continues
 working normally.
 
 A single ~15MB ARM binary provides:
 
 - **RTSP/WebRTC video streaming** with hardware-accelerated H.264 encoding
 - **Apple HomeKit** integration (doorbell, lock, camera)
-- **Home Assistant** integration via MQTT with auto-discovery of 39+ entities
+- **Home Assistant** integration via MQTT with auto-discovery
 - **REST API** with 45+ endpoints and Swagger documentation
 - **Web dashboard** (Svelte SPA) for real-time monitoring and control
 - **Hardware monitoring** of physical buttons, GPIO pins, LEDs, and temperature
@@ -37,7 +37,7 @@ All of this runs on the intercom's constrained ARM Cortex-A7 SoC with 512MB RAM.
 ## Architecture
 
 ```
-BTicino Classe 300X (192.168.1.38)
+BTicino Classe 100X / 300X
  Native processes: bt_vct, openserver, btvideophone, bt_av_media (untouched)
  OpenWebNet ports: 20000 (events), 30006 (commands), 30007 (video control)
  SIP proxy: Flexisip on 127.0.0.1:5060
@@ -47,13 +47,13 @@ BTicino Classe 300X (192.168.1.38)
   |                                                                      |
   |  OpenWebNet Client                                                   |
   |    - EVENT session on port 20000 (read-only monitoring)              |
-  |    - Commands via netcat to port 30006 (non-persistent)              |
+  |    - One short connection per command to port 30006                  |
   |    - HMAC-SHA256 authentication                                      |
   |    - 158+ command definitions across 15 WHO systems                  |
   |    - 4-level safety system with audit logging                        |
   |                                                                      |
   |  SIP/Video Pipeline                                                  |
-  |    - Dual-role SIP client (webrtc + c300x identities)                |
+  |    - Dual-role SIP client (webrtc + c100x or c300x identity)         |
   |    - Self-INVITE via local Flexisip proxy                            |
   |    - GStreamer: imxv4l2videosrc -> imxvpuenc_h264 -> rtph264pay      |
   |    - RTP relay with UDP fan-out to multiple clients                  |
@@ -61,7 +61,7 @@ BTicino Classe 300X (192.168.1.38)
   |                                                                      |
   |  MQTT Bridge                                                         |
   |    - Paho MQTT client with auto-reconnect and LWT                    |
-  |    - 39+ Home Assistant auto-discovery entities                      |
+  |    - Home Assistant auto-discovery entities                          |
   |    - Command topics for remote control                               |
   |    - Device config publishing with file change detection             |
   |                                                                      |
@@ -103,7 +103,7 @@ Physical Events                     Smart Home Platforms
                                  v
 Remote Commands                 OpenWebNet
   MQTT set topic  -----+         |
-  HomeKit control -----+---> Command ---> netcat:30006 ---> Device
+  HomeKit control -----+---> Command ---> TCP :30006  ---> Device
   REST API POST   -----+     Builder
   Web UI button   -----+
 ```
@@ -164,16 +164,16 @@ alsasrc (hw:0, S16LE 8kHz mono) -> speexenc -> rtpspeexpay -> udpsink :10000
 **How to use**:
 ```bash
 # VLC
-vlc rtsp://192.168.1.38:6554/doorbell
+vlc rtsp://<device-ip>:6554/doorbell
 
 # ffplay
-ffplay -rtsp_transport udp rtsp://192.168.1.38:6554/doorbell
+ffplay -rtsp_transport udp rtsp://<device-ip>:6554/doorbell
 
 # go2rtc (for Home Assistant camera integration)
 # Add to go2rtc.yaml:
 #   streams:
 #     doorbell:
-#       - rtsp://192.168.1.38:6554/doorbell
+#       - rtsp://<device-ip>:6554/doorbell
 ```
 
 **Implementation**: `pkg/sip/gstreamer.go`, `pkg/sip/rtp_relay.go`,
@@ -186,7 +186,7 @@ ffplay -rtsp_transport udp rtsp://192.168.1.38:6554/doorbell
 Full auto-discovery integration with Home Assistant via MQTT. The bridge
 publishes discovery payloads on startup so all entities appear automatically.
 
-**39+ entities** across these types:
+Entities by type (the Classe 100X build leaves out the 300X-only ones):
 
 | Type | Entities | Examples |
 |------|----------|---------|
@@ -382,7 +382,7 @@ The bridge implements the BTicino OpenWebNet protocol for bus communication.
 
 **Connection modes**:
 - **EVENT session** (port 20000): Read-only monitoring of all bus traffic
-- **COMMAND session** (port 30006): Send commands via fresh netcat TCP connections
+- **COMMAND session** (port 30006): Send each command over its own short TCP connection
 - **VIDEO control** (port 30007): Video stream start/stop commands
 
 **Authentication**: HMAC-SHA256 with BCD digit-to-hex encoding and
@@ -529,10 +529,11 @@ published/delivered, handler count).
 
 ### 12. SIP Client
 
-Dual-role SIP client that registers two identities (`webrtc` and `c300x`) with
+Dual-role SIP client that registers two identities (`webrtc` and the unit's,
+`c100x` or `c300x` after `DeviceVariant`) with
 the device's local Flexisip SIP proxy at `127.0.0.1:5060`.
 
-**Self-INVITE flow**: The `webrtc` identity sends a SIP INVITE to `c300x`.
+**Self-INVITE flow**: The `webrtc` identity sends a SIP INVITE to the unit's identity.
 Flexisip routes it back to the bridge, which auto-answers with 200 OK and
 completes the dialog with ACK. This triggers the SIP call state that enables
 camera capture.
@@ -548,9 +549,9 @@ The Flexisip domain is `YOUR_GATEWAY_ID.bs.iotleg.com` and localhost connections
 
 | Port | Protocol | Service | Direction |
 |------|----------|---------|-----------|
-| 8080 | TCP | Web dashboard + REST API | Inbound |
+| 8082 | TCP | Web dashboard + REST API | Inbound |
 | 6554 | TCP | RTSP video streaming | Inbound |
-| 5002 | TCP | HomeKit (HAP) | Inbound |
+| 8081 | TCP | HomeKit (HAP) | Inbound |
 | 10000 | UDP | RTP audio relay | Internal |
 | 10002 | UDP | RTP video relay | Internal |
 | 20000 | TCP | OpenWebNet EVENT session | Outbound (localhost) |
@@ -573,7 +574,7 @@ Firewall rules for inbound ports are persisted in
 | `pkg/bticino` | 1 | Device constants: GPIO pins, LEDs, filesystem paths, ports |
 | `pkg/bticino_commands` | 1 | High-level command sequences with timing (door unlock, light) |
 | `pkg/openwebnet` | 4 | OWN protocol: TCP client, HMAC auth, 158+ commands, safety |
-| `pkg/mqtt` | 1 | MQTT bridge: Paho client, 39+ HA entities, command handling |
+| `pkg/mqtt` | 1 | MQTT bridge: Paho client, HA discovery, command handling |
 | `pkg/homekit` | 4 | HomeKit bridge: doorbell, lock, camera accessories |
 | `pkg/sip` | 7 | SIP client, RTSP server, RTP relay, GStreamer, video manager |
 | `pkg/webserver` | 6 | HTTP server, REST API, SSE, config management handlers |
@@ -584,8 +585,10 @@ Firewall rules for inbound ports are persisted in
 | `pkg/deviceconfig` | 7 | Device config readers (XML/INI), file watcher, MQTT publisher |
 | `pkg/udpproxy` | 1 | UDP proxy (port 40004 to 4000 for scrcpy) |
 | `pkg/version` | 1 | Version management from VERSION file |
+| `pkg/access` | 2 | Classifies door openings (intercom, key/RFID) |
+| `pkg/logging` | 2 | Log rotation within fixed size limits |
+| `pkg/system` | 1 | Bridge restart and device reboot |
 
-**Total**: ~44 Go source files, 16 packages, ~17,000 lines of Go code.
 
 ---
 
@@ -597,7 +600,7 @@ Firewall rules for inbound ports are persisted in
 | `github.com/eclipse/paho.mqtt.golang` | v1.5.1 | MQTT client |
 | `github.com/sirupsen/logrus` | v1.9.3 | Structured logging |
 | `golang.org/x/net` | v0.44.0 | Multicast/IPv4 networking |
-| `golang.org/x/sys` | - | Linux system calls |
+| `golang.org/x/sys` | v0.36.0 | Linux system calls |
 | `gopkg.in/yaml.v2` | v2.4.0 | YAML parsing |
 | `github.com/swaggo/swag` | - | Swagger/OpenAPI generation |
 
@@ -613,7 +616,7 @@ slyoldfox is a Node.js/TypeScript project with similar goals. Key differences:
 | Language | Go | TypeScript/Node.js |
 | Binary | Single static binary (~15MB) | Node.js runtime + dependencies |
 | HomeKit | Native Go (brutella/hap) | hap-nodejs |
-| MQTT | Paho with 42+ HA entities | Basic MQTT |
+| MQTT | Paho with HA discovery | Basic MQTT |
 | Web UI | Svelte SPA with SSE | Minimal |
 | Video | Direct GStreamer + RTSP server | ffmpeg/scrcpy-based |
 | Live door media → HA (v0.22–v0.24) | Passive `lo:5000`/`lo:5007` taps (audio Speex + video H.264, cleartext) → RTSP → go2rtc → HA; arm on native channel-up | Not implemented |

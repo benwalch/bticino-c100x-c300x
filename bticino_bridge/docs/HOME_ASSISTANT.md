@@ -2,8 +2,9 @@
 
 The bridge integrates with Home Assistant over **MQTT with auto-discovery**.
 You do **not** need to write any YAML: once the bridge is running and the MQTT
-broker is configured, the entities appear automatically under a single device
-(**BTicino Classe 300X**).
+broker is configured, the entities appear automatically under a single device,
+**BTicino Classe 100X** or **BTicino Classe 300X** after the build's
+`DeviceVariant`. Entities marked *300X only* are not published on a 100X build.
 
 - **Discovery prefix:** `homeassistant/` (HA standard — do not change)
 - **Data prefix:** `bticino` (configurable via `mqtt.topic_prefix`; never set it to
@@ -218,8 +219,3 @@ cards:
         entity_id: lock.bticino_lock_main
 ```
 
-## Automations
-
-Ready-made examples live in [`configs/homeassistant/automations.yaml`](../configs/homeassistant/automations.yaml)
-(notify on ring, open door on button, etc.). A manual discovery/entity reference
-is in [`configs/homeassistant/discovery.yaml`](../configs/homeassistant/discovery.yaml).

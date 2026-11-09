@@ -3,7 +3,7 @@
 ## Prerequisites
 
 1. **go2rtc installed and running** (see `docs/GO2RTC_INTEGRATION.md`)
-2. **bticino_bridge v0.11.5+ running** with SIP and RTSP enabled
+2. **bticino_bridge running** with SIP and RTSP enabled
 3. **Home Assistant 2024.11+** (for native go2rtc integration)
 
 ---
@@ -18,7 +18,7 @@
 # go2rtc integration (HA 2024.11+)
 go2rtc:
   streams:
-    videoportero: rtsp://192.168.1.38:6554/doorbell
+    videoportero: rtsp://<device-ip>:6554/doorbell
 
 # Camera entity
 camera:
@@ -66,9 +66,9 @@ camera:
   - name: Videoportero
     icon: mdi:doorbell-video
     unique_id: bticino_videoportero_cam
-    still_image_url: http://192.168.1.38:1984/apiframe/videoportero?jpg
+    still_image_url: http://<device-ip>:1984/apiframe/videoportero?jpg
     stream_source: >-
-      rtsp://192.168.1.38:1984/stream/videoportero
+      rtsp://<device-ip>:1984/stream/videoportero
 ```
 
 ### Using Picture Entity Card
@@ -140,7 +140,7 @@ cards:
 type: custom:webrtc-camera
 entity: camera.videoportero
 name: Videoportero
-url: rtsp://192.168.1.38:1984/stream/videoportero
+url: rtsp://<device-ip>:1984/stream/videoportero
 ```
 
 ---
@@ -167,7 +167,7 @@ automation:
             priority: high
             ttl: 0
             image: >-
-              http://192.168.1.38:1984/apiframe/videoportero?jpg
+              http://<device-ip>:1984/apiframe/videoportero?jpg
             actions:
               - action: "UNLOCK"
                 title: "Open Door"
@@ -270,7 +270,7 @@ cards:
 ### Camera not showing stream
 
 1. Check go2rtc is running: `ssh bticino './start_go2rtc.sh status'`
-2. Check stream URL: `curl http://192.168.1.38:1984/api/streams`
+2. Check stream URL: `curl http://<device-ip>:1984/api/streams`
 3. Check firewall: `ssh bticino 'iptables -L'`
 
 ### High latency
@@ -282,7 +282,7 @@ cards:
 ```yaml
 go2rtc:
   streams:
-    videoportero: rtsp://192.168.1.38:6554/doorbell#transport=tcp
+    videoportero: rtsp://<device-ip>:6554/doorbell#transport=tcp
 ```
 
 ### Audio not working
@@ -294,5 +294,5 @@ go2rtc:
 ```yaml
 go2rtc:
   streams:
-    videoportero: rtsp://192.168.1.38:6554/doorbell#video=copy#audio=off
+    videoportero: rtsp://<device-ip>:6554/doorbell#video=copy#audio=off
 ```

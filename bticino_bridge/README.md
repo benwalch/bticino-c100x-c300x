@@ -1,317 +1,136 @@
-# BTicino Classe 300X Enhanced Bridge
+# BTicino Bridge
 
-Go bridge for the BTicino Classe 300X video door entry unit. It runs **on the device
-itself** (ARM7, i.MX6) and integrates the intercom with Home Assistant (MQTT),
-Apple HomeKit, a Svelte web dashboard, a REST API and hardware-accelerated
-**RTSP video streaming**.
+Go bridge that runs on a BTicino Classe 100X or 300X video door entry unit
+(ARM7, i.MX6) and connects it to Home Assistant (MQTT), Apple HomeKit, a web
+dashboard, a REST API and RTSP video.
 
-**Version:** 0.24.0 (see `VERSION` and `CHANGELOG.md`)
-**Target:** Linux ARM7 (i.MX6 inside the Classe 300X)
+This bridge comes from
+[fquinto/bticinoClasse300x](https://github.com/fquinto/bticinoClasse300x),
+which wrote it for the Classe 300X. This fork is tested on a Classe 100X; the
+300X-only features (answering machine, display, ringer) are not tested here.
+Version and changes: [`VERSION`](VERSION), [`CHANGELOG.md`](CHANGELOG.md).
 
-## Current status
+## Device variant
+
+The model is chosen at build time: `DeviceVariant` in
+`pkg/bticino/constants.go` is `"c100x"` or `"c300x"`. Rebuild after changing
+it. It selects the LED table and the video port, and on the Classe 100X it
+hides what that unit does not have or ignores: the answering machine with its
+messages and memos, and the display and ringer controls.
+
+## Status
 
 | Component | Status |
 |---|---|
-| **Live video on call (:6554 `/doorbell-video`)** | ✅ Working — passive AF_PACKET tap of the native video leg (`lo:5002`, cleartext H.264) → relay → RTSP → go2rtc → HA. **Zero bus commands**; on by default (`streaming.live_on_call: true`), independent of `video_on_demand` |
-| **RTSP on-demand video (:6554 `/doorbell`)** | 🧪 Experimental — **off by default** (`video_on_demand: false`). Self-INVITE activation competes with the native camera; only enable once validated on your unit |
-| **Camera snapshots** | ✅ Working — cooperative single `*7*300` (VPU decode → JPEG); doorbell camera published to MQTT on ring |
-| **Web/API authentication** | ✅ Working — optional HTTP Basic Auth over the whole server (`security.web_auth_required` + `web_username`/`web_password`); fail-closed if enabled without a password. POST, PUT and DELETE from other sites are refused (403), so a web page cannot open the door through a logged-in browser |
-| **Incoming call detection** | ✅ Working — `doorbell.pressed`/`call.hangup` (OWN bus) drive live video; `GET /api/call`, hangup |
-| Svelte web dashboard (:8082) | ✅ Working — 6 pages (dashboard w/ GPIO tooltips, controls w/ System reboot/restart, messages, memos, logs, settings) |
-| REST API (40+ endpoints) | ✅ Working — Swagger UI at `/api/docs/`; incl. `POST /api/system/restart-bridge`, `POST /api/system/reboot` |
-| Real-time SSE (`/api/events`) | ✅ Working — live LED/GPIO updates, no polling |
-| OpenWebNet client (80+ cmds) | ✅ Working — monitor on port 20000 + commands via one short connection each to 30006 |
-| MQTT Home Assistant (42+ entities) | ✅ Working — auto-discovery + object_id |
-| Device config sync (conf.xml, aswm, tvcc) | ✅ Working — QML→Bridge→MQTT (languages, ringtones, volumes, display) |
-| Answering machine: messages + memos | ✅ Working — mark read/unread, delete, download video |
-| Physical button monitoring | ✅ Working — event0 keyboard, event1 touch, event2 GPIO |
-| Physical monitoring (temp, LEDs, GPIO) | ✅ Working — 7 LEDs, 13 GPIO pins |
-| Web log viewer (/logs) | ✅ Working — 500-entry ring buffer |
-| Multicast listener (:7667) | ⚠️ Implemented (port held by a native process) |
-| HomeKit (:8081) | ⚠️ Implemented, not verified |
-
-**v0.24.0** (current) — all three live-media tracks (video, audio, audio-listen) now
-arm on the native OpenWebNet **channel-up** frames (`*7*300#…#5000#`/`#5007#`), not just
-on SIP/doorbell events. This fixes the common real-world case — opening camera+mic from
-the app (or the indoor C300) is native auto-activation, **not** a SIP call — so the media
-tracks used to never arm even though cleartext media was already on `lo:5000`/`lo:5007`.
-Additive and passive (zero new bus commands). Milestones since v0.18: v0.19 talk-back to
-the door via the answering-machine greeting; v0.20 access classifier → HA (intercom/key/
-RFID); v0.21 full-duplex audio on the bridge's own leg; v0.22 "hear" the door via a
-passive `lo:5000` tap; v0.23 (B1) hear+see the door from HA. See `CHANGELOG.md`.
-
-**v0.18.0** — live video during a call via a **passive** mirror: a read-only
-AF_PACKET tap on `lo:5002` (where the firmware already streams cleartext H.264 RTP
-for the whole call) feeds the existing relay → RTSP `/doorbell-video` → go2rtc → HA.
-A real doorbell ring proved a bridge-issued `*7*300` is ignored mid-call (the native
-firmware holds both video slots), so the tap sends **zero commands to the bus**.
-Also: HTTP Basic Auth over web/API, GPIO tooltips, a System (restart/reboot) section
-in Controls, and a Settings audit (fixed save, validation, path-traversal). See
-`CHANGELOG.md`.
-
-**v0.15.5** — earlier milestone: a complete on-demand RTSP video pipeline **without
-relying on `bt_av_media`** (which has an unfixable routing bug in `libjel.so`):
-
-```
-RTSP client (VLC/ffplay) ──RTSP──> bticino-bridge:6554
-                                        │
-                                   SIP self-INVITE (webrtc→c300x via local Flexisip)
-                                        │
-                                   GStreamer pipelines:
-                                     imxv4l2videosrc → imxvpuenc_h264 → rtph264pay → udpsink :10002
-                                     alsasrc → speexenc → rtpspeexpay → udpsink :10000
-                                        │
-                                   RTP relay (fan-out to all RTSP clients)
-```
-
-Architecture details and decisions: `CHANGELOG.md` (the authoritative running log).
-
----
+| Web dashboard (:8082) | Dashboard, Controls, Logs, Settings; Messages and Notes on the 300X only |
+| Web/API authentication | Optional HTTP Basic Auth (`security.web_auth_required`). POST, PUT and DELETE from other sites are refused (403). No HTTPS |
+| MQTT / Home Assistant | Auto-discovery, see [`docs/HOME_ASSISTANT.md`](docs/HOME_ASSISTANT.md) |
+| OpenWebNet | Monitor on port 20000, commands to port 30006 |
+| Live video on call (:6554 `/doorbell-video`) | Passive tap of the native video leg, no bus commands (`streaming.live_on_call`) |
+| Camera session | Video without a call over a loopback self-call, started by an RTSP viewer or the HA switch `switch.bticino_video_session` (`streaming.camera_session`) |
+| Camera snapshots | `GET /api/snapshot`; a still goes to MQTT on a ring |
+| REST API | Swagger UI at `/api/docs/` |
+| Live updates | Server-sent events at `/api/events` (LEDs, GPIO) |
+| HomeKit (:8081) | Implemented, not verified |
 
 ## Architecture
 
 ```
-BTicino Classe 300X
- Native processes: bt_vct, openserver, bt_av_media, flexisip (NOT touched)
- OpenWebNet ports: 20000 (monitor), 30006 (commands), 30007 (video)
+Native processes: bt_vct, openserver, bt_av_media, flexisip (not touched)
 
- bticino-bridge (ARM binary)
-  ├── OpenWebNet Client ──── Monitors port 20000 (read-only)
-  │                          Commands via short connections to 30006 (non-interfering mode)
-  ├── Web Server (:8082) ─── Embedded Svelte SPA + REST API + Swagger UI + SSE
-  ├── MQTT Bridge ────────── Paho MQTT → HA broker (39+ auto-discovery entities)
-  ├── HomeKit Bridge ─────── brutella/hap on :8081 (lock, doorbell, camera)
-  ├── SIP/RTSP ───────────── SIP self-INVITE → GStreamer (VPU) → RTP relay → RTSP :6554
-  ├── Device Config ──────── Reads/watches conf.xml, aswm, tvcc → republishes to MQTT
-  ├── Event Bus ──────────── Internal pub/sub between components
-  ├── Input Monitor ──────── /dev/input/event0-2 (buttons, touch, GPIO)
-  ├── Message Parser ─────── Answering machine messages + voice/text memos
-  └── Multicast Listener ─── UDP 239.255.76.67:7667 (BTicino syslog)
+bticino_bridge
+ ├── OpenWebNet ────── monitor :20000, one short connection per command to :30006
+ ├── Web server ────── Svelte UI + REST API + Swagger + SSE on :8082
+ ├── MQTT ──────────── Home Assistant discovery and command topics
+ ├── HomeKit ───────── brutella/hap on :8081
+ ├── SIP / RTSP ────── loopback SIP via the local Flexisip, RTP relay, RTSP :6554
+ ├── Device config ─── reads and watches conf.xml, aswm, tvcc
+ ├── Input monitor ─── buttons, touch, GPIO
+ └── Message parser ── answering machine messages and memos (300X)
 ```
 
-### Non-interfering mode (critical)
+### Non-interfering mode
 
-The bridge shares the device with the native BTicino processes. To avoid fighting
-them for ports/hardware it only **monitors** on port 20000 and sends each command in
-its own short connection to 30006, the same exchange as `echo '<frame>' | nc 0 30006`:
-the frame and a newline, a half-close, then it waits up to 5 s for the server to close.
-Only a single frame is accepted (digits, `*` and `#`, starting with `*` and ending
-with the only `##`). Do not open persistent sockets to 30006/30007. BTicino requires ~310 ms
-of spacing between commands.
-
-## Go packages
-
-| Package | Lines | Description |
-|---|---|---|
-| `cmd/` | ~1330 | Entry point. Wires subsystems based on config + flags |
-| `pkg/webserver/` | ~6580 | Web server, REST API, config/device/streaming handlers |
-| `pkg/sip/` | ~4820 | Video: SIP client, GStreamer, RTP relay, RTSP server |
-| `pkg/openwebnet/` | ~2410 | OpenWebNet client: monitor, HMAC auth, 4-level safety manager |
-| `pkg/deviceconfig/` | ~1750 | Read/watch conf.xml, aswm, tvcc → MQTT |
-| `pkg/mqtt/` | ~1710 | MQTT bridge: Paho, HA discovery, command topics, LWT |
-| `pkg/input/` | ~975 | Hardware monitor: buttons, touchscreen, GPIO sysfs |
-| `pkg/messageparser/` | ~750 | Answering machine parser: msg_info.ini, voice/text memos |
-| `pkg/bticino/` | ~700 | Constants: filesystem paths, ports, OWN commands |
-| `pkg/multicast/` | ~610 | UDP multicast listener + OpenWebNet handler |
-| `pkg/homekit/` | ~550 | HomeKit bridge: lock, doorbell, camera |
-| `pkg/events/` | ~490 | Pub/sub event bus with pattern matching (+ tests) |
-| `pkg/config/` | ~420 | YAML config with defaults |
-| `pkg/bticino_commands/` | ~370 | High-level commands: multi-step sequences |
-| `pkg/udpproxy/` | ~150 | Auxiliary UDP proxy |
-| `pkg/version/` | ~90 | Version read from `VERSION` + build-time injection |
-
-## Dependencies
-
-| Module | Purpose |
-|---|---|
-| `github.com/brutella/hap` | HomeKit Accessory Protocol |
-| `github.com/eclipse/paho.mqtt.golang` | MQTT client |
-| `github.com/sirupsen/logrus` | Structured logging |
-| `github.com/swaggo/swag` | Swagger documentation generation |
-| `golang.org/x/net` | Multicast/ipv4 |
-| `gopkg.in/yaml.v2` | YAML parsing |
-
-Frontend: Svelte 4 + Vite (under `web/`, needs Node.js to build).
+The bridge shares the unit with the native processes. It only monitors port
+20000 and sends each command in its own short connection to 30006, the same
+exchange as `echo '<frame>' | nc 0 30006`: the frame and a newline, a
+half-close, then it waits up to 5 s for the server to close. Only a single
+frame is accepted (digits, `*` and `#`, starting with `*` and ending with the
+only `##`). Do not open persistent sockets to 30006/30007. The unit needs about
+310 ms between commands.
 
 ## Build and deploy
 
+Needs Go 1.25+ and Node.js.
+
 ```bash
-make build        # Svelte frontend (web/dist) + ARM Go binary
-make build-go     # binary only: GOOS=linux GOARCH=arm GOARM=7
-make build-web    # frontend only (npm install + vite build)
-make dev          # local dev: vite :5173 + go run ./cmd/main.go
-make deploy       # build + scripts/deploy.sh (scp to device, restart)
-make test         # scripts/run_all_tests.sh --all (needs the device)
+make build        # web UI (web/dist) + ARM binary
+make build-go     # binary only
+make build-web    # web UI only
+make dev          # local development: vite + go run
+make deploy       # build, copy to the device, restart the bridge
 make clean
 ```
 
-The binary is installed at `/home/bticino/cfg/extra/` on the device.
-Alternative from the repo root: `../deploy-standard.sh full` (base64 streaming over
-SSH, md5 verify, single-instance start, health-check + auto-rollback). Full guide:
-[`docs/DEPLOY.md`](docs/DEPLOY.md).
+`make deploy` runs `scripts/deploy.sh`, which connects to the SSH host
+`bticino` (set it up in `~/.ssh/config`) and installs to
+`/home/bticino/cfg/extra/`. Its options are listed at the top of the script.
 
-### Runtime flags (`cmd/main.go`)
-
-`-config` (default `configs/config.yaml`), `-log-level`, `-version`,
-`-test` (no device connection), `-web-port`, and the toggles
-`-enable-openwebnet` / `-enable-web` / `-enable-homekit` / `-enable-video`.
+Flags: `-config` (default `configs/config.yaml`; the device runs with
+`config.yaml`), `-log-level`, `-version`, `-test` (no device connection),
+`-web-port`, and `-enable-openwebnet`, `-enable-web`, `-enable-homekit`,
+`-enable-video`, `-enable-answerer`.
 
 ## Configuration
 
-Single file: `configs/config.yaml` (other files in `configs/` are historical examples).
+One file: `configs/config.yaml`, deployed as
+`/home/bticino/cfg/extra/config.yaml`. Most options can be changed on the
+Settings page. Saving from the web UI drops the comments in the file.
 
 ```yaml
-bridge:
-  name: "BTicino Bridge Enhanced"
-  log_level: "info"
-
-openwebnet:
-  host: "127.0.0.1"
-  port: 30006
-
-sip:
-  enabled: true
-  server_host: "127.0.0.1"   # local Flexisip
-  transport: "tcp"
-  username: "webrtc"          # self-INVITE: webrtc@domain → answerer@domain (per DeviceVariant; optional sip_target overrides)
-
 mqtt:
   enabled: true
-  host: "192.168.1.3"         # broker IP (Home Assistant)
+  host: "<broker-ip>"
   port: 1883
-  username: "mqtt_user"
-  password: "CHANGE_ME"
-  topic_prefix: "bticino"     # do NOT use "homeassistant"
+  username: "<CHANGE-ME>"
+  password: "<CHANGE-ME>"
+  topic_prefix: "bticino"     # do not use "homeassistant"
+
+sip:
+  native_dev_addr: "<CHANGE-ME>"   # required for camera sessions, no fallback
+  transport: "tcp"                 # camera sessions failed with udp on a 100X
 
 streaming:
-  enabled: true
   rtsp_port: 6554
-  video_on_demand: false      # SAFETY: video activation off by default (see below)
-  video_backend: "avmedia"    # avmedia | gstreamer | auto (only if video_on_demand)
+  live_on_call: true
+  camera_session: true
+  video_on_demand: false
 
-web:
-  enabled: true
-  port: 8082
-
-homekit:
-  enabled: true
-  port: "8081"
-  pin: "12345678"
-  storage_path: "./homekit_data"
+security:
+  web_auth_required: true
+  web_username: "<CHANGE-ME>"
+  web_password: "<CHANGE-ME>"
 ```
 
-> ⚠️ **Video safety note.** `video_on_demand` is **off by default**. Activating
-> camera video on demand (RTSP self-INVITE / `*7*300`) competes with the native
-> firmware for the camera; a command storm during testing once triggered the
-> device's watchdog to reboot. SIP registration and incoming-call detection stay
-> on (they are passive). Only set `video_on_demand: true` after validating the
-> video pipeline on your own unit.
-
-## REST API
-
-40+ endpoints documented in **Swagger UI**: `http://<device-ip>:8082/api/docs/`
-
-Summary by group:
-
-```bash
-# Status / system
-GET  /api/status              GET /api/system
-GET  /api/events              # SSE: real-time LEDs/GPIO
-GET  /api/snapshot            # JPEG camera still (params: timeout, max_age)
-
-# SIP call
-GET  /api/call                # call state + registration
-POST /api/controls/call/hangup
-
-# Answering machine messages and memos
-GET  /api/messages            GET /api/messages/{id}
-GET  /api/messages/download/{id}/{type}
-POST /api/messages/mark-read/{id}
-DELETE /api/messages/delete/{id}
-GET  /api/memos               GET /api/memos/{id}
-
-# Controls
-POST /api/controls/door/unlock
-POST /api/controls/display/on|off
-POST /api/controls/mute/on|off
-POST /api/controls/doorbell/on|off
-POST /api/controls/answering-machine/toggle
-POST /api/controls/light/on
-POST /api/controls/command    # arbitrary OpenWebNet: {"command": "*8*19*20##"}
-
-# Streaming
-GET  /api/streaming           POST /api/streaming/start|stop
-GET  /api/streaming/sessions|config
-POST /api/streaming/record
-
-# Configuration (bridge and native device)
-GET  /api/config              POST /api/config/save|validate|backup|restore|reload
-GET  /api/config/device|language|timezone|ntp|ringtones|volumes|display|cameras|answering
-POST /api/device/save
-
-# Logs
-GET  /api/logs?level=info&count=200
-GET  /api/logs/download
-```
-
-## Home Assistant
-
-~39 entities are exposed over **MQTT auto-discovery** — no YAML needed; they
-appear under a single *BTicino Classe 300X* device. See
-[`docs/HOME_ASSISTANT.md`](docs/HOME_ASSISTANT.md) for the full entity reference
-(topics, controls, sensors) and example Lovelace/automation snippets.
+> **Video safety.** Leave `video_on_demand` off. The old on-demand path
+> competes with the native firmware for the camera, and a command storm once
+> made the unit's watchdog reboot it. The camera session is the supported way to
+> get video without a call.
 
 ## RTSP video
 
 ```bash
-# From any machine on the LAN:
 ffplay rtsp://<device-ip>:6554/doorbell
-vlc rtsp://<device-ip>:6554/doorbell
 ```
 
-- Hardware H.264 (i.MX VPU), 720x576 PAL, ~7 fps, ~1500 kbps
-- Supports UDP unicast and TCP interleaved, multiple simultaneous clients (fan-out)
-- See `docs/WEBRTC_RTSP_STREAMING.md` and the v0.15.5 entry in `CHANGELOG.md`
+See [`docs/WEBRTC_RTSP_STREAMING.md`](docs/WEBRTC_RTSP_STREAMING.md) and
+[`docs/GO2RTC_INTEGRATION.md`](docs/GO2RTC_INTEGRATION.md).
 
 ## Tests
 
 ```bash
-go test ./...                          # unit tests
-make test                              # integration tests (needs the device)
+go test ./...
 ```
 
-Unit coverage is low: `pkg/events/`, `pkg/multicast/` and `pkg/sip/` have tests. The rest
-is validated with the `scripts/run_all_tests.sh` integration tests against the
-real device.
-
-## File layout
-
-```
-bticino_bridge/
-├── cmd/main.go                        # Entry point (~1330 lines)
-├── pkg/
-│   ├── bticino/                       # Device constants
-│   ├── bticino_commands/              # High-level commands
-│   ├── config/                        # YAML config loader
-│   ├── deviceconfig/                  # conf.xml/aswm/tvcc → MQTT (7 files)
-│   ├── events/                        # Pub/sub event bus (+ tests)
-│   ├── homekit/                       # HomeKit bridge (lock, doorbell, camera)
-│   ├── input/                         # Buttons, touchscreen, GPIO
-│   ├── messageparser/                 # Answering machine + memos
-│   ├── mqtt/                          # MQTT bridge (Paho)
-│   ├── multicast/                     # UDP multicast listener (+ tests)
-│   ├── openwebnet/                    # OWN client: auth, commands, safety
-│   ├── sip/                           # SIP + GStreamer + RTP relay + RTSP
-│   ├── udpproxy/                      # UDP proxy
-│   ├── version/                       # Version management
-│   └── webserver/                     # REST API + handlers + Swagger
-├── web/                               # Svelte 4 + Vite frontend
-│   └── src/routes/                    # dashboard, controls, messages, memos, logs, settings
-├── configs/config.yaml                # Single configuration file
-├── deployment/                        # systemd unit + scripts
-├── docs/                              # Guides (streaming, HA, HomeKit, OWN commands...)
-├── scripts/                           # deploy.sh, run_all_tests.sh, MQTT utilities
-├── Makefile
-├── CHANGELOG.md                       # Authoritative change log
-└── VERSION                            # 0.24.0
-```
+On macOS run them in the `golang:1.25` image. `make test` runs the integration
+tests in `scripts/run_all_tests.sh` against the device.

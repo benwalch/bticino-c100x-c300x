@@ -2,6 +2,12 @@
 
 **BTicino Bridge - Enhanced Video Streaming**
 
+> Written upstream for the Classe 300X. In this fork the SIP side runs against
+> the local Flexisip over TCP (see the bridge `README.md`), and camera sessions
+> (`streaming.camera_session`) are the supported way to get video without a
+> call. `webrtc_enabled`, `webrtc_port`, `max_duration` and
+> `auto_stop_on_last_client` have no effect.
+
 This document describes the complete WebRTC/RTSP streaming implementation that brings your `bticino_bridge` to parity with `slyoldfox/c300x-controller`.
 
 ---
@@ -64,15 +70,15 @@ The enhanced server provides **3 stream paths** (compatible with slyoldfox):
 
 ```bash
 # Test with ffplay
-ffplay -f rtsp -i rtsp://192.168.1.38:6554/doorbell
+ffplay -f rtsp -i rtsp://<device-ip>:6554/doorbell
 
 # Test with VLC
-vlc rtsp://192.168.1.38:6554/doorbell-video
+vlc rtsp://<device-ip>:6554/doorbell-video
 
 # Test with go2rtc (add to go2rtc.yaml)
 streams:
   bticino_doorbell:
-    - "rtsp://192.168.1.38:6554/doorbell#video=copy#audio=pcma"
+    - "rtsp://<device-ip>:6554/doorbell#video=copy#audio=pcma"
 ```
 
 ---
@@ -85,11 +91,7 @@ streams:
 streaming:
   enabled: true
   rtsp_port: 6554              # RTSP server port
-  webrtc_enabled: false         # WebRTC gateway (requires go2rtc)
-  webrtc_port: 8889             # WebRTC port
   recording_path: "/home/bticino/cfg/extra/recordings"
-  max_duration: 60              # Max recording duration (seconds)
-  auto_stop_on_last_client: true
 ```
 
 ### SIP Configuration (required for streaming)
@@ -97,7 +99,7 @@ streaming:
 ```yaml
 sip:
   enabled: true
-  local_host: "192.168.1.38"
+  local_host: "<device-ip>"
   local_port: 47300
   server_host: "sipserver.bs.iotleg.com"
   server_port: 5061
@@ -194,14 +196,14 @@ Add to your `go2rtc.yaml`:
 ```yaml
 streams:
   bticino_doorbell:
-    - "rtsp://192.168.1.38:6554/doorbell#video=copy#audio=pcma"
-    - "exec:ffmpeg -re -fflags nobuffer -f alaw -ar 8000 -i - -ar 8000 -acodec speex -f rtp -payload_type 97 rtp://192.168.1.38:40004#backchannel=1"
+    - "rtsp://<device-ip>:6554/doorbell#video=copy#audio=pcma"
+    - "exec:ffmpeg -re -fflags nobuffer -f alaw -ar 8000 -i - -ar 8000 -acodec speex -f rtp -payload_type 97 rtp://<device-ip>:40004#backchannel=1"
   
   bticino_doorbell_video:
-    - "rtsp://192.168.1.38:6554/doorbell-video#video=copy"
+    - "rtsp://<device-ip>:6554/doorbell-video#video=copy"
 
   bticino_recorder:
-    - "rtsp://192.168.1.38:6554/doorbell-recorder#video=copy#audio=copy"
+    - "rtsp://<device-ip>:6554/doorbell-recorder#video=copy#audio=copy"
 ```
 
 ### Lovelace Card (WebRTC Camera)
@@ -312,19 +314,19 @@ mqtt:
 
 2. **Verify RTSP server is running**:
    ```bash
-   curl http://192.168.1.38:8082/api/streaming
+   curl http://<device-ip>:8082/api/streaming
    ```
 
 3. **Check SIP registration**:
    ```bash
-   curl http://192.168.1.38:8082/api/status
+   curl http://<device-ip>:8082/api/status
    ```
 
 ### No Video/Audio
 
 1. **Verify SIP call is active**:
    ```bash
-   curl http://192.168.1.38:8082/api/streaming/sessions
+   curl http://<device-ip>:8082/api/streaming/sessions
    ```
 
 2. **Check device video activation**:
@@ -377,7 +379,7 @@ docker run -d \
 # go2rtc.yaml
 streams:
   bticino:
-    - rtsp://192.168.1.38:6554/doorbell
+    - rtsp://<device-ip>:6554/doorbell
   
 webrtc:
   candidates:

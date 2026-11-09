@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Docs describe this fork: the READMEs say it is a fork of
+  fquinto/bticinoClasse300x and tested on a Classe 100X, firmware build and
+  flashing moved to `legacy/README.md`, `docs/DEPLOY.md` describes
+  `make deploy` (the `deploy-standard.sh` it named is gone), and the docs
+  index lists only existing pages. Removed outdated reports, plans and
+  superseded guides, and `configs/homeassistant/`, whose topics and entities
+  no longer exist.
+
 - MQTT discovery names the device after `DeviceVariant`: "BTicino Classe 100X"
   with model "Classe 100 X16E", or "BTicino Classe 300X" with model
   "Classe 300 X13E". Before, a 300X build also reported itself as a Classe

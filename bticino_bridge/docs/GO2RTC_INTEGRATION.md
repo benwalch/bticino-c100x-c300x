@@ -12,7 +12,7 @@ Since v0.18.0 the **live video during a call** does **not** use a self-INVITE ag
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    BTicino Classe 300X                             │
+│                    BTicino Classe 100X / 300X                   │
 ├─────────────────────────────────────────────────────────────────┤
 │  Native call ringing  ──►  bt_av_media streams H.264 RTP         │
 │                            (cleartext) to  lo:5002               │
@@ -98,15 +98,15 @@ external self-INVITE and audio backchannel) is kept below for reference.
 # go2rtc.yaml
 streams:
   doorbell:
-    - rtsp://192.168.1.38:6554/doorbell#video=copy#audio=copy
+    - rtsp://<device-ip>:6554/doorbell#video=copy#audio=copy
     # Backchannel for two-way audio (optional)
-    - exec:ffmpeg -re -fflags nobuffer -f alaw -ar 8000 -i - -ar 8000 -acodec speex -f rtp -payload_type 97 rtp://192.168.1.38:40004
+    - exec:ffmpeg -re -fflags nobuffer -f alaw -ar 8000 -i - -ar 8000 -acodec speex -f rtp -payload_type 97 rtp://<device-ip>:40004
 
 # WebRTC configuration
 webrtc:
   listen: :8555
   candidates:
-    - 192.168.1.38:8555
+    - <device-ip>:8555
     - stun:stun.l.google.com:19302
 
 # API configuration
@@ -131,7 +131,7 @@ Add to `configuration.yaml`:
 ```yaml
 go2rtc:
   streams:
-    doorbell: rtsp://192.168.1.38:6554/doorbell
+    doorbell: rtsp://<device-ip>:6554/doorbell
 ```
 
 Then add camera:
@@ -151,7 +151,7 @@ Create camera with WebRTC URL:
 camera:
   - name: Videoportero
     icon: mdi:doorbell-video
-    stream_source: rtsp://192.168.1.38:1984/stream/doorbell
+    stream_source: rtsp://<device-ip>:1984/stream/doorbell
 ```
 
 Or use Picture Glance card with WebRTC:
@@ -159,7 +159,7 @@ Or use Picture Glance card with WebRTC:
 ```yaml
 type: custom:webrtc-camera
 entity: camera.videoportero
-url: rtsp://192.168.1.38:1984/stream/doorbell
+url: rtsp://<device-ip>:1984/stream/doorbell
 ```
 
 ## Testing
@@ -168,24 +168,24 @@ url: rtsp://192.168.1.38:1984/stream/doorbell
 
 ```bash
 # With VLC or ffmpeg
-ffplay rtsp://192.168.1.38:6554/doorbell
+ffplay rtsp://<device-ip>:6554/doorbell
 ```
 
 ### Test WebRTC
 
-Open in browser: `http://192.168.1.38:1984`
+Open in browser: `http://<device-ip>:1984`
 
 ### API Endpoints
 
 ```bash
 # List streams
-curl http://192.168.1.38:1984/api/streams
+curl http://<device-ip>:1984/api/streams
 
 # Get stream info
-curl http://192.168.1.38:1984/api/stream/doorbell
+curl http://<device-ip>:1984/api/stream/doorbell
 
 # Get snapshot
-curl http://192.168.1.38:1984/apiframe/doorbell?jpg
+curl http://<device-ip>:1984/apiframe/doorbell?jpg
 ```
 
 ## Troubleshooting
@@ -204,7 +204,7 @@ curl http://192.168.1.38:1984/apiframe/doorbell?jpg
 
 ```yaml
 streams:
-  doorbell: rtsp://192.168.1.38:6554/doorbell#video=copy#audio=off
+  doorbell: rtsp://<device-ip>:6554/doorbell#video=copy#audio=off
 ```
 
 ### High latency
@@ -215,7 +215,7 @@ streams:
 
 ```yaml
 streams:
-  doorbell: rtsp://192.168.1.38:6554/doorbell#transport=tcp
+  doorbell: rtsp://<device-ip>:6554/doorbell#transport=tcp
 ```
 
 ## Advanced: Two-Way Audio
@@ -240,8 +240,8 @@ udp_proxy:
 ```yaml
 streams:
   doorbell:
-    - rtsp://192.168.1.38:6554/doorbell
-    - exec:ffmpeg -re -fflags nobuffer -f alaw -ar 8000 -i - -ar 8000 -acodec speex -f rtp rtp://192.168.1.38:40004
+    - rtsp://<device-ip>:6554/doorbell
+    - exec:ffmpeg -re -fflags nobuffer -f alaw -ar 8000 -i - -ar 8000 -acodec speex -f rtp rtp://<device-ip>:40004
 ```
 
 3. Use WebRTC with backchannel in HA
@@ -254,7 +254,7 @@ streams:
 
 ```yaml
 api:
-  listen: 192.168.1.38:1984
+  listen: <device-ip>:1984
   username: admin
   password: your_secure_password
 ```

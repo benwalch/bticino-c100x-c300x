@@ -1,5 +1,11 @@
 # Security
 
+> In this fork: report issues through this repository's GitHub security
+> advisories. The flasher and builder are not in this repository; firmware is
+> built with `legacy/main.py`, and that image contains the root password, the
+> SSH key and, with MQTT, the broker credentials. Treat it as personal, as
+> described below.
+
 ## Reporting an issue
 
 If you find a security problem in this project's code (the bridge, the flasher,

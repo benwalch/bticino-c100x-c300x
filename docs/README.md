@@ -6,7 +6,7 @@ running it with Home Assistant.
 ## Classe 100X in this fork
 
 These pages come from upstream and describe the Classe 300X unless they say
-otherwise. They do not cover the Classe 100X. The root [`README`](../README.md)
+otherwise. They do not cover the Classe 100X. [`legacy/README.md`](../legacy/README.md)
 describes how to build a firmware in this fork.
 
 ## Start here

@@ -1,5 +1,9 @@
 # Roadmap — Two-way audio (talk-back) & native WebRTC
 
+> Upstream plan for the Classe 300X. Parts of it were implemented later, for
+> example talk-back; see `CHANGELOG.md`. The status below is the one at the
+> time of writing.
+
 Development plan for the two big remaining features from the r0bb10 gap analysis.
 They share prerequisites, so they are planned together. **Nothing here is
 implemented yet.** License reminder: r0bb10's Companion has no license — we

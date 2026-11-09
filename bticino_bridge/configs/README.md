@@ -1,86 +1,20 @@
-# BTicino Bridge - Single Configuration
+# Configuration
 
-**IMPORTANT**: There is only ONE valid configuration file:
+`config.yaml` is the only configuration file. `make deploy` copies it to the
+device as `/home/bticino/cfg/extra/config.yaml`, and the bridge runs with
+`-config config.yaml` from that directory. Use `scripts/deploy.sh
+--skip-config` to keep the file on the device instead.
 
-```
-config.yaml  ← ONLY configuration file
-```
+The file holds secrets (MQTT, web login, SIP). Do not commit real values.
 
-## 📁 Structure
+## Editing
 
-```
-configs/
-├── config.yaml              # ← ONLY configuration file
-└── homeassistant/           # Home Assistant configurations (optional)
-```
+- **Web UI:** the Settings page at `http://<device-ip>:8082/settings`. Saving
+  writes a backup to `/home/bticino/cfg/extra/backups/config_<timestamp>.yaml`
+  first. The saved file loses its comments.
+- **By hand:** edit the file on the device, then restart the bridge from the
+  Controls page.
 
-## 🚀 Usage
-
-### **On your development machine**:
-```bash
-# The configs/config.yaml file is used as a template
-# For deploy, copy to the device
-```
-
-### **On the device**:
-```bash
-# Location: /home/bticino/cfg/extra/config.yaml
-# The bridge starts with:
-./bticino_bridge -config config.yaml
-```
-
-## 📝 Configuration Sections
-
-1. **Bridge** - Name, version, log level
-2. **OpenWebNet** - OpenWebNet bus connection
-3. **SIP** - SIP server configuration (local or external flexisip)
-4. **MQTT** - Home Assistant connection
-5. **Web** - Web dashboard (port, directories)
-6. **HomeKit** - Apple HomeKit integration
-7. **Hardware** - GPIO, input devices
-8. **Logging** - Log configuration
-9. **Streaming** - RTSP/WebRTC for video
-10. **Network** - NTP, DNS, firewall
-11. **Servers** - External servers (cloud, updates, SIP)
-12. **Notifications** - MQTT, email, push
-13. **Privacy** - Privacy and telemetry
-14. **Security** - Authentication, HTTPS, rate limiting
-
-## ⚠️ Historical Files (REMOVED)
-
-These files NO LONGER exist; they were consolidated into `config.yaml`:
-
-- ❌ `config_ha.yaml` - Removed
-- ❌ `config_production_homekit.yaml` - Removed
-- ❌ `config-streaming-example.yaml` - Removed
-- ❌ `config_with_servers.yaml` - Removed
-- ❌ `config_streaming.yaml` (device) - Removed
-
-## 🔄 Backup
-
-Backups are created automatically in:
-```
-/home/bticino/cfg/extra/backups/config_YYYYMMDD_HHMMSS.yaml
-```
-
-## 🛠️ Editing
-
-### **From the Web UI** (Recommended):
-```
-http://192.168.1.38:8082/settings
-```
-
-### **Manual** (SSH):
-```bash
-ssh bticino
-cd /home/bticino/cfg/extra
-nano config.yaml
-# Restart bridge
-pkill -9 bticino_bridge
-./bticino_bridge -config config.yaml &
-```
-
----
-
-**Last updated**: 2026-03-26  
-**Version**: v0.13.0
+The bridge [`README.md`](../README.md) lists the options that matter most.
+Options the bridge never applied were removed from the Settings page; see
+[`CHANGELOG.md`](../CHANGELOG.md) under 1.0.0.
