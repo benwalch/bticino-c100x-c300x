@@ -41,6 +41,7 @@ type Client struct {
 	connections map[int]net.Conn // Port -> Connection mapping
 	connected   map[int]bool     // Port -> Connected status
 	mutex       sync.RWMutex
+	closed      bool // set by Disconnect, ends reconnecting
 	logger      *logrus.Logger
 	cmdDatabase *CommandDatabase
 	safetyMgr   *SafetyManager
@@ -121,6 +122,7 @@ func (c *Client) Connect() error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
+	c.closed = false
 	c.logger.Infof("Connecting to OpenWebNet gateway at %s (ports: %v)", c.host, c.ports)
 
 	var errors []error
@@ -142,7 +144,8 @@ func (c *Client) Connect() error {
 				time.Sleep(c.retryDelay)
 			}
 
-			conn, err := net.DialTimeout("tcp", address, c.timeout)
+			var conn net.Conn
+			conn, err = net.DialTimeout("tcp", address, c.timeout)
 			if err == nil {
 				c.connections[port] = conn
 				c.connected[port] = true
@@ -199,7 +202,7 @@ func (c *Client) Connect() error {
 				}
 
 				// Start reading messages in background
-				go c.readMessages(port)
+				go c.readMessages(port, initReader)
 				break
 			}
 
@@ -208,6 +211,7 @@ func (c *Client) Connect() error {
 
 		if err != nil {
 			errors = append(errors, fmt.Errorf("port %d: %v", port, err))
+			go c.reconnectPort(port)
 		}
 	}
 
@@ -224,6 +228,7 @@ func (c *Client) Disconnect() error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
+	c.closed = true
 	var errors []error
 	disconnectedPorts := 0
 
@@ -440,8 +445,9 @@ func (c *Client) choosePortForCommand(cmdStr string) int {
 	return c.mainPort
 }
 
-// readMessages continuously reads messages from a specific port
-func (c *Client) readMessages(port int) {
+// readMessages continuously reads messages from a specific port. It keeps the
+// handshake's reader: frames sent right after the session ACK may sit in its buffer.
+func (c *Client) readMessages(port int, reader *bufio.Reader) {
 	c.logger.Infof("Starting message reader for port %d", port)
 
 	c.mutex.RLock()
@@ -452,9 +458,6 @@ func (c *Client) readMessages(port int) {
 		c.logger.Infof("Message reader for port %d stopped (no connection)", port)
 		return
 	}
-
-	// Create reader once outside the loop to preserve buffered data
-	reader := bufio.NewReader(conn)
 
 	for {
 		c.mutex.RLock()
@@ -525,17 +528,36 @@ func (c *Client) readMessages(port int) {
 	c.logger.Infof("Message reader for port %d ended", port)
 }
 
-// reconnectPort attempts to reconnect to a specific port
+const maxReconnectDelay = 30 * time.Second
+
+// reconnectPort redials a port until it succeeds or Disconnect is called.
 func (c *Client) reconnectPort(port int) {
 	c.logger.Infof("Attempting to reconnect to port %d...", port)
 
-	for attempt := 1; attempt <= c.retryCount; attempt++ {
-		time.Sleep(c.retryDelay)
+	delay := c.retryDelay
+	if delay <= 0 {
+		delay = time.Second
+	}
+	for attempt := 1; ; attempt++ {
+		time.Sleep(delay)
+		delay = min(2*delay, maxReconnectDelay)
+
+		c.mutex.RLock()
+		closed := c.closed
+		c.mutex.RUnlock()
+		if closed {
+			return
+		}
 
 		address := fmt.Sprintf("%s:%d", c.host, port)
 		conn, err := net.DialTimeout("tcp", address, c.timeout)
 		if err == nil {
 			c.mutex.Lock()
+			if c.closed {
+				c.mutex.Unlock()
+				conn.Close()
+				return
+			}
 			c.connections[port] = conn
 			c.connected[port] = true
 			c.mutex.Unlock()
@@ -589,14 +611,12 @@ func (c *Client) reconnectPort(port int) {
 			}
 
 			// Restart message reader for this port
-			go c.readMessages(port)
+			go c.readMessages(port, initReader)
 			return
 		}
 
 		c.logger.Errorf("Reconnection attempt %d to port %d failed: %v", attempt, port, err)
 	}
-
-	c.logger.Errorf("Failed to reconnect to port %d after %d attempts", port, c.retryCount)
 }
 
 // Event handler setters

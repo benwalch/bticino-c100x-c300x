@@ -262,21 +262,8 @@ func main() {
 
 		owClient = openwebnet.NewClient(owConfig)
 
-		if !*testMode {
-			logger.Info("Connecting to BTicino device...")
-			if err := owClient.Connect(); err != nil {
-				logger.Errorf("Failed to connect to BTicino device: %v", err)
-				logger.Warn("Continuing without OpenWebNet - features limited")
-			} else {
-				logger.Info("✅ OpenWebNet: Successfully connected to BTicino device")
-
-				// Enable critical commands for door unlock functionality
-				logger.Warn("🔓 Enabling critical commands for door unlock functionality")
-				owClient.EnableCriticalCommands(true)
-			}
-		} else {
-			logger.Info("Running in test mode - no OpenWebNet device connection")
-		}
+		logger.Warn("🔓 Enabling critical commands for door unlock functionality")
+		owClient.EnableCriticalCommands(true)
 	}
 
 	// ==================== COMPONENTS: BTicino Integration ====================
@@ -1148,7 +1135,15 @@ func main() {
 			}
 		})
 
-		logger.Info("OpenWebNet: Bus event monitor active on port 20000 - doorbell detection enabled")
+		// Connect only now: the reader delivers frames from the first one on.
+		if *testMode {
+			logger.Info("Running in test mode - no OpenWebNet device connection")
+		} else if err := owClient.Connect(); err != nil {
+			logger.Errorf("Failed to connect to BTicino device, retrying in background: %v", err)
+		} else {
+			logger.Info("✅ OpenWebNet: Successfully connected to BTicino device")
+			logger.Info("OpenWebNet: Bus event monitor active on port 20000 - doorbell detection enabled")
+		}
 	}
 
 	// ==================== STARTUP COMPLETE ====================

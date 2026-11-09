@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+- The OpenWebNet monitor on port 20000 no longer gives up. After a dropped
+  connection it retried `retry_attempts` times `retry_delay` apart (3 s by
+  default) and then stopped for good, so doorbell events silently stopped
+  reaching Home Assistant until the bridge was restarted. It now retries until
+  it is connected again, waiting up to 30 s between attempts, and it also does
+  so when the first connect at startup fails. `retry_attempts` now only applies
+  to that first connect.
+- Bus events are no longer lost around a connect: frames that arrived together
+  with the session ACK were dropped, and frames before the event handler was
+  installed were ignored (up to about 45 s while the SIP start was retried).
+  The monitor now connects only after its handler is in place.
+
 - Security: the web server refuses POST, PUT and DELETE requests that a browser
   sends from another site (403), using Go's `http.CrossOriginProtection`. Before,
   any web page open in a browser that had logged in to the dashboard could open
