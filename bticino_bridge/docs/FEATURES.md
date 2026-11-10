@@ -195,7 +195,7 @@ Entities by type (the Classe 100X build leaves out the 300X-only ones):
 | Binary Sensor | 1 | Doorbell ringing |
 | Sensor | 11 | Temperature, new/total messages, storage, keypad, bus event, SIP status, diagnostics, multicast count, activity log, system info |
 | Button | 2 | Staircase light, door open |
-| Select | 3 | Language, timezone, ringtone |
+| Select | 5 | Ringtones (entrance, secondary, floor, internal, external) |
 | Number | 3 | Intercom volume, door volume, display brightness |
 | Device Trigger | 1 | Doorbell press |
 
@@ -246,7 +246,7 @@ hash-based routing and Server-Sent Events for real-time updates.
 | Page | Path | Description |
 |------|------|-------------|
 | Dashboard | `#dashboard` | Device (exact model, variant, firmware), system tiles (uptime, flash, memory, CPU temperature), connections (OpenWebNet, MQTT, web), LED states and a collapsible GPIO list **with per-pin function tooltips** |
-| Controls | `#controls` | Door unlock, display, mute, doorbell, light, answering machine, raw OWN command, and a **System** section (Restart Bridge / Reboot Device, double-confirmed). On the Classe 100X only door unlock, light and System: it ignores display and doorbell-sound commands and has no answering machine |
+| Controls | `#controls` | Door unlock, display, mute, doorbell, light, answering machine, raw OWN command, a **Ringtones** section (pick, play in the browser and set the five ringtones of the device menu), and a **System** section (Restart Bridge / Reboot Device, double-confirmed). On the Classe 100X only door unlock, light, Ringtones and System: it ignores display and doorbell-sound commands and has no answering machine |
 | Messages | `#messages` | Answering machine messages: list, play, download, mark read, delete (Classe 300X only) |
 | Memos | `#memos` | Voice and text memos: list, play, download (Classe 300X only) |
 | Settings | `#settings` | YAML config editor (incl. `live_on_call`, `video_on_demand`, `video_backend`, web auth), device settings, backup/restore |
@@ -369,10 +369,12 @@ Turn it on if the dashboard is reachable beyond a trusted network.
 | GET | `/api/device/ntp` | NTP configuration |
 | GET | `/api/device/timezone` | Device timezone |
 | GET | `/api/device/language` | Device language |
-| GET | `/api/device/ringtone` | Current ringtone |
-| GET | `/api/device/ringtones` | Available ringtones |
+| GET | `/api/device/ringtone` | Ringtone id per type (`s0`, `s1`, `internal`, `external`, `floor`) |
+| POST | `/api/device/ringtone` | Set a ringtone: `{"type":"s0","id":4}` |
+| GET | `/api/device/ringtones` | Available ringtones (`id`, `file`) |
+| GET | `/api/device/ringtones/{id}.wav` | WAV file of a listed ringtone, for playback in the browser |
 | GET | `/api/device/languages` | Available languages |
-| POST | `/api/device/save` | Save device settings |
+| POST | `/api/device/save` | Save device settings (not ringtones) |
 
 ---
 

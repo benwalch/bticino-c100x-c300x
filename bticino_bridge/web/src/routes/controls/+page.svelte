@@ -1,7 +1,7 @@
 <script>
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import Icon from '../../lib/Icon.svelte'
-  import { Lock, LockOpen, Lightbulb, Bell, Monitor, Voicemail, RotateCcw, Power, RefreshCw, CircleCheck } from 'lucide'
+  import { Lock, LockOpen, Lightbulb, Bell, BellRing, Monitor, Voicemail, RotateCcw, Power, RefreshCw, CircleCheck, Play, Square } from 'lucide'
   
   let controls = {
     door: { locked: true, loading: false },
@@ -23,9 +23,87 @@
     reboot: { loading: false }
   }
 
-  onMount(async () => {
-    await loadControls()
+  // The ringtone types of the device menu, as named in Home Assistant.
+  const ringtoneTypes = [
+    { type: 's0', name: 'Entrance doorbell' },
+    { type: 's1', name: 'Secondary doorbell' },
+    { type: 'floor', name: 'Floor doorbell' },
+    { type: 'internal', name: 'Internal intercom' },
+    { type: 'external', name: 'External intercom' }
+  ]
+  let ringtones = { loaded: false, error: null, current: {}, selected: {}, options: [], setting: null }
+  let player = null
+  let playingType = null
+
+  onMount(() => {
+    loadControls()
+    loadRingtones()
   })
+  onDestroy(stopRingtone)
+
+  function refresh() {
+    loadControls()
+    loadRingtones()
+  }
+
+  async function fetchJSON(url, options) {
+    const response = await fetch(url, options)
+    const data = await response.json()
+    if (!response.ok || data.success === false) throw new Error(data.error || response.statusText)
+    return data
+  }
+
+  async function loadRingtones() {
+    try {
+      const [values, list] = await Promise.all([
+        fetchJSON('/api/device/ringtone'),
+        fetchJSON('/api/device/ringtones')
+      ])
+      ringtones = { ...ringtones, loaded: true, error: null, current: values.ringtones, selected: { ...values.ringtones }, options: list.ringtones }
+    } catch (e) {
+      ringtones = { ...ringtones, loaded: true, error: e.message }
+    }
+  }
+
+  async function setRingtone({ type, name }) {
+    const id = ringtones.selected[type]
+    try {
+      ringtones.setting = type
+      await fetchJSON('/api/device/ringtone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, id })
+      })
+      ringtones.current[type] = id
+      error = null
+      success = `${name} ringtone set to ${id}`
+      setTimeout(() => success = null, 3000)
+    } catch (e) {
+      error = e.message
+    } finally {
+      ringtones.setting = null
+    }
+  }
+
+  // Plays the selected ringtone in this browser; a second click stops it.
+  function toggleRingtone(type) {
+    const wasPlaying = playingType === type
+    stopRingtone()
+    if (wasPlaying) return
+    player = new Audio(`/api/device/ringtones/${ringtones.selected[type]}.wav`)
+    player.onended = stopRingtone
+    playingType = type
+    player.play().catch(e => {
+      error = e.message
+      stopRingtone()
+    })
+  }
+
+  function stopRingtone() {
+    if (player) player.pause()
+    player = null
+    playingType = null
+  }
   
   async function loadControls() {
     try {
@@ -217,7 +295,7 @@
       <h1>Controls</h1>
       <span class="muted">Commands go to the intercom over OpenWebNet.</span>
     </div>
-    <button type="button" class="btn" on:click={loadControls}><Icon icon={RefreshCw} size={16} />Refresh</button>
+    <button type="button" class="btn" on:click={refresh}><Icon icon={RefreshCw} size={16} />Refresh</button>
   </div>
 
   {#if success}
@@ -287,6 +365,43 @@
         </div>
         {/if}
       </div>
+    </section>
+
+    <section class="block" aria-labelledby="h-ringtones">
+      <div class="stack gap4">
+        <h2 id="h-ringtones">Ringtones</h2>
+        <span class="muted small">Play previews the selected ringtone in this browser. Set changes it on the intercom at once; the intercom's own menu shows the change only after its UI restarts, and saving that menu page writes its old values back.</span>
+      </div>
+      {#if !ringtones.loaded}
+        <div class="muted">Loading ringtones…</div>
+      {:else if ringtones.error}
+        <div class="banner bad" role="alert">Ringtones unavailable: {ringtones.error}</div>
+      {:else}
+      <div class="grid">
+        {#each ringtoneTypes as ringtone}
+        <div class="card control">
+          <div class="control-head">
+            <div class="control-icon"><Icon icon={BellRing} size={20} /></div>
+            <div class="stack"><span class="control-name">{ringtone.name}</span><span class="muted small">Ringtone {ringtones.current[ringtone.type]}</span></div>
+          </div>
+          <div class="ringtone-row">
+            <select aria-label="{ringtone.name} ringtone" bind:value={ringtones.selected[ringtone.type]} on:change={stopRingtone} disabled={ringtones.setting === ringtone.type}>
+              {#each ringtones.options as option}
+              <option value={option.id}>Ringtone {option.id}</option>
+              {/each}
+            </select>
+            <button type="button" class="btn" aria-label={playingType === ringtone.type ? 'Stop' : 'Play'} on:click={() => toggleRingtone(ringtone.type)}>
+              <Icon icon={playingType === ringtone.type ? Square : Play} size={16} />
+            </button>
+          </div>
+          <button type="button" class="btn primary" on:click={() => setRingtone(ringtone)}
+            disabled={ringtones.setting === ringtone.type || ringtones.selected[ringtone.type] === ringtones.current[ringtone.type]}>
+            {ringtones.setting === ringtone.type ? 'Setting…' : 'Set'}
+          </button>
+        </div>
+        {/each}
+      </div>
+      {/if}
     </section>
 
     <section class="block" aria-labelledby="h-system">
@@ -376,6 +491,20 @@
   }
   .control-icon.accent { background: var(--accent-soft); color: var(--accent); }
   .control-icon.red { background: #FEF2F2; color: #B91C1C; }
+
+  .ringtone-row { display: flex; gap: 8px; }
+  .ringtone-row select {
+    flex: 1;
+    min-width: 0;
+    min-height: 42px;
+    padding: 0 12px;
+    border: 1px solid #D5D9E0;
+    border-radius: 10px;
+    font: inherit;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--surface);
+  }
 
   .btn {
     display: inline-flex;

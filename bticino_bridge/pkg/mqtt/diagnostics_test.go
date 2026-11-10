@@ -1,6 +1,10 @@
 package mqtt
 
-import "testing"
+import (
+	"testing"
+
+	"bticino_bridge/pkg/deviceconfig"
+)
 
 func TestDiagnosticSensorsAreDiagnostic(t *testing.T) {
 	for _, id := range []string{
@@ -41,5 +45,17 @@ func TestDeviceInfoVersions(t *testing.T) {
 	d = b.deviceInfo()
 	if d["sw_version"] != "1.5.8" || d["hw_version"] != "02.07.0" {
 		t.Errorf("device = %v, want sw_version 1.5.8 and hw_version 02.07.0", d)
+	}
+}
+
+// Every ringtone select must be a type the device can set.
+func TestRingtoneSelectsAreSettable(t *testing.T) {
+	if len(ringtoneSelects) != len(deviceconfig.SettableRingtones) {
+		t.Errorf("%d selects for %d settable ringtones", len(ringtoneSelects), len(deviceconfig.SettableRingtones))
+	}
+	for _, r := range ringtoneSelects {
+		if _, ok := deviceconfig.SettableRingtones[r.typ]; !ok {
+			t.Errorf("select %q has no settings.xml object", r.typ)
+		}
 	}
 }

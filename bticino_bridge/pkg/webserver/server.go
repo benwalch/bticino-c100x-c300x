@@ -408,6 +408,7 @@ func (ws *WebServer) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/device/language", ws.handleAPIDeviceLanguage)
 	mux.HandleFunc("/api/device/ringtone", ws.handleAPIDeviceRingtone)
 	mux.HandleFunc("/api/device/ringtones", ws.handleAPIDeviceRingtones)
+	mux.HandleFunc("/api/device/ringtones/", ws.handleAPIDeviceRingtoneFile)
 	mux.HandleFunc("/api/device/languages", ws.handleAPIDeviceLanguages)
 	mux.HandleFunc("/api/device/save", ws.handleAPIDeviceSave)
 

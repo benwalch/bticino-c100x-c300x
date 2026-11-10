@@ -1,12 +1,10 @@
 package mqtt
 
 import (
-	"bufio"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"net"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -829,44 +827,31 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 		entityCount++
 	}
 
-	// --- Sensor: Ringtone S0 (entrance panel) ---
-	b.discovery("sensor", "bticino_ringtone_s0", map[string]interface{}{
-		"name":           "Entrance Doorbell Ringtone",
-		"unique_id":      "bticino_intercom_ringtone_s0",
-		"object_id":      "bticino_ringtone_s0",
-		"state_topic":    dp + "/audio/ringtone",
-		"value_template": "Ringtone #{{ value_json.s0 }}",
-		"icon":           "mdi:bell",
-		"device":         device,
-		"availability":   avail,
-	})
-	entityCount++
-
-	// --- Sensor: Ringtone Door (flat/floor door) ---
-	b.discovery("sensor", "bticino_ringtone_floor", map[string]interface{}{
-		"name":           "Floor Doorbell Ringtone",
-		"unique_id":      "bticino_intercom_ringtone_floor",
-		"object_id":      "bticino_ringtone_floor",
-		"state_topic":    dp + "/audio/ringtone",
-		"value_template": "Ringtone #{{ value_json.floor }}",
-		"icon":           "mdi:bell",
-		"device":         device,
-		"availability":   avail,
-	})
-	entityCount++
-
-	// --- Sensor: Ringtone S1 (secondary entrance station) ---
-	b.discovery("sensor", "bticino_ringtone_s1", map[string]interface{}{
-		"name":           "Secondary Doorbell Ringtone",
-		"unique_id":      "bticino_intercom_ringtone_s1",
-		"object_id":      "bticino_ringtone_s1",
-		"state_topic":    dp + "/audio/ringtone",
-		"value_template": "Ringtone #{{ value_json.s1 }}",
-		"icon":           "mdi:bell",
-		"device":         device,
-		"availability":   avail,
-	})
-	entityCount++
+	// --- Selects: ringtones of the device menu (Configuration) ---
+	if options, err := ringtoneOptions(); err != nil {
+		b.logger.WithError(err).Warn("MQTT discovery: ringtone list unreadable, no ringtone selects")
+	} else {
+		for _, r := range ringtoneSelects {
+			b.discovery("select", "bticino_ringtone_"+r.typ, map[string]interface{}{
+				"name":            r.name,
+				"unique_id":       "bticino_intercom_ringtone_" + r.typ,
+				"object_id":       "bticino_ringtone_" + r.typ,
+				"state_topic":     dp + "/audio/ringtone",
+				"value_template":  "{{ value_json." + r.typ + " }}",
+				"command_topic":   dp + "/audio/ringtone/" + r.typ + "/set",
+				"options":         options,
+				"entity_category": "config",
+				"icon":            "mdi:bell-ring",
+				"device":          device,
+				"availability":    avail,
+			})
+			entityCount++
+		}
+	}
+	// Before 1.0.0 the ringtones were read-only sensors: clear their discovery.
+	for _, typ := range []string{"s0", "floor", "s1"} {
+		b.publish("homeassistant/sensor/bticino_ringtone_"+typ+"/config", "", true)
+	}
 
 	// --- Sensor: Volume S0 ---
 	b.discovery("sensor", "bticino_volume_s0", map[string]interface{}{
@@ -1239,6 +1224,28 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	b.logger.Infof("MQTT: Published %d Home Assistant discovery entities (total with device config)", entityCount)
 }
 
+// ringtoneSelects are the ringtones of the device menu, in menu order.
+var ringtoneSelects = []struct{ typ, name string }{
+	{"s0", "Entrance Doorbell Ringtone"},
+	{"s1", "Secondary Doorbell Ringtone"},
+	{"floor", "Floor Doorbell Ringtone"},
+	{"internal", "Internal Intercom Ringtone"},
+	{"external", "External Intercom Ringtone"},
+}
+
+// ringtoneOptions lists the ringtone ids the device offers, as select options.
+func ringtoneOptions() ([]string, error) {
+	list, err := deviceconfig.ReadRingtoneList(deviceconfig.RingtonesXMLPath)
+	if err != nil {
+		return nil, err
+	}
+	options := make([]string, 0, len(list))
+	for _, r := range list {
+		options = append(options, strconv.Itoa(r.ID))
+	}
+	return options, nil
+}
+
 // deviceInfo builds the HA device block. sw_version and hw_version are the
 // native firmware and hardware versions from the WHO=13 queries; they are left
 // out until QuerySystemInfo has read them (it republishes discovery then).
@@ -1268,8 +1275,8 @@ var diagnosticEntities = map[string]bool{
 	"bticino_environment_temperature": true, "bticino_messages_storage": true, "bticino_panel_keypad": true,
 	"bticino_system_diagnostics": true,
 	"bticino_bus_log":            true, "bticino_system_network": true, "bticino_sip_registration": true,
-	"bticino_answering":   true,
-	"bticino_ringtone_s0": true, "bticino_ringtone_floor": true, "bticino_ringtone_s1": true, "bticino_volume_s0": true, "bticino_volume_s1": true, "bticino_volume_floor": true,
+	"bticino_answering": true,
+	"bticino_volume_s0": true, "bticino_volume_s1": true, "bticino_volume_floor": true,
 	"bticino_display_brightness":     true,
 	"bticino_system_network_address": true, "bticino_system_network_mac": true, "bticino_network_wifi": true,
 	"bticino_system_flash_usage": true, "bticino_system_memory_usage": true,
@@ -1372,6 +1379,12 @@ func (b *MQTTBridge) subscribeToCommands() {
 		sub(dp+"/mute/set", b.handleMuteCommand)
 	}
 	sub(dp+"/light/staircase/set", b.handleLightCommand)
+	for _, r := range ringtoneSelects {
+		typ := r.typ
+		sub(dp+"/audio/ringtone/"+typ+"/set", func(client pahomqtt.Client, msg pahomqtt.Message) {
+			b.handleRingtoneCommand(typ, string(msg.Payload()))
+		})
+	}
 	if b.config.SIP.Answerer.Enabled {
 		sub(dp+"/answerer/answer", b.handleAnswererAnswer)
 		sub(dp+"/answerer/hangup", b.handleAnswererHangup)
@@ -1528,6 +1541,23 @@ func (b *MQTTBridge) handleDoorbellSoundCommand(client pahomqtt.Client, msg paho
 	b.doorbellSoundOn = on
 	b.mu.Unlock()
 	b.publish(b.dataPrefix()+"/audio/ring/muted", boolState(on), true)
+}
+
+// handleRingtoneCommand sets a ringtone from its HA select. The state topic
+// follows from the settings.xml file watcher.
+func (b *MQTTBridge) handleRingtoneCommand(ringtoneType, payload string) {
+	b.incCommands()
+	log := b.logger.WithFields(logrus.Fields{"type": ringtoneType, "ringtone": payload})
+	id, err := strconv.Atoi(strings.TrimSpace(payload))
+	if err != nil {
+		log.Warn("MQTT: Ringtone command is not a number")
+		return
+	}
+	if err := deviceconfig.SetRingtone(ringtoneType, id); err != nil {
+		log.WithError(err).Error("MQTT: Failed to set ringtone")
+		return
+	}
+	log.Info("MQTT: Ringtone set")
 }
 
 func (b *MQTTBridge) handleDisplayCommand(client pahomqtt.Client, msg pahomqtt.Message) {
@@ -2439,101 +2469,14 @@ func (b *MQTTBridge) ExecuteCommand(command string) (bool, error) {
 	return b.executeOWN(command)
 }
 
-// executeOWNWithResponse sends an OWN command by opening a dedicated TCP command session
-// to port 20000. Each call opens a new connection, sends *99*0## to open a session,
-// then sends the command and reads the response (data + ACK) on the same socket.
-// This is needed because port 30006 only returns ACK/NACK without response data.
+// executeOWNWithResponse sends one frame in a command session on port 20000,
+// which returns reply data (port 30006 only returns ACK/NACK).
 func (b *MQTTBridge) executeOWNWithResponse(command string) (string, error) {
-	b.logger.WithField("command", command).Debug("Executing OpenWebNet query via TCP command session (port 20000)")
-
-	// Connect to port 20000 with a 5s timeout
-	conn, err := net.DialTimeout("tcp", "127.0.0.1:20000", 5*time.Second)
-	if err != nil {
-		return "", fmt.Errorf("error connecting to port 20000: %w", err)
-	}
-	defer conn.Close()
-
-	reader := bufio.NewReader(conn)
-
-	// readMessage reads a ##-terminated OWN message from the socket
-	readMessage := func(timeout time.Duration) (string, error) {
-		conn.SetReadDeadline(time.Now().Add(timeout))
-		var msg strings.Builder
-		for {
-			b, err := reader.ReadByte()
-			if err != nil {
-				return msg.String(), err
-			}
-			msg.WriteByte(b)
-			s := msg.String()
-			if strings.HasSuffix(s, "##") {
-				return s, nil
-			}
-		}
-	}
-
-	// Step 1: Read server greeting
-	greeting, err := readMessage(3 * time.Second)
-	if err != nil {
-		return "", fmt.Errorf("error reading greeting: %w", err)
-	}
-	b.logger.WithField("greeting", greeting).Debug("OpenWebNet query session greeting")
-
-	// If it requires authentication (*98*2##), we do not support queries via TCP in that case
-	if strings.Contains(greeting, "*98*") {
-		return "", fmt.Errorf("server requires HMAC authentication, query not supported")
-	}
-
-	// Step 2: Send command-session open *99*0##
-	_, err = conn.Write([]byte("*99*0##"))
-	if err != nil {
-		return "", fmt.Errorf("error sending command session: %w", err)
-	}
-
-	// Step 3: Read session response (must be *#*1## = ACK)
-	sessionResp, err := readMessage(3 * time.Second)
-	if err != nil {
-		return "", fmt.Errorf("error reading session response: %w", err)
-	}
-	if !strings.Contains(sessionResp, "*#*1##") {
-		return "", fmt.Errorf("command session rejected: %s", sessionResp)
-	}
-
-	// Step 4: Send the query command
-	_, err = conn.Write([]byte(command))
-	if err != nil {
-		return "", fmt.Errorf("error sending command %s: %w", command, err)
-	}
-
-	// Step 5: Read response(s) - may be data + ACK or NACK
-	// Read first message (may be the data or directly ACK/NACK)
-	firstResp, err := readMessage(3 * time.Second)
-	if err != nil {
-		return "", fmt.Errorf("error reading response to %s: %w", command, err)
-	}
-
-	// If NACK, the command was not understood
-	if firstResp == "*#*0##" {
-		return "", fmt.Errorf("command %s rejected (NACK)", command)
-	}
-
-	// If plain ACK (no data), return empty
-	if firstResp == "*#*1##" {
-		return "", nil
-	}
-
-	// It is the response data. Try to read the ACK that follows
-	result := firstResp
-	ackResp, err := readMessage(2 * time.Second)
+	response, err := openwebnet.SendCommandSession(command)
 	if err == nil {
-		b.logger.WithField("ack", ackResp).Debug("ACK received after query data")
+		b.logger.WithFields(logrus.Fields{"command": command, "response": response}).Debug("OpenWebNet command session reply")
 	}
-
-	b.logger.WithFields(logrus.Fields{
-		"command":  command,
-		"response": result,
-	}).Debug("OpenWebNet query response received via TCP session")
-	return result, nil
+	return response, err
 }
 
 // ==================== MQTT HELPERS ====================

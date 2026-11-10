@@ -12,6 +12,7 @@ Breaking changes since 0.29.4 (details below):
 - Home Assistant entities renamed from Spanish to English.
 - `sip.native_dev_addr` no longer falls back to a built-in unit address.
 - Access and call-type values on MQTT and the greeting API are English.
+- Ringtone sensors are replaced by `select` entities.
 
 Known limits:
 - Tested on a Classe 100X only. The Classe 300X paths (answering machine,
@@ -22,6 +23,24 @@ Known limits:
 - Saving settings from the web UI drops the comments in `config.yaml`.
 
 ### Changes
+
+- **Breaking:** ringtones can be set from Home Assistant and the API. The
+  sensors `sensor.bticino_ringtone_s0`, `_s1` and `_floor` are replaced by
+  `select.bticino_ringtone_s0`, `_s1`, `_floor`, `_internal` and `_external`
+  (command topic `bticino/audio/ringtone/<type>/set`, payload is the ringtone
+  id). Migration: change automations and dashboards to the `select.` entity
+  IDs; the old sensors are removed from discovery. `POST /api/device/ringtone`
+  sets a ringtone, `GET /api/device/ringtone` and `GET /api/device/ringtones`
+  return the real values instead of placeholders, and `POST /api/device/save`
+  rejects a ringtone. The bridge writes `settings.xml` and sends `*8*99*##`
+  on port 20000, so the new ringtone plays at once; the device menu shows it
+  only after the device UI restarts. Ringtones are now read by the object id
+  of `settings.xml` (14101 to 14110), the id the native software uses.
+
+- The Controls tab of the web UI has a Ringtones section: pick a ringtone per
+  type, play it in the browser and set it on the device.
+  `GET /api/device/ringtones/{id}.wav` serves the files listed in
+  `ringtones.xml`.
 
 - **Breaking:** values that were Spanish are English. Home Assistant
   automations that compare them need the new values:

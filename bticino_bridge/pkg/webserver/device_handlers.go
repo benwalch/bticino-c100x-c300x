@@ -5,10 +5,14 @@ package webserver
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
+
+	"bticino_bridge/pkg/deviceconfig"
 )
 
 // DeviceConfig represents the device configuration
@@ -105,32 +109,63 @@ func (ws *WebServer) handleAPIDeviceLanguage(w http.ResponseWriter, r *http.Requ
 	})
 }
 
-// @Summary Get device ringtone
-// @Description Returns the current device ringtone setting
+// @Summary Get or set the device ringtones
+// @Description GET returns the ringtone id of each settable type (s0, s1, internal, external, floor).
+// @Description POST sets one: settings.xml is written and the device reloads its ringtones.
+// @Description The device menu shows the old value until the device UI restarts.
 // @Tags Device
 // @Accept json
 // @Produce json
+// @Param request body object false "Ringtone to set, e.g. {\"type\":\"s0\",\"id\":4}"
 // @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 502 {object} map[string]interface{}
+// @Failure 503 {object} map[string]interface{}
 // @Router /api/device/ringtone [get]
+// @Router /api/device/ringtone [post]
 func (ws *WebServer) handleAPIDeviceRingtone(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
+	switch r.Method {
+	case http.MethodGet:
+		settings, err := deviceconfig.ReadSettingsXML(deviceconfig.DevicePaths.SettingsXML)
+		if err != nil {
+			ws.writeJSONError(w, http.StatusServiceUnavailable, err.Error())
+			return
+		}
+		ws.writeJSON(w, map[string]interface{}{"ringtones": settings.Ringtones.SettableValues()})
+
+	case http.MethodPost:
+		var body struct {
+			Type string `json:"type"`
+			ID   int    `json:"id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			ws.writeJSONError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+			return
+		}
+		err := deviceconfig.SetRingtone(body.Type, body.ID)
+		switch {
+		case errors.Is(err, deviceconfig.ErrInvalidRingtone):
+			ws.writeJSONError(w, http.StatusBadRequest, err.Error())
+		case err != nil:
+			ws.logger.WithError(err).Warn("Setting ringtone failed")
+			ws.writeJSONError(w, http.StatusBadGateway, err.Error())
+		default:
+			ws.logger.Infof("Ringtone %s set to %d", body.Type, body.ID)
+			ws.writeJSON(w, map[string]interface{}{"success": true})
+		}
+
+	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
 	}
-
-	ringtone := "default"
-
-	ws.writeJSON(w, map[string]interface{}{
-		"ringtone": ringtone,
-	})
 }
 
 // @Summary Get available ringtones
-// @Description Returns the list of available ringtones
+// @Description Returns the ringtones the device offers (ringtones.xml)
 // @Tags Device
 // @Accept json
 // @Produce json
 // @Success 200 {object} map[string]interface{}
+// @Failure 503 {object} map[string]interface{}
 // @Router /api/device/ringtones [get]
 func (ws *WebServer) handleAPIDeviceRingtones(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
@@ -138,16 +173,62 @@ func (ws *WebServer) handleAPIDeviceRingtones(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	ringtones := []string{
-		"default",
-		"ringtone_1",
-		"ringtone_2",
-		"ringtone_3",
+	list, err := deviceconfig.ReadRingtoneList(deviceconfig.RingtonesXMLPath)
+	if err != nil {
+		ws.writeJSONError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	ws.writeJSON(w, map[string]interface{}{"ringtones": list})
+}
+
+// @Summary Get a ringtone file
+// @Description Returns the WAV file of a ringtone listed in ringtones.xml, for playback in the browser
+// @Tags Device
+// @Produce audio/wav
+// @Param id path int true "Ringtone id"
+// @Success 200 {file} binary
+// @Failure 404 {string} string
+// @Router /api/device/ringtones/{id}.wav [get]
+func (ws *WebServer) handleAPIDeviceRingtoneFile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" && r.Method != "HEAD" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
 
-	ws.writeJSON(w, map[string]interface{}{
-		"ringtones": ringtones,
-	})
+	name := strings.TrimPrefix(r.URL.Path, "/api/device/ringtones/")
+	id, err := strconv.Atoi(strings.TrimSuffix(name, ".wav"))
+	if err != nil || !strings.HasSuffix(name, ".wav") {
+		http.NotFound(w, r)
+		return
+	}
+	path, err := deviceconfig.RingtoneFilePath(id)
+	if errors.Is(err, deviceconfig.ErrInvalidRingtone) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		ws.writeJSONError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "audio/wav")
+	http.ServeContent(w, r, name, info.ModTime(), file)
+}
+
+func (ws *WebServer) writeJSONError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": message})
 }
 
 // @Summary Get available languages
@@ -177,7 +258,7 @@ func (ws *WebServer) handleAPIDeviceLanguages(w http.ResponseWriter, r *http.Req
 }
 
 // @Summary Save device configuration
-// @Description Saves the device configuration (NTP, timezone, language, ringtone)
+// @Description Saves the device configuration (NTP, timezone, language); ringtones use /api/device/ringtone
 // @Tags Device
 // @Accept json
 // @Produce json
@@ -215,7 +296,8 @@ func (ws *WebServer) handleAPIDeviceSave(w http.ResponseWriter, r *http.Request)
 	}
 
 	if body.Config.Ringtone != "" {
-		ws.logger.Infof("Setting ringtone: %s", body.Config.Ringtone)
+		ws.writeJSONError(w, http.StatusBadRequest, "ringtone is set via POST /api/device/ringtone")
+		return
 	}
 
 	ws.writeJSON(w, map[string]interface{}{

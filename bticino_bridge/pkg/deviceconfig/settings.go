@@ -65,7 +65,6 @@ type RawSettingsObj struct {
 
 // RawSettingsIst represents the ist element inside an object
 type RawSettingsIst struct {
-	UII                 string `xml:"uii,attr"`
 	IDRingtone          string `xml:"id_ringtone,attr"`
 	Enable              string `xml:"enable,attr"`
 	Volume              string `xml:"volume,attr"`
@@ -104,13 +103,8 @@ func ReadSettingsXML(path string) (*SettingsXML, error) {
 			ringtoneAttr = obj.IDRingtone
 		}
 		if ringtoneAttr != "" {
-			// It is a ringtone
 			ringtoneID, _ := strconv.Atoi(ringtoneAttr)
-			if obj.Ist.UII != "" {
-				uii, _ := strconv.Atoi(obj.Ist.UII)
-
-				assignRingtone(&settings.Ringtones, uii, ringtoneID)
-			}
+			assignRingtone(&settings.Ringtones, obj.CID, ringtoneID)
 		} else if obj.CID == "14121" || obj.CID == "14122" || obj.CID == "14123" ||
 			obj.CID == "14124" || obj.CID == "14125" || obj.CID == "14127" || obj.CID == "14129" {
 			// It is a volume
@@ -171,26 +165,27 @@ func ReadSettingsXML(path string) (*SettingsXML, error) {
 	return settings, nil
 }
 
-// assignRingtone assigns the ringtone by UII
-func assignRingtone(r *Ringtones, uii, ringtoneID int) {
-	switch uii {
-	case 52: // Ringtone S0
+// assignRingtone assigns the ringtone by object id, as the native firmware
+// identifies them (the <ist> uii is not used by it).
+func assignRingtone(r *Ringtones, cid string, ringtoneID int) {
+	switch cid {
+	case "14101":
 		r.S0 = ringtoneID
-	case 53: // Ringtone S1
+	case "14102":
 		r.S1 = ringtoneID
-	case 54: // Ringtone S2
+	case "14103":
 		r.S2 = ringtoneID
-	case 55: // Ringtone S3
+	case "14104":
 		r.S3 = ringtoneID
-	case 56: // Ringtone Internal
+	case "14105":
 		r.Internal = ringtoneID
-	case 57: // Ringtone External
+	case "14106":
 		r.External = ringtoneID
-	case 58: // Ringtone Door
+	case "14107":
 		r.Door = ringtoneID
-	case 59: // Ringtone Alarm
+	case "14109":
 		r.Alarm = ringtoneID
-	case 60: // Ringtone Message
+	case "14110":
 		r.Message = ringtoneID
 	}
 }

@@ -73,15 +73,32 @@ optional restart buttons.
 | Entity | State topic |
 |---|---|
 | Answering machine status *(300X only)* | `bticino/answering` |
-| S0 ringtone (entrance panel) | `bticino/audio/ringtone` (`value_json.s0`) |
-| Secondary doorbell ringtone | `bticino/audio/ringtone` (`value_json.s1`) |
-| Floor door ringtone | `bticino/audio/ringtone` (`value_json.floor`) |
 | Entrance doorbell volume | `bticino/audio/volume` (`value_json.s0`) |
 | Secondary doorbell volume | `bticino/audio/volume` (`value_json.s1`) |
 | Floor doorbell volume | `bticino/audio/volume` (`value_json.floor`) |
 | Display brightness | `bticino/display/settings` (`value_json.brightness`; also `clean_time`) |
 | Camera brightness (<id> per TVCC config) | `bticino/camera/<id>/settings` |
 | Camera contrast (<id> per TVCC config) | `bticino/camera/<id>/settings` (`value_json.contrast`) |
+
+### Ringtones (`select`, `entity_category: config`)
+
+| Entity | Command topic |
+|---|---|
+| Entrance Doorbell Ringtone (`select.bticino_ringtone_s0`) | `bticino/audio/ringtone/s0/set` |
+| Secondary Doorbell Ringtone (`select.bticino_ringtone_s1`) | `bticino/audio/ringtone/s1/set` |
+| Floor Doorbell Ringtone (`select.bticino_ringtone_floor`) | `bticino/audio/ringtone/floor/set` |
+| Internal Intercom Ringtone (`select.bticino_ringtone_internal`) | `bticino/audio/ringtone/internal/set` |
+| External Intercom Ringtone (`select.bticino_ringtone_external`) | `bticino/audio/ringtone/external/set` |
+
+These are the five ringtones of the device menu. The state comes from
+`bticino/audio/ringtone` (`value_json.<type>`), the options are the ids in
+`/home/bticino/ringtones/ringtones.xml`, and the payload is the ringtone id.
+The bridge writes the id into `settings.xml` and sends `*8*99*##` on port
+20000, so the device plays the new ringtone at once.
+
+The device's own menu keeps showing the old value until the device UI
+restarts. Saving that menu page writes its old values back to `settings.xml`;
+the selects then show those values again.
 
 ## Binary sensors
 
