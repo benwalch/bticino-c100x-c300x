@@ -9,6 +9,7 @@ import (
 	"net"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -50,6 +51,8 @@ type MQTTBridge struct {
 	muteOn             bool
 	displayOn          bool
 	sipRegistered      bool
+	busConnected       bool      // OpenWebNet monitor on port 20000
+	startTime          time.Time // process start, for the "Bridge Started" sensor
 	lastDoorbellTime   time.Time
 	lastIncomingCall   time.Time
 	lastButtonPress    time.Time
@@ -168,6 +171,7 @@ func NewMQTTBridge(cfg *config.Config, logger *logrus.Logger) (*MQTTBridge, erro
 		voicemailEnabled: true,  // Default: enabled
 		doorbellSoundOn:  true,  // Default: enabled
 		displayOn:        false, // Default: off (screensaver)
+		startTime:        time.Now(),
 		retryInterval:    connectRetryInterval,
 		waitPoll:         connectWaitPoll,
 	}, nil
@@ -412,13 +416,7 @@ func (b *MQTTBridge) SetFileWatcher() {
 func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	dp := b.dataPrefix()
 
-	device := map[string]interface{}{
-		"identifiers":  []string{"bticlasse100x"},
-		"name":         bticino.DeviceModelName(),
-		"model":        bticino.DeviceModelCode(),
-		"manufacturer": bticino.DeviceManufacturer,
-		"sw_version":   "Bridge v" + version.GetVersion(),
-	}
+	device := b.deviceInfo()
 
 	// configuration_url: "Visit" link in HA to the device web dashboard.
 	// We detect the LAN IP automatically.
@@ -773,14 +771,14 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
-	// --- 39. Sensor: System Information (WHO=13) ---
+	// --- 39. Sensor: Firmware Version (WHO=13); the attributes carry the network facts ---
 	b.discovery("sensor", "bticino_system_network", map[string]interface{}{
-		"name":                  "System Information",
+		"name":                  "Firmware Version",
 		"unique_id":             "bticino_intercom_system_network",
 		"object_id":             "bticino_system_network",
 		"state_topic":           dp + "/system/network",
 		"json_attributes_topic": dp + "/system/network/attributes",
-		"icon":                  "mdi:information-outline",
+		"icon":                  "mdi:chip",
 		"device":                device,
 		"availability":          avail,
 	})
@@ -1085,6 +1083,70 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	})
 	entityCount++
 
+	// --- Sensors: flash and memory usage (Diagnostic, same cadence as WiFi) ---
+	for _, u := range []struct{ id, name, icon string }{
+		{"flash", "Flash Usage", "mdi:harddisk"},
+		{"memory", "Memory Usage", "mdi:memory"},
+	} {
+		b.discovery("sensor", "bticino_system_"+u.id+"_usage", map[string]interface{}{
+			"name":                u.name,
+			"unique_id":           "bticino_intercom_system_" + u.id + "_usage",
+			"object_id":           "bticino_system_" + u.id + "_usage",
+			"state_topic":         dp + "/system/" + u.id,
+			"unit_of_measurement": "%",
+			"state_class":         "measurement",
+			"icon":                u.icon,
+			"device":              device,
+			"availability":        avail,
+		})
+		entityCount++
+	}
+
+	// --- Sensor: Bridge Version (Diagnostic); the device page shows the native firmware ---
+	b.discovery("sensor", "bticino_system_bridge_version", map[string]interface{}{
+		"name":         "Bridge Version",
+		"unique_id":    "bticino_intercom_system_bridge_version",
+		"object_id":    "bticino_system_bridge_version",
+		"state_topic":  dp + "/system/bridge_version",
+		"icon":         "mdi:tag-outline",
+		"device":       device,
+		"availability": avail,
+	})
+	entityCount++
+
+	// --- Sensors: device boot and bridge start (Diagnostic) ---
+	for _, ts := range []struct{ id, name, icon string }{
+		{"last_boot", "Last Boot", "mdi:restart"},
+		{"bridge_started", "Bridge Started", "mdi:play-circle-outline"},
+	} {
+		b.discovery("sensor", "bticino_system_"+ts.id, map[string]interface{}{
+			"name":         ts.name,
+			"unique_id":    "bticino_intercom_system_" + ts.id,
+			"object_id":    "bticino_system_" + ts.id,
+			"state_topic":  dp + "/system/" + ts.id,
+			"device_class": "timestamp",
+			"icon":         ts.icon,
+			"device":       device,
+			"availability": avail,
+		})
+		entityCount++
+	}
+
+	// --- Binary Sensor: OpenWebNet bus monitor connection (Diagnostic) ---
+	b.discovery("binary_sensor", "bticino_bus_connection", map[string]interface{}{
+		"name":         "OpenWebNet Bus",
+		"unique_id":    "bticino_intercom_bus_connection",
+		"object_id":    "bticino_bus_connection",
+		"state_topic":  dp + "/bus/connection",
+		"payload_on":   "ON",
+		"payload_off":  "OFF",
+		"device_class": "connectivity",
+		"icon":         "mdi:lan-connect",
+		"device":       device,
+		"availability": avail,
+	})
+	entityCount++
+
 	// --- Button: Mark all messages as read (300X only) ---
 	if bticino.AnsweringMachineAvailable() {
 		b.discovery("button", "bticino_messages_mark_read", map[string]interface{}{
@@ -1177,6 +1239,28 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 	b.logger.Infof("MQTT: Published %d Home Assistant discovery entities (total with device config)", entityCount)
 }
 
+// deviceInfo builds the HA device block. sw_version and hw_version are the
+// native firmware and hardware versions from the WHO=13 queries; they are left
+// out until QuerySystemInfo has read them (it republishes discovery then).
+func (b *MQTTBridge) deviceInfo() map[string]interface{} {
+	device := map[string]interface{}{
+		"identifiers":  []string{"bticlasse100x"},
+		"name":         bticino.DeviceModelName(),
+		"model":        bticino.DeviceModelCode(),
+		"manufacturer": bticino.DeviceManufacturer,
+	}
+	b.mu.RLock()
+	fw, hw := b.systemInfo["firmware_version"], b.systemInfo["hardware_version"]
+	b.mu.RUnlock()
+	if fw != "" {
+		device["sw_version"] = fw
+	}
+	if hw != "" {
+		device["hw_version"] = hw
+	}
+	return device
+}
+
 // diagnosticEntities are the object_ids that belong in the "Diagnostic"
 // section of Home Assistant. Everything else (locks, switches, action buttons
 // and operational sensors like messages/doorbell/call) stays in Controls/Sensors.
@@ -1188,6 +1272,9 @@ var diagnosticEntities = map[string]bool{
 	"bticino_ringtone_s0": true, "bticino_ringtone_floor": true, "bticino_ringtone_s1": true, "bticino_volume_s0": true, "bticino_volume_s1": true, "bticino_volume_floor": true,
 	"bticino_display_brightness":     true,
 	"bticino_system_network_address": true, "bticino_system_network_mac": true, "bticino_network_wifi": true,
+	"bticino_system_flash_usage": true, "bticino_system_memory_usage": true,
+	"bticino_system_last_boot": true, "bticino_system_bridge_started": true, "bticino_bus_connection": true,
+	"bticino_system_bridge_version": true,
 }
 
 // entityCategory decides the HA entity_category from the object_id. The
@@ -1583,8 +1670,26 @@ func (b *MQTTBridge) wifiMonitorLoop(interval time.Duration) {
 			continue
 		}
 		b.publishWiFiSignal()
+		b.publishSystemUsage()
 		b.refreshNetworkInfo()
 	}
+}
+
+// publishSystemUsage publishes flash and memory usage in percent. Both are
+// local reads (statfs, /proc/meminfo), no process spawn and no flash writes.
+func (b *MQTTBridge) publishSystemUsage() {
+	dp := b.dataPrefix()
+	if total, used, err := system.FlashUsage(system.FlashMountPath); err == nil && total > 0 {
+		b.publish(dp+"/system/flash", usagePercent(used, total), true)
+	}
+	if total, available, err := system.ReadMeminfo(system.ProcMeminfoPath); err == nil && total > 0 {
+		b.publish(dp+"/system/memory", usagePercent(total-available, total), true)
+	}
+}
+
+// usagePercent formats used/total as a whole percentage.
+func usagePercent(used, total uint64) string {
+	return strconv.FormatUint((used*100+total/2)/total, 10)
 }
 
 // refreshNetworkInfo re-reads the local IP (DHCP can change it while
@@ -1930,6 +2035,7 @@ func (b *MQTTBridge) publishAllStates() {
 	mute := b.muteOn
 	display := b.displayOn
 	sip := b.sipRegistered
+	busConnected := b.busConnected
 	b.mu.RUnlock()
 
 	if bticino.AnsweringMachineAvailable() {
@@ -1950,13 +2056,22 @@ func (b *MQTTBridge) publishAllStates() {
 		b.publish(dp+"/video/session", "OFF", true)
 	}
 
-	// WiFi signal: initial publish + start the periodic monitor once
+	// WiFi signal and system usage: initial publish + start the periodic monitor once
 	go b.publishWiFiSignal()
+	b.publishSystemUsage()
 	b.wifiOnce.Do(func() { go b.wifiMonitorLoop(60 * time.Second) })
 
 	// New entities: SIP status, system diagnostics
 	b.publish(dp+"/sip/registration", boolState(sip), true)
 	b.publish(dp+"/system/diagnostics", "starting", true)
+	b.publish(dp+"/bus/connection", boolState(busConnected), true)
+
+	// Start times (HA timestamp sensors need ISO 8601 with a time zone)
+	if up, err := system.ReadUptime(system.ProcUptimePath); err == nil {
+		b.publish(dp+"/system/last_boot", time.Now().Add(-up).Truncate(time.Second).Format(time.RFC3339), true)
+	}
+	b.publish(dp+"/system/bridge_started", b.startTime.Truncate(time.Second).Format(time.RFC3339), true)
+	b.publish(dp+"/system/bridge_version", version.GetVersion(), true)
 
 	// GPIO pins initial state (all OFF until first read)
 	gpioPins := []int{12, 13, 47, 49, 52, 54, 56, 58, 60, 154, 155, 176, 180}
@@ -2128,8 +2243,13 @@ func (b *MQTTBridge) QuerySystemInfo() {
 	// Keep the facts for the periodic network refresh (IP can change under
 	// DHCP while everything else here is reboot-static).
 	b.mu.Lock()
+	old := b.systemInfo
 	b.systemInfo = info
 	b.mu.Unlock()
+	// The device block carries firmware and hardware version: republish
+	// discovery once they are known or have changed.
+	deviceChanged := old["firmware_version"] != info["firmware_version"] ||
+		old["hardware_version"] != info["hardware_version"]
 
 	// Publish as JSON on the sensor
 	jsonData, err := json.Marshal(info)
@@ -2151,6 +2271,10 @@ func (b *MQTTBridge) QuerySystemInfo() {
 	}
 	if mac, ok := info["mac_address"]; ok {
 		b.publish(dp+"/system/network/mac", mac, true)
+	}
+
+	if deviceChanged {
+		b.publishHomeAssistantDiscovery()
 	}
 
 	b.logger.WithField("info", info).Info("System information published")
@@ -2224,6 +2348,14 @@ func (b *MQTTBridge) PublishSIPStatus(registered bool) {
 	b.sipRegistered = registered
 	b.mu.Unlock()
 	b.publish(b.dataPrefix()+"/sip/registration", boolState(registered), true)
+}
+
+// UpdateBusState publishes whether the OpenWebNet monitor (port 20000) is connected.
+func (b *MQTTBridge) UpdateBusState(connected bool) {
+	b.mu.Lock()
+	b.busConnected = connected
+	b.mu.Unlock()
+	b.publish(b.dataPrefix()+"/bus/connection", boolState(connected), true)
 }
 
 // PublishSystemDiagnostics publishes system diagnostic info to MQTT

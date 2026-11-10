@@ -1133,6 +1133,18 @@ func main() {
 			}
 		})
 
+		// Monitor connection state -> "OpenWebNet Bus" diagnostic sensor.
+		owClient.OnConnected(func(int) {
+			if mqttBridge != nil {
+				mqttBridge.UpdateBusState(owClient.IsConnected())
+			}
+		})
+		owClient.OnDisconnected(func(int, error) {
+			if mqttBridge != nil {
+				mqttBridge.UpdateBusState(owClient.IsConnected())
+			}
+		})
+
 		// Connect only now: the reader delivers frames from the first one on.
 		if *testMode {
 			logger.Info("Running in test mode - no OpenWebNet device connection")

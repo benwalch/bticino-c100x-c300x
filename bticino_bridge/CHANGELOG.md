@@ -59,6 +59,17 @@ Known limits:
   repository and a dashboard screenshot
   (`docs/images/dashboard.png`, made with placeholder data).
 
+- New diagnostic entities in Home Assistant: Flash Usage and Memory Usage
+  (%, refreshed every 60 s like the Wi-Fi signal), Last Boot and Bridge
+  Started (timestamps), Bridge Version, and OpenWebNet Bus (connectivity of
+  the port 20000 monitor). "System Information" is named "Firmware Version";
+  its entity ID stays `sensor.bticino_system_network`. The HA device page
+  shows the native firmware as `sw_version` and the hardware version as
+  `hw_version` (both from WHO=13) instead of the bridge version; discovery is
+  sent again once they are read. The OpenWebNet client now reports a
+  dropped connection to its disconnect handler, not only a deliberate
+  disconnect.
+
 - MQTT discovery names the device after `DeviceVariant`: "BTicino Classe 100X"
   with model "Classe 100 X16E", or "BTicino Classe 300X" with model
   "Classe 300 X13E". Before, a 300X build also reported itself as a Classe

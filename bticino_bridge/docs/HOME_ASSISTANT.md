@@ -54,13 +54,19 @@ optional restart buttons.
 | Activity log | `sensor` | `bticino/bus/log` | + `.../attributes` for history |
 | Firmware version | `sensor` | `bticino/system/network` | State is the firmware version; IP/MAC/kernel in attributes |
 
-### Diagnostic — network (`entity_category: diagnostic`)
+### Diagnostic — system and network (`entity_category: diagnostic`)
 
 | Entity | State topic | Notes |
 |---|---|---|
 | IP address | `bticino/system/network/address` | plain value |
 | MAC address | `bticino/system/network/mac` | plain value |
 | Wi-Fi signal (%) | `bticino/network/wifi` | from `connmanctl` Strength, refreshed every 60 s |
+| Flash usage (%) | `bticino/system/flash` | writable flash partition `/home/bticino/cfg/extra`, refreshed every 60 s |
+| Memory usage (%) | `bticino/system/memory` | `MemTotal − MemAvailable` from `/proc/meminfo`, refreshed every 60 s |
+| Last boot | `bticino/system/last_boot` | `device_class: timestamp`, device boot from `/proc/uptime` |
+| Bridge started | `bticino/system/bridge_started` | `device_class: timestamp`, start of the bridge process |
+| Bridge version | `bticino/system/bridge_version` | version of this bridge; the device page shows the native firmware (`sw_version`) and hardware (`hw_version`) |
+| OpenWebNet Bus | `bticino/bus/connection` | `binary_sensor`, `device_class: connectivity`; monitor connection on port 20000, updated on connect and disconnect |
 
 ### Device configuration (read-only mirror of the native settings)
 

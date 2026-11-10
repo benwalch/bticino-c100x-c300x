@@ -451,6 +451,9 @@ func (c *Client) readMessages(port int, reader *bufio.Reader) {
 			delete(c.connections, port)
 			c.connected[port] = false
 			c.mutex.Unlock()
+			if c.onDisconnect != nil {
+				go c.onDisconnect(port, err)
+			}
 
 			go c.reconnectPort(port)
 			break
