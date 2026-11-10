@@ -55,7 +55,9 @@ Known limits:
   `make deploy` (the `deploy-standard.sh` it named is gone), and the docs
   index lists only existing pages. Removed outdated reports, plans and
   superseded guides, and `configs/homeassistant/`, whose topics and entities
-  no longer exist.
+  no longer exist. The root README has a model status table, a map of the
+  repository and a dashboard screenshot
+  (`docs/images/dashboard.png`, made with placeholder data).
 
 - MQTT discovery names the device after `DeviceVariant`: "BTicino Classe 100X"
   with model "Classe 100 X16E", or "BTicino Classe 300X" with model
