@@ -10,15 +10,15 @@ func TestBuildForwardArgs(t *testing.T) {
 	args := buildForwardArgs("/tmp/in.sdp", "127.0.0.1:10000", ans)
 	joined := strings.Join(args, " ")
 	if !strings.Contains(joined, "-f rtp") {
-		t.Fatalf("salida no es RTP: %s", joined)
+		t.Fatalf("output is not RTP: %s", joined)
 	}
 	if !strings.Contains(joined, "rtp://127.0.0.1:10000") {
-		t.Fatalf("destino RTP incorrecto: %s", joined)
+		t.Fatalf("wrong RTP destination: %s", joined)
 	}
 	if strings.Contains(joined, "-f wav") || strings.Contains(joined, ".wav") {
-		t.Fatalf("no debe escribir WAV: %s", joined)
+		t.Fatalf("must not write WAV: %s", joined)
 	}
 	if !strings.Contains(joined, "srtp") {
-		t.Fatalf("whitelist debe permitir srtp (descifrado entrante): %s", joined)
+		t.Fatalf("whitelist must allow srtp (incoming decryption): %s", joined)
 	}
 }

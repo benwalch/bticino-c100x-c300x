@@ -236,12 +236,12 @@ additional_locks:
   #   where: 22
 
 # ==================== ACCESS CLASSIFIER ====================
-# Classifies each door opening as intercom ("telefonillo") or key ("llave") by
+# Classifies each door opening as "visitor" or "resident" (key/RFID) by
 # correlating it with earlier rings and calls. Only listens to the internal bus;
 # sends no commands.
 access:
   enabled: false
-  correlation_window: 30s      # opening within this time after a ring or call → "telefonillo"
+  correlation_window: 30s      # opening within this time after a ring or call → "visitor"
   max_hold_wait: 8s            # how long to wait for the door to close to measure the pulse duration
   duration_visitor_max: 3500ms # duration ≤ → "visitor" range (only adjusts the CONFIDENCE, not the label)
 

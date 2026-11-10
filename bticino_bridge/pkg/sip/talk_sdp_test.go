@@ -14,7 +14,7 @@ func TestBuildBackchannelSDP(t *testing.T) {
 		"a=rtpmap:97 speex/8000\r\n",
 	} {
 		if !strings.Contains(sdp, want) {
-			t.Errorf("SDP backchannel no contiene %q\n---\n%s", want, sdp)
+			t.Errorf("backchannel SDP does not contain %q\n---\n%s", want, sdp)
 		}
 	}
 }

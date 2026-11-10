@@ -26,7 +26,7 @@ func readOut(t *testing.T, c *net.UDPConn, d time.Duration) rtpOut {
 	_ = c.SetReadDeadline(time.Now().Add(d))
 	n, err := c.Read(buf)
 	if err != nil {
-		t.Fatalf("el consumidor no recibió RTP: %v", err)
+		t.Fatalf("the consumer received no RTP: %v", err)
 	}
 	return rtpOut{
 		pt: buf[1] & 0x7f, marker: buf[1]&0x80 != 0,
@@ -57,7 +57,7 @@ func newVFillRelay(t *testing.T) (*net.UDPConn, int) {
 	return cons, port
 }
 
-// readFrame lee paquetes hasta el marker (fin de fotograma).
+// readFrame reads packets up to the marker (end of frame).
 func readFrame(t *testing.T, c *net.UDPConn) []rtpOut {
 	t.Helper()
 	var f []rtpOut
@@ -68,49 +68,49 @@ func readFrame(t *testing.T, c *net.UDPConn) []rtpOut {
 			return f
 		}
 	}
-	t.Fatal("fotograma sin marker")
+	t.Fatal("frame without marker")
 	return nil
 }
 
-// En reposo el RTSP no queda mudo: fondo negro H.264 (SPS+PPS+IDR) a ~1 fps con PT96,
-// para que el ffmpeg de go2rtc siga conectado y la imagen real llegue al instante al
-// abrirse el ojo (antes: ciclo de reintentos de ~90 s).
-func TestRelayVideoFondoEnReposo(t *testing.T) {
+// At rest the RTSP does not go silent: a black H.264 background (SPS+PPS+IDR) at
+// ~1 fps with PT96, so go2rtc's ffmpeg stays connected and the real picture arrives
+// at once when the panel view opens (before: a retry cycle of ~90 s).
+func TestRelayVideoBackgroundAtRest(t *testing.T) {
 	cons, _ := newVFillRelay(t)
 	f1 := readFrame(t, cons)
 	if f1[0].pt != 96 || f1[0].payload[0]&31 != 7 || f1[1].payload[0]&31 != 8 {
-		t.Fatalf("el fotograma de reposo debe empezar por SPS y PPS: PT%d nal %d,%d", f1[0].pt, f1[0].payload[0]&31, f1[1].payload[0]&31)
+		t.Fatalf("the idle frame must start with SPS and PPS: PT%d nal %d,%d", f1[0].pt, f1[0].payload[0]&31, f1[1].payload[0]&31)
 	}
 	hasIDR := false
 	for i, p := range f1 {
 		if p.ts != f1[0].ts {
-			t.Fatal("todos los paquetes de un fotograma comparten timestamp")
+			t.Fatal("all packets of a frame share the timestamp")
 		}
 		if i > 0 && p.seq != f1[i-1].seq+1 {
-			t.Fatal("secuencia no continua")
+			t.Fatal("sequence not continuous")
 		}
 		nt := p.payload[0] & 31
 		if nt == 5 || (nt == 28 && p.payload[1]&31 == 5) {
 			hasIDR = true
 		}
 		if nt == 6 {
-			t.Fatal("el SEI de x264 no debe emitirse")
+			t.Fatal("the x264 SEI must not be emitted")
 		}
 	}
 	if !hasIDR {
-		t.Fatal("el fotograma de reposo debe llevar IDR")
+		t.Fatal("the idle frame must carry an IDR")
 	}
 	f2 := readFrame(t, cons)
 	if d := f2[0].ts - f1[0].ts; d < 60000 || d > 120000 {
-		t.Fatalf("el fondo debe repetirse a ~1 fps (Δts=%d, esperado ~90000)", d)
+		t.Fatalf("the background must repeat at ~1 fps (Δts=%d, expected ~90000)", d)
 	}
 }
 
-// El vídeo real sale reescrito (SSRC/secuencia propios) conservando marker y la
-// separación de timestamps del origen, y mientras fluye no se intercala el fondo.
-func TestRelayVideoRealDesplazaAlFondo(t *testing.T) {
+// Real video goes out rewritten (own SSRC/sequence) keeping the marker and the
+// source's timestamp spacing, and while it flows the background is not interleaved.
+func TestRelayVideoRealDisplacesBackground(t *testing.T) {
 	cons, port := newVFillRelay(t)
-	readFrame(t, cons) // fondo inicial
+	readFrame(t, cons) // initial background
 	src := func(seq uint16, ts uint32, marker bool, payload []byte) []byte {
 		b := mkRTP(96, seq, 0xabcdef01, payload)
 		binary.BigEndian.PutUint32(b[4:8], ts)
@@ -120,7 +120,7 @@ func TestRelayVideoRealDesplazaAlFondo(t *testing.T) {
 		return b
 	}
 	var got []rtpOut
-	for i := 0; i < 30; i++ { // ~1,5 s de vídeo real a 20 fps
+	for i := 0; i < 30; i++ { // ~1.5 s of real video at 20 fps
 		ts := uint32(1000 + i*4500)
 		sendTo(t, port, src(uint16(i*2), ts, false, []byte{0x5c, 0x85, 0xAA}))
 		sendTo(t, port, src(uint16(i*2+1), ts, true, []byte{0x5c, 0x45, 0xBB}))
@@ -135,21 +135,21 @@ func TestRelayVideoRealDesplazaAlFondo(t *testing.T) {
 		if bytes.Equal(p.payload, []byte{0x5c, 0x85, 0xAA}) || bytes.Equal(p.payload, []byte{0x5c, 0x45, 0xBB}) {
 			real = append(real, p)
 		} else if len(real) > 0 && p.payload[0]&31 == 7 {
-			t.Fatal("se intercaló el fondo mientras llegaba vídeo real")
+			t.Fatal("the background was interleaved while real video arrived")
 		}
 	}
 	if len(real) < 20 {
-		t.Fatalf("llegaron %d paquetes reales", len(real))
+		t.Fatalf("%d real packets arrived", len(real))
 	}
 	for i := 1; i < len(real); i++ {
 		if real[i].ssrc != real[0].ssrc || real[i].ssrc == 0xabcdef01 {
-			t.Fatal("el vídeo real debe salir con el SSRC propio del relay")
+			t.Fatal("real video must go out with the relay's own SSRC")
 		}
 	}
 	if !real[1].marker || real[0].marker {
-		t.Fatal("hay que conservar el bit marker del origen")
+		t.Fatal("the source's marker bit must be kept")
 	}
 	if d := real[2].ts - real[0].ts; d != 4500 {
-		t.Fatalf("hay que conservar la separación de timestamps del origen (Δ=%d, esperado 4500)", d)
+		t.Fatalf("the source's timestamp spacing must be kept (Δ=%d, expected 4500)", d)
 	}
 }

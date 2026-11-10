@@ -8,45 +8,45 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// TestMediaDrain_ConsumeUDPsinError verifica que el drenaje lee y descarta paquetes UDP sin
-// error, incrementando el contador de paquetes de audio. Usa puertos efímeros (0,0) para no
-// depender de puertos fijos durante el test.
-func TestMediaDrain_ConsumeUDPsinError(t *testing.T) {
-	d, err := startMediaDrain(0, 0, logrus.New()) // 0,0 => puertos efímeros elegidos por el SO
+// TestMediaDrain_ConsumesUDPWithoutError checks that the drain reads and drops UDP packets
+// without error, counting audio packets. It uses ephemeral ports (0,0) so the test does
+// not depend on fixed ports.
+func TestMediaDrain_ConsumesUDPWithoutError(t *testing.T) {
+	d, err := startMediaDrain(0, 0, logrus.New()) // 0,0 => ephemeral ports chosen by the OS
 	if err != nil {
 		t.Fatalf("startMediaDrain: %v", err)
 	}
-	// Descubre el puerto real de audio (expón d.AudioAddr() para el test).
+	// Find the real audio port (d.AudioAddr() is exposed for the test).
 	addr := d.AudioAddr()
 	conn, err := net.Dial("udp", addr)
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
 	for i := 0; i < 10; i++ {
-		conn.Write([]byte("paquete-srtp-simulado"))
+		conn.Write([]byte("simulated-srtp-packet"))
 	}
 	time.Sleep(50 * time.Millisecond)
 	d.Stop()
 	if got := d.PacketsAudio(); got < 1 {
-		t.Fatalf("esperaba >=1 paquete drenado, got %d", got)
+		t.Fatalf("expected >=1 packet drained, got %d", got)
 	}
 }
 
-// TestMediaDrain_VideoPortCero verifica que si videoPort==0 no se abre socket de vídeo (no falla,
-// simplemente no hay drenaje de vídeo).
-func TestMediaDrain_VideoPortCero(t *testing.T) {
+// TestMediaDrain_VideoPortZero checks that with videoPort==0 no video socket is opened (no
+// failure, there is just no video drain).
+func TestMediaDrain_VideoPortZero(t *testing.T) {
 	d, err := startMediaDrain(0, 0, logrus.New())
 	if err != nil {
 		t.Fatalf("startMediaDrain: %v", err)
 	}
 	defer d.Stop()
 	if d.VideoAddr() != "" {
-		t.Fatalf("esperaba VideoAddr vacío con videoPort=0, got %q", d.VideoAddr())
+		t.Fatalf("expected an empty VideoAddr with videoPort=0, got %q", d.VideoAddr())
 	}
 }
 
-// TestMediaDrain_StopEsIdempotente verifica que llamar Stop() dos veces no entra en pánico.
-func TestMediaDrain_StopEsIdempotente(t *testing.T) {
+// TestMediaDrain_StopIsIdempotent checks that calling Stop() twice does not panic.
+func TestMediaDrain_StopIsIdempotent(t *testing.T) {
 	d, err := startMediaDrain(0, 0, logrus.New())
 	if err != nil {
 		t.Fatalf("startMediaDrain: %v", err)

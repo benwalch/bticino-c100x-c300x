@@ -2,7 +2,7 @@ package sip
 
 import "os/exec"
 
-// ExecRunner lanza procesos reales con os/exec. Implementa ProcRunner.
+// ExecRunner starts real processes with os/exec. It implements ProcRunner.
 type ExecRunner struct{}
 
 func NewExecRunner() *ExecRunner { return &ExecRunner{} }

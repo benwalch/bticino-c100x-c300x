@@ -5,14 +5,14 @@ import (
 	"time"
 )
 
-func TestExecRunner_ArrancaYMata(t *testing.T) {
+func TestExecRunner_StartsAndKills(t *testing.T) {
 	r := NewExecRunner()
-	// `sleep 30` como proceso inocuo de larga duración.
+	// `sleep 30` as a harmless long-running process.
 	p, err := r.Start("sleep", []string{"30"})
 	if err != nil {
-		t.Skipf("no hay 'sleep' en el entorno de test: %v", err)
+		t.Skipf("no 'sleep' in the test environment: %v", err)
 	}
-	// Matarlo y confirmar que Wait retorna en un tiempo razonable.
+	// Kill it and confirm that Wait returns in a reasonable time.
 	if err := p.Kill(); err != nil {
 		t.Fatalf("Kill: %v", err)
 	}
@@ -21,13 +21,13 @@ func TestExecRunner_ArrancaYMata(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(3 * time.Second):
-		t.Fatal("Wait no retornó tras Kill")
+		t.Fatal("Wait did not return after Kill")
 	}
 }
 
-func TestExecRunner_BinarioInexistente(t *testing.T) {
+func TestExecRunner_MissingBinary(t *testing.T) {
 	r := NewExecRunner()
 	if _, err := r.Start("/no/existe/ffmpeg-xyz", []string{"-x"}); err == nil {
-		t.Fatal("esperaba error al arrancar un binario inexistente")
+		t.Fatal("expected an error starting a missing binary")
 	}
 }

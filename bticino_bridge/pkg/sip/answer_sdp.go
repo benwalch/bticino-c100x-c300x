@@ -6,14 +6,14 @@ import (
 	"strings"
 )
 
-// GenerateSRTPKey genera una clave SDES para AES_CM_128_HMAC_SHA1_80 (30 bytes,
-// base64). Alias de NewSRTPMasterKey para mantener una única fuente de clave.
+// GenerateSRTPKey generates an SDES key for AES_CM_128_HMAC_SHA1_80 (30 bytes,
+// base64). Alias of NewSRTPMasterKey to keep a single key source.
 func GenerateSRTPKey() (string, error) {
 	return NewSRTPMasterKey()
 }
 
-// BuildAnswerSDP construye la SDP answer del contestador. Audio speex PT96 sobre SRTP
-// (AES_CM_128_HMAC_SHA1_80). Si videoPort>0, añade m=video H264 42801F. Determinista.
+// BuildAnswerSDP builds the answerer's SDP answer. Speex audio PT96 over SRTP
+// (AES_CM_128_HMAC_SHA1_80). If videoPort>0, it adds m=video H264 42801F. Deterministic.
 func BuildAnswerSDP(localIP string, audioPort, videoPort int, srtpKeyB64 string) string {
 	var b strings.Builder
 	b.WriteString("v=0\r\n")
@@ -32,24 +32,24 @@ func BuildAnswerSDP(localIP string, audioPort, videoPort int, srtpKeyB64 string)
 		b.WriteString("a=rtpmap:96 H264/90000\r\n")
 		b.WriteString("a=fmtp:96 profile-level-id=42801F\r\n")
 		b.WriteString(fmt.Sprintf("a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:%s\r\n", srtpKeyB64))
-		// recvonly: el bridge solo RECIBE el vídeo de la placa (no tiene cámara que enviar).
-		// Es lo que declara la app oficial 1.17.3 al contestar. No afecta al vídeo hacia HA.
+		// recvonly: the bridge only RECEIVES the entrance panel's video (it has no camera to send).
+		// This is what the official app 1.17.3 declares when answering. It does not affect video to HA.
 		b.WriteString("a=recvonly\r\n")
 	}
 	return b.String()
 }
 
-// ParseRemoteAudioPort extrae el puerto de la primera línea m=audio del offer.
+// ParseRemoteAudioPort extracts the port of the first m=audio line of the offer.
 func ParseRemoteAudioPort(offer string) (int, error) {
 	for _, line := range strings.Split(offer, "\n") {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "m=audio ") {
 			fields := strings.Fields(line)
 			if len(fields) < 2 {
-				return 0, fmt.Errorf("m=audio malformada: %q", line)
+				return 0, fmt.Errorf("malformed m=audio: %q", line)
 			}
 			return strconv.Atoi(fields[1])
 		}
 	}
-	return 0, fmt.Errorf("no hay m=audio en el offer")
+	return 0, fmt.Errorf("no m=audio in the offer")
 }

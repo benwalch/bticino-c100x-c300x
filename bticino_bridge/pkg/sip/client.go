@@ -170,18 +170,19 @@ type BTicinoSIPClient struct {
 	resolveNativeFunc   func() (string, error)
 	establishDialogFunc func(uri, sdp string) (*cameraDialog, error)
 	terminateDialogFunc func(*cameraDialog)
-	// nativeCalls: subconjunto de originatedCalls que DEBE llegar al bt_vct nativo
-	// (InviteWithSDP: el ojo, AudioCall). El listener c300x no los auto-contesta
-	// (responde 480 en su rama). El self-INVITE de vídeo de MakeCall NO está aquí:
-	// ese sí lo auto-contesta nuestro listener (loopback, video_on_demand).
+	// nativeCalls: the subset of originatedCalls that MUST reach the native bt_vct
+	// (InviteWithSDP: the panel view, AudioCall). The c300x listener does not
+	// auto-answer them (it answers 480 on its branch). MakeCall's video
+	// self-INVITE is NOT here: our listener does auto-answer that one (loopback,
+	// video_on_demand).
 	nativeCalls map[string]time.Time
-	// watch es el vigilante del diálogo saliente conectado (ver dialog_watch.go);
-	// watchMu lo protege por separado de mutex (el vigilante necesita mutex).
+	// watch is the watcher of the connected outgoing dialog (see dialog_watch.go);
+	// watchMu guards it separately from mutex (the watcher needs mutex).
 	watchMu sync.Mutex
 	watch   *dialogWatch
-	// Ruta del diálogo saliente (RFC 3261 §12.1.2): remoteTarget = Contact del
-	// 200 OK; routeSet = Record-Route en orden inverso. El BYE debe ir por aquí:
-	// a sip:c300x@dominio sin Route, Flexisip no lo entregaba al bt_vct.
+	// Route of the outgoing dialog (RFC 3261 §12.1.2): remoteTarget = Contact of
+	// the 200 OK; routeSet = Record-Route in reverse order. The BYE must go this
+	// way: sent to sip:c300x@domain without a Route, Flexisip did not deliver it to bt_vct.
 	remoteTarget string
 	routeSet     []string
 }
@@ -328,8 +329,8 @@ func (c *BTicinoSIPClient) Start() error {
 	}, "sip")
 
 	// Start re-registration timer
-	// Se comprueba cada 30 s y se renueva a mitad de la expiración: si el socket
-	// webrtc está ocupado (ojo en curso) hay muchos reintentos antes de caducar.
+	// Checked every 30 s and renewed at half the expiry: if the webrtc socket is
+	// busy (panel view running) there are many retries before it expires.
 	c.registerTick = time.NewTicker(registerCheckInterval)
 	go c.registrationManager()
 
@@ -559,12 +560,12 @@ func (c *BTicinoSIPClient) localListener() {
 // handleLocalMessage dispatches one message read from the answerer identity socket.
 func (c *BTicinoSIPClient) handleLocalMessage(msg *SIPMessage) {
 	if msg.StatusCode != "" {
-		// Respuesta (p.ej. al re-REGISTER): se entrega a quien la espera.
+		// Response (e.g. to the re-REGISTER): handed to whoever waits for it.
 		if ch := c.localID.responses(); ch != nil {
 			select {
 			case ch <- msg:
 			default:
-				c.logger.Debugf("%s listener: respuesta %s sin destinatario, descartada", c.answerUser, msg.StatusCode)
+				c.logger.Debugf("%s listener: response %s without a recipient, dropped", c.answerUser, msg.StatusCode)
 			}
 		}
 		return
@@ -578,8 +579,8 @@ func (c *BTicinoSIPClient) handleLocalMessage(msg *SIPMessage) {
 		c.respondToOptions(c.localID, msg)
 	} else if msg.Method == "ACK" {
 		if !c.shouldAutoAnswer(sipCallID(msg)) {
-			// ACK hop-by-hop de Flexisip a nuestro 480 de la rama loopback: no es sesión.
-			c.logger.Debugf("%s listener: ACK de la rama loopback (480) — ignorado", c.answerUser)
+			// Flexisip's hop-by-hop ACK to our 480 on the loopback branch: not a session.
+			c.logger.Debugf("%s listener: ACK of the loopback branch (480), ignored", c.answerUser)
 			return
 		}
 		c.logger.Infof("%s listener: received ACK — SIP session fully established!", c.answerUser)
@@ -600,8 +601,8 @@ func (c *BTicinoSIPClient) handleLocalMessage(msg *SIPMessage) {
 		}, "sip")
 	} else if msg.Method == "BYE" {
 		if !c.shouldAutoAnswer(sipCallID(msg)) {
-			// BYE de un diálogo nuestro que no es de esta pata: se contesta y NO se
-			// toca el estado (cerraría por error el ojo en curso).
+			// BYE of one of our dialogs that is not this leg's: answer it and do NOT
+			// touch the state (it would close the running panel view by mistake).
 			c.sendBYEResponse(c.localID, msg)
 			return
 		}
@@ -620,10 +621,10 @@ func (c *BTicinoSIPClient) handleLocalMessage(msg *SIPMessage) {
 	}
 }
 
-// shouldAutoAnswer decide si el listener c300x debe auto-contestar este INVITE.
-// Devuelve false para los INVITE que originamos con InviteWithSDP (el ojo de
-// PanelView, AudioCall): deben llegar al bt_vct NATIVO, no al loopback del bridge.
-// El self-INVITE de vídeo (MakeCall) sí se auto-contesta (regresión de la 0.29.0).
+// shouldAutoAnswer decides whether the c300x listener auto-answers this INVITE.
+// It returns false for INVITEs we place with InviteWithSDP (the PanelView panel
+// view, AudioCall): they must reach the NATIVE bt_vct, not the bridge loopback.
+// The video self-INVITE (MakeCall) is auto-answered (0.29.0 regression).
 func (c *BTicinoSIPClient) shouldAutoAnswer(callID string) bool {
 	c.mutex.Lock()
 	_, toNative := c.nativeCalls[callID]
@@ -631,7 +632,7 @@ func (c *BTicinoSIPClient) shouldAutoAnswer(callID string) bool {
 	return !toNative
 }
 
-// CallID devuelve el Call-ID del diálogo originado más reciente.
+// CallID returns the Call-ID of the most recently placed dialog.
 func (c *BTicinoSIPClient) CallID() string {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -691,16 +692,16 @@ func (c *BTicinoSIPClient) handleIncomingInvite(invite *SIPMessage) {
 		}, "sip")
 	}
 
-	// INVITE propio (p.ej. el ojo de PanelView): NO se auto-contesta, debe
-	// llegar al bt_vct nativo y no al loopback del bridge.
+	// Our own INVITE (e.g. the PanelView panel view): NOT auto-answered, it must
+	// reach the native bt_vct and not the bridge loopback.
 	if !c.shouldAutoAnswer(callID) {
-		c.logger.WithField("call_id", callID).Infof("%s: INVITE propio (loopback) — 480 en esta rama; lo atiende el nativo", c.answerUser)
-		// Respuesta FINAL obligatoria: si esta rama del fork queda sin contestar,
-		// Flexisip no reenvía la final del bt_vct (p.ej. su 486) y el INVITE del
-		// ojo acaba en timeout. Un 2xx del nativo prevalece igualmente.
+		c.logger.WithField("call_id", callID).Infof("%s: own INVITE (loopback): 480 on this branch; the native side handles it", c.answerUser)
+		// A FINAL response is required: if this fork branch stays unanswered,
+		// Flexisip does not forward bt_vct's final (e.g. its 486) and the panel
+		// view's INVITE times out. A 2xx from the native side still wins.
 		resp := c.buildLoopbackReject(callID, from, to, viaHeaders, cseqHeader)
 		if _, err := c.localID.conn.Write([]byte(resp)); err != nil {
-			c.logger.WithError(err).Warnf("%s: no se pudo enviar 480 a la rama loopback", c.answerUser)
+			c.logger.WithError(err).Warnf("%s: could not send 480 to the loopback branch", c.answerUser)
 		}
 		return
 	}
@@ -743,7 +744,7 @@ func (c *BTicinoSIPClient) handleIncomingInvite(invite *SIPMessage) {
 	c.mutex.Lock()
 	c.callID = callID
 	c.toTag = toTag
-	c.remoteTarget, c.routeSet = "", nil // diálogo UAS: no heredar la ruta de un ojo previo
+	c.remoteTarget, c.routeSet = "", nil // UAS dialog: do not inherit the route of an earlier panel view
 	c.callState = IncomingCall
 	c.mutex.Unlock()
 
@@ -807,9 +808,9 @@ func (c *BTicinoSIPClient) build100Trying(callID, from, to string, viaHeaders, r
 	return strings.Join(lines, "\r\n")
 }
 
-// buildLoopbackReject construye el 480 final para la rama del fork que nos trae
-// un INVITE propio. El To-tag se deriva del Call-ID para que las retransmisiones
-// del INVITE reciban exactamente la misma respuesta.
+// buildLoopbackReject builds the final 480 for the fork branch that brings us
+// our own INVITE. The To-tag is derived from the Call-ID so that INVITE
+// retransmissions get exactly the same response.
 func (c *BTicinoSIPClient) buildLoopbackReject(callID, from, to string, viaHeaders []string, cseq string) string {
 	if !strings.Contains(to, ";tag=") {
 		to = fmt.Sprintf("%s;tag=lb%08x", to, crc32.ChecksumIEEE([]byte(callID)))
@@ -950,7 +951,7 @@ func (c *BTicinoSIPClient) respondToOptions(id *sipIdentity, options *SIPMessage
 // SIP handshake to complete (including auto-answer from the answerer identity).
 // Returns only when the call is Connected or an error occurs.
 func (c *BTicinoSIPClient) MakeCall(target string) error {
-	c.stopDialogWatch() // un solo lector del socket webrtc
+	c.stopDialogWatch() // a single reader of the webrtc socket
 	c.webrtcID.readMu.Lock()
 	defer c.webrtcID.readMu.Unlock()
 	c.mutex.Lock()
@@ -1136,23 +1137,22 @@ func (c *BTicinoSIPClient) MakeCall(target string) error {
 	return nil
 }
 
-// Comprobación en tiempo de compilación: *BTicinoSIPClient satisface
-// CallOriginator (usado por AudioCall, pkg/sip/audio_call.go).
+// Compile-time check: *BTicinoSIPClient satisfies CallOriginator (used by
+// AudioCall, pkg/sip/audio_call.go).
 var _ CallOriginator = (*BTicinoSIPClient)(nil)
 
-// InviteWithSDP origina un INVITE a target con el SDP dado (p.ej. una oferta
-// de audio real para talk-back) y devuelve el cuerpo SDP de la respuesta 200
-// OK. Satisface la interfaz CallOriginator que usa AudioCall (Task 7/8).
+// InviteWithSDP places an INVITE to target with the given SDP (e.g. a real
+// audio offer for talk-back) and returns the SDP body of the 200 OK. It
+// satisfies the CallOriginator interface used by AudioCall.
 //
-// Reutiliza la misma maquinaria que MakeCall (registro de Call-ID en
-// originatedCalls, envío por la pata webrtc, bucle de lectura de respuestas
-// hasta 200 OK, ACK), pero en vez de descartar el cuerpo del 200 OK lo
-// extrae y lo devuelve — es la respuesta SDP que necesita el emisor de audio
-// para saber a qué puerto/clave SRTP enviar el WAV.
+// It reuses the MakeCall machinery (Call-ID registered in originatedCalls,
+// sent over the webrtc leg, response read loop until 200 OK, ACK), but instead
+// of dropping the 200 OK body it extracts and returns it: that is the SDP
+// answer the audio sender needs to know which port/SRTP key to send the WAV to.
 func (c *BTicinoSIPClient) InviteWithSDP(target, sdp string) (string, error) {
-	c.stopDialogWatch() // un solo lector del socket webrtc
+	c.stopDialogWatch() // a single reader of the webrtc socket
 	c.webrtcID.readMu.Lock()
-	handedOff := false // al conectar, el lector pasa al vigilante del diálogo
+	handedOff := false // once connected, the reader passes to the dialog watcher
 	defer func() {
 		if !handedOff {
 			c.webrtcID.readMu.Unlock()
@@ -1167,8 +1167,8 @@ func (c *BTicinoSIPClient) InviteWithSDP(target, sdp string) (string, error) {
 
 	c.logger.Infof("=== INVITEWITHSDP: Initiating audio call to %s ===", target)
 
-	// Nuevo Call-ID, registrado como self-originado (igual que MakeCall) para
-	// que el listener de c300x no lo confunda con una llamada externa real.
+	// New Call-ID, registered as self-originated (like MakeCall) so the c300x
+	// listener does not take it for a real external call.
 	c.mutex.Lock()
 	c.callID = c.generateCallID()
 	c.remoteTag = ""
@@ -1185,11 +1185,11 @@ func (c *BTicinoSIPClient) InviteWithSDP(target, sdp string) (string, error) {
 			delete(c.nativeCalls, id)
 		}
 	}
-	c.nativeCalls[c.callID] = now // va al nativo, no al loopback
+	c.nativeCalls[c.callID] = now // goes to the native side, not the loopback
 	inviteCallID := c.callID
 	c.mutex.Unlock()
 
-	// Drenar el canal de "conectado" de una llamada previa
+	// Drain the "connected" channel of an earlier call
 	select {
 	case <-c.callConnectedCh:
 	default:
@@ -1224,7 +1224,7 @@ func (c *BTicinoSIPClient) InviteWithSDP(target, sdp string) (string, error) {
 			}
 			c.logger.Infof("=== INVITEWITHSDP: Got response: status=%s method=%s ===", response.StatusCode, response.Method)
 
-			// Provisionales — seguimos esperando
+			// Provisional: keep waiting
 			if response.StatusCode == "100" {
 				continue
 			}
@@ -1238,10 +1238,9 @@ func (c *BTicinoSIPClient) InviteWithSDP(target, sdp string) (string, error) {
 			if response.StatusCode == "200" {
 				c.logger.Info("=== INVITEWITHSDP: Got 200 OK! Extracting SDP + sending ACK ===")
 
-				// El cuerpo SDP de la respuesta va tras la primera línea en
-				// blanco de Raw. response.Body ya lo trae parseado (Content-
-				// Length aplicado), pero por robustez caemos también a
-				// partir manualmente de Raw si Body viniera vacío.
+				// The response's SDP body follows the first blank line of Raw.
+				// response.Body already has it parsed (Content-Length applied),
+				// but for robustness we also split Raw by hand if Body is empty.
 				answerSDP := response.Body
 				if answerSDP == "" {
 					if idx := strings.Index(response.Raw, "\r\n\r\n"); idx >= 0 {
@@ -1287,7 +1286,7 @@ func (c *BTicinoSIPClient) InviteWithSDP(target, sdp string) (string, error) {
 					"target": target,
 					"kind":   "audio_talkback",
 				}, "sip")
-				// Tras el ACK, vigilar el diálogo: BYE del nativo → 200 + sip.dialog.ended.
+				// After the ACK, watch the dialog: native BYE → 200 + sip.dialog.ended.
 				c.startDialogWatch(inviteCallID)
 				handedOff = true
 
@@ -1303,13 +1302,13 @@ func (c *BTicinoSIPClient) InviteWithSDP(target, sdp string) (string, error) {
 	return "", fmt.Errorf("timeout waiting for 200 OK")
 }
 
-// isOwnInviteResponse filtra lo que llega al socket webrtc mientras esperamos la
-// respuesta de NUESTRO INVITE. Ahí pueden quedar mensajes de diálogos previos:
-// el 200 del BYE anterior (Hangup no lo consume), 200 retransmitidos de un INVITE
-// abandonado y BYE del nativo. Tomar el primer "200" como propio rompía el ojo
-// "Ver placa" (2026-10-13: SDP vacío → BYE inmediato, y el 200 real del nativo
-// se quedaba sin ACK ~32 s). Solo vale una respuesta con nuestro Call-ID y CSeq
-// de INVITE; a los BYE ajenos se les contesta 200 para cerrar su transacción.
+// isOwnInviteResponse filters what reaches the webrtc socket while we wait for
+// the response to OUR INVITE. Messages of earlier dialogs can be left there:
+// the 200 of the previous BYE (Hangup does not consume it), retransmitted 200s
+// of an abandoned INVITE, and native BYEs. Taking the first "200" as ours broke
+// the "Show door panel" view (2026-10-13: empty SDP → immediate BYE, and the
+// native side's real 200 went unACKed for ~32 s). Only a response with our
+// Call-ID and INVITE CSeq counts; foreign BYEs get a 200 to close their transaction.
 func (c *BTicinoSIPClient) isOwnInviteResponse(msg *SIPMessage, callID string) bool {
 	msgCallID := sipCallID(msg)
 	cseq := msg.Headers["CSeq"]
@@ -1317,18 +1316,18 @@ func (c *BTicinoSIPClient) isOwnInviteResponse(msg *SIPMessage, callID string) b
 		cseq = msg.Headers["Cseq"]
 	}
 
-	if msg.StatusCode == "" { // es una petición, no una respuesta
+	if msg.StatusCode == "" { // a request, not a response
 		if msg.Method == "BYE" {
-			c.logger.Infof("SIP: BYE de otro diálogo (Call-ID=%s) mientras esperaba el INVITE; respondo 200", msgCallID)
+			c.logger.Infof("SIP: BYE of another dialog (Call-ID=%s) while waiting for the INVITE; answering 200", msgCallID)
 			c.sendBYEResponse(c.webrtcID, msg)
 		} else {
-			c.logger.Debugf("SIP: petición %s ignorada mientras esperaba el INVITE", msg.Method)
+			c.logger.Debugf("SIP: request %s ignored while waiting for the INVITE", msg.Method)
 		}
 		return false
 	}
 	f := strings.Fields(cseq)
 	if msgCallID != callID || len(f) < 2 || !strings.EqualFold(f[1], "INVITE") {
-		c.logger.Infof("SIP: respuesta ajena descartada (status=%s Call-ID=%s CSeq=%s)", msg.StatusCode, msgCallID, cseq)
+		c.logger.Infof("SIP: foreign response dropped (status=%s Call-ID=%s CSeq=%s)", msg.StatusCode, msgCallID, cseq)
 		return false
 	}
 	return true
@@ -1420,9 +1419,9 @@ func (c *BTicinoSIPClient) buildACK(target string, okResponse *SIPMessage) strin
 	return strings.Join(lines, "\r\n")
 }
 
-// dialogRouteFrom extrae del 200 OK la ruta del diálogo para el UAC (RFC 3261
-// §12.1.2): remote target = URI del Contact; route set = Record-Route en orden
-// INVERSO (el último proxy añadido es el primero que visitamos).
+// dialogRouteFrom extracts the UAC's dialog route from the 200 OK (RFC 3261
+// §12.1.2): remote target = Contact URI; route set = Record-Route in REVERSE
+// order (the last proxy added is the first one we visit).
 func dialogRouteFrom(resp *SIPMessage) (string, []string) {
 	target := ""
 	if ct := resp.Headers["Contact"]; ct != "" {
@@ -1432,7 +1431,7 @@ func dialogRouteFrom(resp *SIPMessage) (string, []string) {
 	}
 	var routes []string
 	for i := len(resp.RecordRoute) - 1; i >= 0; i-- {
-		// Un Record-Route puede traer varias entradas separadas por comas.
+		// A Record-Route can hold several comma-separated entries.
 		parts := strings.Split(resp.RecordRoute[i], ",")
 		for j := len(parts) - 1; j >= 0; j-- {
 			if r := strings.TrimSpace(parts[j]); r != "" {
@@ -1443,7 +1442,7 @@ func dialogRouteFrom(resp *SIPMessage) (string, []string) {
 	return target, routes
 }
 
-// routeHeaders formatea el route set como cabeceras Route.
+// routeHeaders formats the route set as Route headers.
 func routeHeaders(routes []string) []string {
 	out := make([]string, 0, len(routes))
 	for _, r := range routes {
@@ -1600,16 +1599,16 @@ func (c *BTicinoSIPClient) buildUnregisterRequestForIdentity(id *sipIdentity) st
 	return strings.Join(lines, "\r\n")
 }
 
-// buildInviteRequest construye el INVITE de self-INVITE de vídeo (SDP dummy).
-// No tocar el SDP aquí: el pipeline de vídeo depende de buildSDP().
+// buildInviteRequest builds the video self-INVITE (dummy SDP).
+// Do not touch the SDP here: the video pipeline depends on buildSDP().
 func (c *BTicinoSIPClient) buildInviteRequest(target string) string {
 	return c.buildInviteRequestWithSDP(target, c.buildSDP())
 }
 
-// buildInviteRequestWithSDP construye un INVITE a target con el cuerpo SDP
-// dado explícitamente (en vez del buildSDP() dummy). Usado por InviteWithSDP
-// para originar llamadas de audio real (talk-back) sin afectar al self-INVITE
-// de vídeo, que sigue pasando por buildInviteRequest/buildSDP.
+// buildInviteRequestWithSDP builds an INVITE to target with the given SDP body
+// (instead of the dummy buildSDP()). InviteWithSDP uses it to place real audio
+// calls (talk-back) without affecting the video self-INVITE, which still goes
+// through buildInviteRequest/buildSDP.
 func (c *BTicinoSIPClient) buildInviteRequestWithSDP(target, sdp string) string {
 	requestURI := fmt.Sprintf("sip:%s@%s", target, c.config.Domain)
 	from := fmt.Sprintf("sip:%s@%s", c.config.Username, c.config.Domain)
@@ -1683,7 +1682,7 @@ func (c *BTicinoSIPClient) buildSDP() string {
 }
 
 func (c *BTicinoSIPClient) Hangup() error {
-	c.stopDialogWatch() // ANTES de tomar c.mutex (el vigilante lo usa al procesar un BYE)
+	c.stopDialogWatch() // BEFORE taking c.mutex (the watcher uses it when handling a BYE)
 	conn, _ := c.identityConn(c.webrtcID)
 
 	c.mutex.Lock()
@@ -1772,11 +1771,11 @@ func (c *BTicinoSIPClient) buildByeRequest() string {
 	return strings.Join(lines, "\r\n")
 }
 
-// registerCheckInterval es cada cuánto se mira si toca renovar el registro.
+// registerCheckInterval is how often to check whether the registration needs renewing.
 const registerCheckInterval = 30 * time.Second
 
-// errSocketBusy: el socket de la identidad lo posee otro lector (ojo en curso).
-var errSocketBusy = errors.New("socket SIP ocupado por otro lector")
+// errSocketBusy: another reader owns the identity's socket (panel view running).
+var errSocketBusy = errors.New("SIP socket busy with another reader")
 
 // startLocalListener starts the answerer listener as the only reader of its socket.
 func (c *BTicinoSIPClient) startLocalListener() {
@@ -1801,11 +1800,11 @@ func (id *sipIdentity) markRegistered() {
 	id.mutex.Unlock()
 }
 
-// registerResponseTimeout acota la espera del 200 del REGISTER: Flexisip es local
-// y contesta en ms; un plazo largo retrasaría a quien espera el lector (ojo/BYE).
+// registerResponseTimeout bounds the wait for the REGISTER's 200: Flexisip is
+// local and answers in ms; a long wait would delay whoever waits for the reader (panel view/BYE).
 const registerResponseTimeout = 3 * time.Second
 
-// rawCSeq extrae el valor de la cabecera CSeq de un mensaje SIP en crudo.
+// rawCSeq extracts the CSeq header value from a raw SIP message.
 func rawCSeq(raw string) string {
 	for _, ln := range strings.Split(raw, "\r\n") {
 		if k, v, ok := strings.Cut(ln, ":"); ok && strings.EqualFold(strings.TrimSpace(k), "CSeq") {
@@ -1815,7 +1814,7 @@ func rawCSeq(raw string) string {
 	return ""
 }
 
-// msgCSeq devuelve la CSeq de un mensaje parseado (tolerante a la capitalización).
+// msgCSeq returns the CSeq of a parsed message (case-insensitive header name).
 func msgCSeq(m *SIPMessage) string {
 	for _, k := range []string{"CSeq", "Cseq", "cseq"} {
 		if v := m.Headers[k]; v != "" {
@@ -1825,7 +1824,7 @@ func msgCSeq(m *SIPMessage) string {
 	return ""
 }
 
-// drainResponses vacía respuestas rezagadas del canal antes de una petición nueva.
+// drainResponses empties stale responses from the channel before a new request.
 func drainResponses(id *sipIdentity) {
 	ch := id.responses()
 	if ch == nil {
@@ -1840,9 +1839,9 @@ func drainResponses(id *sipIdentity) {
 	}
 }
 
-// awaitResponse espera la respuesta con exactamente esa CSeq ("<num> <MÉTODO>").
-// Con listener (c300x) la recibe por respCh; si no, lee el socket (el llamante
-// posee el lector). Descarta respuestas ajenas y contesta 200 a BYE rezagados.
+// awaitResponse waits for the response with exactly that CSeq ("<num> <METHOD>").
+// With a listener (c300x) it gets it via respCh; otherwise it reads the socket
+// (the caller owns the reader). It drops foreign responses and answers 200 to stale BYEs.
 func (c *BTicinoSIPClient) awaitResponse(id *sipIdentity, cseq string, timeout time.Duration) (*SIPMessage, error) {
 	deadline := time.Now().Add(timeout)
 	want := strings.Fields(cseq)
@@ -1860,7 +1859,7 @@ func (c *BTicinoSIPClient) awaitResponse(id *sipIdentity, cseq string, timeout t
 					return m, nil
 				}
 			case <-time.After(time.Until(deadline)):
-				return nil, fmt.Errorf("timeout esperando respuesta a %s", method)
+				return nil, fmt.Errorf("timeout waiting for the response to %s", method)
 			}
 		}
 	}
@@ -1880,7 +1879,7 @@ func (c *BTicinoSIPClient) awaitResponse(id *sipIdentity, cseq string, timeout t
 			}
 		}
 	}
-	return nil, fmt.Errorf("timeout esperando respuesta a %s", method)
+	return nil, fmt.Errorf("timeout waiting for the response to %s", method)
 }
 
 func (c *BTicinoSIPClient) registrationManager() {

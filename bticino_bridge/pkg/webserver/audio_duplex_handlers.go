@@ -8,36 +8,33 @@ import (
 	"bticino_bridge/pkg/sip"
 )
 
-// DuplexController es la interfaz mínima que necesitan los endpoints
-// /api/audio/duplex/* (Task 4, sdd 2026-08-21-duplex-door-audio) para
-// abrir/cerrar la pata full-duplex de validación local (Task 3,
-// pkg/sip/audio_call.go: AudioCall.OpenDuplex/Close). Se define aquí, en
-// vez de acoplar el handler directamente al tipo concreto *sip.AudioCall,
-// para poder inyectar un fake en los tests del webserver sin depender de
-// SIP/RTP real.
+// DuplexController is the minimal interface the /api/audio/duplex/*
+// endpoints need to open and close the full-duplex validation leg
+// (pkg/sip/audio_call.go: AudioCall.OpenDuplex/Close). It is defined here
+// instead of using *sip.AudioCall directly so webserver tests can inject a
+// fake without real SIP/RTP.
 type DuplexController interface {
 	OpenDuplex(sinkPath, talkWav string) (sip.AudioAnswer, error)
 	Close() error
-	// IsActive es la fuente de verdad para /status: la pata puede
-	// autocerrarse sola (fin natural del receiver, ver
-	// pkg/sip/audio_call.go OpenDuplex) sin pasar por /stop, así que un
-	// flag espejo en el webserver quedaría obsoleto tras ese cierre.
+	// IsActive is the source of truth for /status: the leg can close by
+	// itself (natural end of the receiver, see OpenDuplex in
+	// pkg/sip/audio_call.go) without going through /stop, so a mirror flag in
+	// the webserver would go stale after that close.
 	IsActive() bool
 }
 
-// SetDuplexController inyecta el controlador de la pata full-duplex de
-// validación local usada por POST/GET /api/audio/duplex/*.
+// SetDuplexController injects the controller of the full-duplex validation
+// leg used by POST/GET /api/audio/duplex/*.
 func (ws *WebServer) SetDuplexController(dc DuplexController) {
 	ws.duplexController = dc
 }
 
-// Endpoints de validación local del audio full-duplex de la pata propia del
-// bridge (WHO=8, ver pkg/sip/audio_call.go). Gateados por
-// audio.duplex_enabled: si está desactivado en config, los tres devuelven
-// 404 (fail-closed — ni siquiera revelan que el endpoint existe), en vez de
-// 503 "no disponible".
+// Local validation endpoints for full-duplex audio on the bridge's own leg
+// (WHO=8, see pkg/sip/audio_call.go). Gated by audio.duplex_enabled: when it
+// is off in the config, all three return 404 (fail-closed, they do not even
+// reveal that the endpoint exists) instead of 503 "unavailable".
 //
-//	POST /api/audio/duplex/start?talk=<wav opcional>
+//	POST /api/audio/duplex/start?talk=<optional wav>
 //	POST /api/audio/duplex/stop
 //	GET  /api/audio/duplex/status
 
@@ -52,7 +49,7 @@ func (ws *WebServer) handleAudioDuplexStart(w http.ResponseWriter, r *http.Reque
 	}
 	if ws.duplexController == nil {
 		ws.writeAudioDuplexJSON(w, http.StatusServiceUnavailable, map[string]interface{}{
-			"success": false, "error": "audio duplex no disponible (SIP no inicializado)",
+			"success": false, "error": "audio duplex unavailable (SIP not initialized)",
 		})
 		return
 	}
@@ -74,17 +71,17 @@ func (ws *WebServer) handleAudioDuplexStart(w http.ResponseWriter, r *http.Reque
 			})
 			return
 		}
-		ws.logger.WithError(err).Warn("audio/duplex/start: fallo al abrir la pata full-duplex")
+		ws.logger.WithError(err).Warn("audio/duplex/start: opening the full-duplex leg failed")
 		ws.writeAudioDuplexJSON(w, http.StatusInternalServerError, map[string]interface{}{
 			"success": false, "error": err.Error(),
 		})
 		return
 	}
 
-	// 202: la pata ya quedó abierta (OpenDuplex vuelve tras el setup —
-	// INVITE/answer/armado), pero la captura/reproducción de audio siguen en
-	// marcha en segundo plano. Nunca se incluye crypto_key: es la clave SRTP
-	// de la sesión y no debe salir por HTTP.
+	// 202: the leg is open (OpenDuplex returns after the setup:
+	// INVITE/answer/arming), but audio capture and playback keep running in
+	// the background. crypto_key is never included: it is the session's SRTP
+	// key and must not leave over HTTP.
 	ws.writeAudioDuplexJSON(w, http.StatusAccepted, map[string]interface{}{
 		"success":      true,
 		"port":         answer.Port,
@@ -104,7 +101,7 @@ func (ws *WebServer) handleAudioDuplexStop(w http.ResponseWriter, r *http.Reques
 	}
 	if ws.duplexController == nil {
 		ws.writeAudioDuplexJSON(w, http.StatusServiceUnavailable, map[string]interface{}{
-			"success": false, "error": "audio duplex no disponible (SIP no inicializado)",
+			"success": false, "error": "audio duplex unavailable (SIP not initialized)",
 		})
 		return
 	}
@@ -112,7 +109,7 @@ func (ws *WebServer) handleAudioDuplexStop(w http.ResponseWriter, r *http.Reques
 	err := ws.duplexController.Close()
 
 	if err != nil {
-		ws.logger.WithError(err).Warn("audio/duplex/stop: fallo al cerrar la pata full-duplex")
+		ws.logger.WithError(err).Warn("audio/duplex/stop: closing the full-duplex leg failed")
 		ws.writeAudioDuplexJSON(w, http.StatusInternalServerError, map[string]interface{}{
 			"success": false, "error": err.Error(),
 		})
@@ -126,9 +123,9 @@ func (ws *WebServer) handleAudioDuplexStatus(w http.ResponseWriter, r *http.Requ
 		http.NotFound(w, r)
 		return
 	}
-	// active es autoritativo (controller.IsActive()), no un flag espejo: la
-	// pata puede autocerrarse (fin natural del receiver) sin pasar por
-	// /stop, y un flag local aquí quedaría desactualizado en ese caso.
+	// active is authoritative (controller.IsActive()), not a mirror flag: the
+	// leg can close by itself (natural end of the receiver) without /stop, and
+	// a local flag would go stale in that case.
 	active := ws.duplexController != nil && ws.duplexController.IsActive()
 
 	ws.writeAudioDuplexJSON(w, http.StatusOK, map[string]interface{}{

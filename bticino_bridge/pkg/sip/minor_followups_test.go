@@ -11,61 +11,61 @@ import (
 	"bticino_bridge/pkg/events"
 )
 
-// Say debe colgar al terminar: si no, el diálogo queda vivo hasta que el nativo
-// lo corta y el vigilante retiene el socket webrtc (re-REGISTER aplazado).
-func TestAudioCallSayCuelgaAlTerminar(t *testing.T) {
+// Say must hang up at the end: otherwise the dialog stays alive until the native
+// side cuts it and the watcher holds the webrtc socket (re-REGISTER deferred).
+func TestAudioCallSayHangsUpWhenDone(t *testing.T) {
 	orig := &fakeOriginator{answer: goodAnswer}
 	ac := NewAudioCall(orig, &fakeOWN{}, &fakePlayer{}, &fakeCapturer{}, "127.0.0.1", 40100, logrus.New())
 	if err := ac.Say("/tmp/hola.wav"); err != nil {
 		t.Fatalf("Say: %v", err)
 	}
 	if !orig.hungUp {
-		t.Fatal("Say debe colgar (BYE) al terminar de reproducir")
+		t.Fatal("Say must hang up (BYE) when playback ends")
 	}
 }
 
-// Con un answer inválido el INVITE ya llegó a 200: hay que colgar (no dejar
-// un diálogo huérfano en el device).
-func TestAudioCallSayCuelgaSiAnswerInvalido(t *testing.T) {
+// With an invalid answer the INVITE already reached 200: hang up (leave no
+// orphaned dialog on the device).
+func TestAudioCallSayHangsUpOnInvalidAnswer(t *testing.T) {
 	orig := &fakeOriginator{answer: "m=audio 7078 RTP/SAVP 98\r\na=rtpmap:98 speex/8000\r\n"}
 	ac := NewAudioCall(orig, &fakeOWN{}, &fakePlayer{}, &fakeCapturer{}, "127.0.0.1", 40100, logrus.New())
 	if err := ac.Say("/tmp/hola.wav"); err == nil {
-		t.Fatal("esperaba error")
+		t.Fatal("expected an error")
 	}
 	if !orig.hungUp {
-		t.Fatal("debe colgar el diálogo si el answer es inválido")
+		t.Fatal("must hang up the dialog if the answer is invalid")
 	}
 }
 
-// Una sola pata de audio: Say con otra pata activa → ErrAudioLegBusy.
-func TestAudioCallSayRespetaPataUnica(t *testing.T) {
+// A single audio leg: Say with another leg active → ErrAudioLegBusy.
+func TestAudioCallSayKeepsSingleLeg(t *testing.T) {
 	ac := NewAudioCall(&fakeOriginator{answer: goodAnswer}, &fakeOWN{}, &fakePlayer{}, &fakeCapturer{}, "127.0.0.1", 40100, logrus.New())
 	ac.mu.Lock()
 	ac.active = true
 	ac.mu.Unlock()
 	if err := ac.Say("/tmp/hola.wav"); !errors.Is(err, ErrAudioLegBusy) {
-		t.Fatalf("esperaba ErrAudioLegBusy, got %v", err)
+		t.Fatalf("expected ErrAudioLegBusy, got %v", err)
 	}
 }
 
-// Solo los INVITE de InviteWithSDP (ojo, AudioCall) van al nativo; el self-INVITE
-// de vídeo de MakeCall (video_on_demand) lo debe auto-contestar NUESTRO listener.
-func TestShouldAutoAnswerSoloDesviaLasLlamadasAlNativo(t *testing.T) {
+// Only InviteWithSDP INVITEs (panel view, AudioCall) go to the native side; MakeCall's
+// video self-INVITE (video_on_demand) must be auto-answered by OUR listener.
+func TestShouldAutoAnswerOnlyDivertsNativeCalls(t *testing.T) {
 	c := &BTicinoSIPClient{originatedCalls: map[string]time.Time{}, nativeCalls: map[string]time.Time{}}
 	c.originatedCalls["selfvideo@127.0.0.1"] = time.Now() // MakeCall
-	c.originatedCalls["ojo@127.0.0.1"] = time.Now()       // InviteWithSDP
-	c.nativeCalls["ojo@127.0.0.1"] = time.Now()
+	c.originatedCalls["eye@127.0.0.1"] = time.Now()       // InviteWithSDP
+	c.nativeCalls["eye@127.0.0.1"] = time.Now()
 	if !c.shouldAutoAnswer("selfvideo@127.0.0.1") {
-		t.Fatal("el self-INVITE de vídeo (MakeCall) debe auto-contestarse en loopback")
+		t.Fatal("the video self-INVITE (MakeCall) must be auto-answered on loopback")
 	}
-	if c.shouldAutoAnswer("ojo@127.0.0.1") {
-		t.Fatal("el INVITE del ojo debe ir al nativo, no auto-contestarse")
+	if c.shouldAutoAnswer("eye@127.0.0.1") {
+		t.Fatal("the panel view INVITE must go to the native side, not be auto-answered")
 	}
 }
 
-// Pulsar "Ver placa" con un ojo YA abierto → ErrEyeBusy con log claro, y SIN
-// publicar panelview.rejected (pondría el sensor HA en idle con el ojo abierto).
-func TestPanelViewPulsarConOjoActivo(t *testing.T) {
+// Pressing "Show door panel" with a panel view ALREADY open → ErrEyeBusy with a clear
+// log, and WITHOUT publishing panelview.rejected (it would set the HA sensor idle).
+func TestPanelViewPressWithViewActive(t *testing.T) {
 	bus := events.NewEventBus(2, logrusTestLogger())
 	rejected := subscribeOnce(bus, "panelview.rejected")
 	logger, hook := logrustest.NewNullLogger()
@@ -75,18 +75,18 @@ func TestPanelViewPulsarConOjoActivo(t *testing.T) {
 	if err := pv.Show(); err != nil {
 		t.Fatalf("Show: %v", err)
 	}
-	marker.active = true // el propio ojo enciende el canal nativo (callActive)
+	marker.active = true // the panel view itself turns the native channel on (callActive)
 	if err := pv.Show(); !errors.Is(err, ErrEyeBusy) {
-		t.Fatalf("esperaba ErrEyeBusy, got %v", err)
+		t.Fatalf("expected ErrEyeBusy, got %v", err)
 	}
 	select {
 	case <-rejected:
-		t.Fatal("no debe publicarse panelview.rejected con el ojo abierto")
+		t.Fatal("panelview.rejected must not be published with the panel view open")
 	case <-time.After(150 * time.Millisecond):
 	}
 	for _, e := range hook.AllEntries() {
 		if e.Level <= logrus.WarnLevel {
-			t.Fatalf("log engañoso a nivel %s: %q", e.Level, e.Message)
+			t.Fatalf("misleading log at level %s: %q", e.Level, e.Message)
 		}
 	}
 }

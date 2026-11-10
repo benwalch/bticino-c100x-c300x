@@ -11,20 +11,20 @@ import (
 	"bticino_bridge/pkg/events"
 )
 
-// Proc abstrae un proceso externo en marcha (ffmpeg real o un fake en tests).
+// Proc wraps a running external process (real ffmpeg or a fake in tests).
 type Proc interface {
 	Kill() error
 	Wait() error
 }
 
-// ProcRunner abstrae el lanzamiento de un proceso externo, inyectable para tests offline.
+// ProcRunner wraps starting an external process, injectable for offline tests.
 type ProcRunner interface {
 	Start(name string, args []string) (Proc, error)
 }
 
-// TalkSender lanza/mata un ffmpeg que envía el audio-mic de HA (backchannel local en
-// bcHost:bcPort) hacia la placa como SRTP, dirigido por doorcall.answered/doorcall.ended.
-// Un fallo del runner NUNCA debe tumbar la llamada: se loguea y se ignora.
+// TalkSender starts and kills an ffmpeg that sends the HA mic audio (local backchannel on
+// bcHost:bcPort) to the entrance panel as SRTP, driven by doorcall.answered/doorcall.ended.
+// A runner failure must NEVER take the call down: it is logged and ignored.
 type TalkSender struct {
 	cfg        config.AnswererConfig
 	runner     ProcRunner
@@ -37,15 +37,15 @@ type TalkSender struct {
 
 	mu              sync.Mutex
 	proc            Proc
-	keepalive       *upstreamKeepalive // relé de subida continua (solo con cfg.TalkKeepalive)
+	keepalive       *upstreamKeepalive // continuous upstream relay (only with cfg.TalkKeepalive)
 	sdpPath         string
 	stopped         bool
-	lastEndedCallID string // último call_id visto en doorcall.ended; evita el ffmpeg huérfano si
-	// el ended llega ANTES que el answered del mismo call-id (orden de goroutines del EventBus).
+	lastEndedCallID string // last call_id seen in doorcall.ended; avoids an orphaned ffmpeg if
+	// ended arrives BEFORE answered for the same call-id (EventBus goroutine order).
 }
 
-// NewTalkSender construye el sender. backchannelHost/Port/PT describen dónde ffmpeg debe
-// escuchar el audio-mic local (el extremo de go2rtc), no el destino SRTP hacia la placa.
+// NewTalkSender builds the sender. backchannelHost/Port/PT describe where ffmpeg must listen
+// for the local mic audio (the go2rtc end), not the SRTP target at the entrance panel.
 func NewTalkSender(cfg config.AnswererConfig, runner ProcRunner, bus events.EventBus, logger *logrus.Logger, ffmpegPath, backchannelHost string, backchannelPort, backchannelPT int) *TalkSender {
 	return &TalkSender{
 		cfg:        cfg,
@@ -59,18 +59,18 @@ func NewTalkSender(cfg config.AnswererConfig, runner ProcRunner, bus events.Even
 	}
 }
 
-// Start se suscribe a doorcall.answered (lanza ffmpeg) y doorcall.ended (lo mata).
+// Start subscribes to doorcall.answered (starts ffmpeg) and doorcall.ended (kills it).
 func (s *TalkSender) Start() error {
 	s.bus.Subscribe("doorcall.answered", func(e *events.Event) { s.onAnswered(e) })
 	s.bus.Subscribe("doorcall.ended", func(e *events.Event) { s.onEnded(e) })
-	// Modo ojo (Ver placa): mismo payload que doorcall.*, se reusan los handlers.
+	// Panel view mode: same payload as doorcall.*, so the handlers are reused.
 	s.bus.Subscribe("panelview.connected", func(e *events.Event) { s.onAnswered(e) })
 	s.bus.Subscribe("panelview.ended", func(e *events.Event) { s.onEnded(e) })
 	return nil
 }
 
-// onAnswered arranca el ffmpeg de talk-back si TalkEnabled y el payload trae media_port/srtp_key
-// válidos. Cualquier fallo (temporal, runner) se loguea y se ignora: la llamada sigue sin hablar.
+// onAnswered starts the talk-back ffmpeg if TalkEnabled and the payload has a valid
+// media_port/srtp_key. Any failure (temp file, runner) is logged and ignored: the call goes on without talk.
 func (s *TalkSender) onAnswered(e *events.Event) {
 	if !s.cfg.TalkEnabled {
 		return
@@ -80,7 +80,7 @@ func (s *TalkSender) onAnswered(e *events.Event) {
 	key, _ := data["srtp_key"].(string)
 	host, _ := data["media_host"].(string)
 	callID, _ := data["call_id"].(string)
-	// media_pt es opcional: solo lo envía el ojo (PanelView). Doorcall no lo trae → 96.
+	// media_pt is optional: only the panel view sends it. Doorcall does not → 96.
 	pt, _ := data["media_pt"].(int)
 	if pt <= 0 {
 		pt = 96
@@ -89,7 +89,7 @@ func (s *TalkSender) onAnswered(e *events.Event) {
 		host = "127.0.0.1"
 	}
 	if port <= 0 || key == "" {
-		s.logger.Warnf("[TALK] doorcall.answered sin media_port/srtp_key válidos: no se habla")
+		s.logger.Warnf("[TALK] doorcall.answered without a valid media_port/srtp_key: no talk")
 		return
 	}
 
@@ -98,48 +98,48 @@ func (s *TalkSender) onAnswered(e *events.Event) {
 		s.mu.Unlock()
 		return
 	}
-	// Carrera de reordenamiento del EventBus: si el doorcall.ended de ESTA misma llamada ya llegó
-	// (goroutine de onEnded ganó la carrera al mutex antes que esta), no lanzar un ffmpeg huérfano
-	// que ningún ended posterior matará. Una llamada NUEVA tiene otro call-id y no se ve afectada.
+	// EventBus reordering race: if the doorcall.ended of THIS call already arrived (the onEnded
+	// goroutine got the mutex first), do not start an orphaned ffmpeg that no later ended would
+	// kill. A NEW call has another call-id and is not affected.
 	if callID != "" && callID == s.lastEndedCallID {
 		s.mu.Unlock()
-		s.logger.Infof("[TALK] la llamada %s ya había terminado; no se lanza talk-back", callID)
+		s.logger.Infof("[TALK] call %s had already ended; talk-back not started", callID)
 		return
 	}
-	if s.proc != nil { // por si acaso: matar un sender previo (no debería pasar, una llamada a la vez)
+	if s.proc != nil { // just in case: kill a previous sender (should not happen, one call at a time)
 		s.killLocked()
 	}
 
-	// Con talk_keepalive, un relé escucha el backchannel de go2rtc y emite un flujo continuo
-	// (voz o silencio) a bcPort+2, que es lo que lee ffmpeg. Si el relé no arranca, se cae al
-	// comportamiento clásico (ffmpeg lee el backchannel directo): mejor hablar sin keepalive
-	// que no hablar.
+	// With talk_keepalive, a relay listens to the go2rtc backchannel and sends a continuous
+	// stream (voice or silence) to bcPort+2, which is what ffmpeg reads. If the relay does not
+	// start, it falls back to the classic behavior (ffmpeg reads the backchannel directly):
+	// talking without keepalive beats not talking.
 	sdpPort := s.bcPort
 	if s.cfg.TalkKeepalive {
 		k, kerr := startUpstreamKeepalive(s.bcHost, s.bcPort, s.bcPort+2, s.bcPT, s.logger)
 		if kerr != nil {
-			s.logger.Warnf("[TALK] keepalive no disponible (%v): talk-back sin subida continua", kerr)
+			s.logger.Warnf("[TALK] keepalive unavailable (%v): talk-back without continuous upstream", kerr)
 		} else {
 			s.keepalive = k
 			sdpPort = s.bcPort + 2
 		}
 	}
 
-	// Escribir el SDP de backchannel (dónde ffmpeg lee el audio-mic local) a un temporal.
+	// Write the backchannel SDP (where ffmpeg reads the local mic audio) to a temp file.
 	sdp := BuildBackchannelSDP(sdpPort, s.bcPT)
 	f, err := os.CreateTemp("", "bt-talk-*.sdp")
 	if err != nil {
-		s.killLocked() // para el relé si llegó a arrancar
+		s.killLocked() // stops the relay if it started
 		s.mu.Unlock()
-		s.logger.Warnf("[TALK] no se pudo crear el SDP temporal: %v — no se habla", err)
+		s.logger.Warnf("[TALK] cannot create the temp SDP: %v; no talk", err)
 		return
 	}
 	if _, werr := f.WriteString(sdp); werr != nil {
 		f.Close()
 		os.Remove(f.Name())
-		s.killLocked() // para el relé si llegó a arrancar
+		s.killLocked() // stops the relay if it started
 		s.mu.Unlock()
-		s.logger.Warnf("[TALK] no se pudo escribir el SDP temporal: %v — no se habla", werr)
+		s.logger.Warnf("[TALK] cannot write the temp SDP: %v; no talk", werr)
 		return
 	}
 	f.Close()
@@ -148,26 +148,26 @@ func (s *TalkSender) onAnswered(e *events.Event) {
 	proc, err := s.runner.Start(s.ffmpegPath, args)
 	if err != nil {
 		os.Remove(f.Name())
-		s.killLocked() // para el relé si llegó a arrancar
+		s.killLocked() // stops the relay if it started
 		s.mu.Unlock()
-		s.logger.Warnf("[TALK] no se pudo lanzar ffmpeg (%v) — la llamada sigue sin talk-back", err)
+		s.logger.Warnf("[TALK] cannot start ffmpeg (%v); the call goes on without talk-back", err)
 		return
 	}
 	s.proc = proc
 	s.sdpPath = f.Name()
 	s.mu.Unlock()
 
-	s.logger.Infof("[TALK] ffmpeg de talk-back lanzado → srtp://%s:%d", host, port)
-	// Wait() bloquea hasta que el proceso termine: NUNCA con s.mu tomado.
+	s.logger.Infof("[TALK] talk-back ffmpeg started → srtp://%s:%d", host, port)
+	// Wait() blocks until the process ends: NEVER with s.mu held.
 	go func() {
 		werr := proc.Wait()
-		s.logger.Infof("[TALK] ffmpeg de talk-back terminó: %v", werr)
+		s.logger.Infof("[TALK] talk-back ffmpeg ended: %v", werr)
 	}()
 }
 
-// onEnded mata el ffmpeg en curso (si lo hay) y limpia el temporal. Registra el call_id ANTES de
-// matar/limpiar, para que un doorcall.answered del MISMO call-id que llegue después (reordenado
-// por el EventBus) sepa que esa llamada ya terminó y no lance un ffmpeg huérfano.
+// onEnded kills the running ffmpeg (if any) and removes the temp file. It records the call_id
+// BEFORE killing and cleaning, so a doorcall.answered of the SAME call-id that arrives later
+// (reordered by the EventBus) knows the call has ended and starts no orphaned ffmpeg.
 func (s *TalkSender) onEnded(e *events.Event) {
 	data, _ := e.Data.(map[string]interface{})
 	cid, _ := data["call_id"].(string)
@@ -178,7 +178,7 @@ func (s *TalkSender) onEnded(e *events.Event) {
 	s.killLocked()
 }
 
-// killLocked mata el proceso y borra el temporal. Asume s.mu tomado. Matar dos veces es un no-op.
+// killLocked kills the process and removes the temp file. Assumes s.mu is held. Killing twice is a no-op.
 func (s *TalkSender) killLocked() {
 	if s.proc != nil {
 		s.proc.Kill()
@@ -194,7 +194,7 @@ func (s *TalkSender) killLocked() {
 	}
 }
 
-// Stop mata el ffmpeg si sigue vivo y marca el sender como detenido; idempotente.
+// Stop kills ffmpeg if it is still alive and marks the sender as stopped; idempotent.
 func (s *TalkSender) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -202,7 +202,7 @@ func (s *TalkSender) Stop() {
 	s.killLocked()
 }
 
-// buildFFmpegArgs devuelve los argumentos (sin el binario) para el sender de talk-back.
+// buildFFmpegArgs returns the arguments (without the binary) for the talk-back sender.
 func buildFFmpegArgs(sdpPath, srtpKeyB64, dstHost string, dstPort, outPT int) []string {
 	return []string{
 		"-hide_banner", "-loglevel", "warning",
@@ -210,7 +210,7 @@ func buildFFmpegArgs(sdpPath, srtpKeyB64, dstHost string, dstPort, outPT int) []
 		"-fflags", "nobuffer",
 		"-i", sdpPath,
 		"-acodec", "copy",
-		"-payload_type", fmt.Sprintf("%d", outPT), // 96 (el PT speex de nuestro answer)
+		"-payload_type", fmt.Sprintf("%d", outPT), // 96 (the speex PT of our answer)
 		"-srtp_out_suite", "AES_CM_128_HMAC_SHA1_80",
 		"-srtp_out_params", srtpKeyB64,
 		"-f", "rtp",

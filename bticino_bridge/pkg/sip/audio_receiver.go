@@ -13,16 +13,16 @@ import (
 
 const defaultAudioReceiverTimeout = 60 * time.Second
 
-// AudioCapturer recibe el audio SRTP entrante del portero y lo escribe a un sink.
-// localHost/localPort = el endpoint LOCAL del bridge (el anunciado en la oferta),
-// donde el portero envía; ans aporta la suite y la clave SRTP a descifrar.
+// AudioCapturer receives the unit's incoming SRTP audio and writes it to a sink.
+// localHost/localPort = the bridge's LOCAL endpoint (the one in the offer),
+// where the unit sends; ans provides the SRTP suite and key to decrypt.
 type AudioCapturer interface {
 	Capture(localHost string, localPort int, sinkPath string, ans AudioAnswer) error
 	Stop()
 }
 
-// BuildInboundSDP genera el SDP que ffmpeg lee para decodificar el RTP entrante
-// (speex/8000) en el puerto LOCAL del bridge, descifrando con la clave del answer.
+// BuildInboundSDP generates the SDP ffmpeg reads to decode the incoming RTP
+// (speex/8000) on the bridge's LOCAL port, decrypting with the answer's key.
 func BuildInboundSDP(localHost string, localPort int, ans AudioAnswer) string {
 	return fmt.Sprintf(
 		"v=0\r\no=- 0 0 IN IP4 %s\r\ns=Listen\r\nc=IN IP4 %s\r\nt=0 0\r\n"+
@@ -58,8 +58,8 @@ func (r *AudioReceiver) buildArgs(sdpPath, sinkPath string) []string {
 	}
 }
 
-// Capture escribe el SDP inbound a un temporal, lanza ffmpeg (con timeout duro) y
-// bloquea hasta que ffmpeg termina o Stop() lo corta. Errores no fatales.
+// Capture writes the inbound SDP to a temp file, starts ffmpeg (with a hard
+// timeout) and blocks until ffmpeg ends or Stop() cuts it. Errors are not fatal.
 func (r *AudioReceiver) Capture(localHost string, localPort int, sinkPath string, ans AudioAnswer) error {
 	sdp := BuildInboundSDP(localHost, localPort, ans)
 	f, err := os.CreateTemp("", "inbound-*.sdp")
@@ -73,12 +73,12 @@ func (r *AudioReceiver) Capture(localHost string, localPort int, sinkPath string
 	}
 	f.Close()
 
-	r.logger.Infof("audio-receiver: escuchando srtp %s:%d → %s (speex PT%d)", localHost, localPort, sinkPath, ans.PayloadType)
+	r.logger.Infof("audio-receiver: listening on srtp %s:%d → %s (speex PT%d)", localHost, localPort, sinkPath, ans.PayloadType)
 	return r.runFFmpeg(r.buildArgs(f.Name(), sinkPath))
 }
 
-// buildForwardArgs: como buildArgs pero la salida es RTP a dstHostPort (speex copy),
-// para alimentar el relay de audio (go2rtc /doorbell) en vez de escribir WAV.
+// buildForwardArgs: like buildArgs, but the output is RTP to dstHostPort (speex copy),
+// to feed the audio relay (go2rtc /doorbell) instead of writing a WAV.
 func buildForwardArgs(sdpPath, dstHostPort string, ans AudioAnswer) []string {
 	return []string{
 		"-hide_banner", "-loglevel", "warning",
@@ -91,9 +91,9 @@ func buildForwardArgs(sdpPath, dstHostPort string, ans AudioAnswer) []string {
 	}
 }
 
-// CaptureForward descifra el SRTP entrante (clave de la placa en ans) y lo reenvía
-// como RTP a dstHostPort. Bloquea hasta Stop() o fin del proceso. Mismo ciclo de
-// vida que Capture (ctx con timeout + Stop()).
+// CaptureForward decrypts the incoming SRTP (the entrance panel's key in ans) and
+// forwards it as RTP to dstHostPort. It blocks until Stop() or the process ends.
+// Same life cycle as Capture (ctx with timeout + Stop()).
 func (r *AudioReceiver) CaptureForward(localHost string, localPort int, dstHostPort string, ans AudioAnswer) error {
 	f, err := os.CreateTemp("", "bt-eye-in-*.sdp")
 	if err != nil {
@@ -106,12 +106,12 @@ func (r *AudioReceiver) CaptureForward(localHost string, localPort int, dstHostP
 	}
 	f.Close()
 
-	r.logger.Infof("audio-receiver: reenviando srtp %s:%d → rtp://%s (speex PT%d)", localHost, localPort, dstHostPort, ans.PayloadType)
+	r.logger.Infof("audio-receiver: forwarding srtp %s:%d → rtp://%s (speex PT%d)", localHost, localPort, dstHostPort, ans.PayloadType)
 	return r.runFFmpeg(buildForwardArgs(f.Name(), dstHostPort, ans))
 }
 
-// runFFmpeg lanza ffmpeg con timeout duro y bloquea hasta que termina o Stop() lo
-// corta. Errores no fatales (se registran).
+// runFFmpeg starts ffmpeg with a hard timeout and blocks until it ends or
+// Stop() cuts it. Errors are not fatal (they are logged).
 func (r *AudioReceiver) runFFmpeg(args []string) error {
 	timeout := r.timeout
 	if timeout <= 0 {
@@ -128,7 +128,7 @@ func (r *AudioReceiver) runFFmpeg(args []string) error {
 
 	out, err := cmd.CombinedOutput()
 	if err != nil && ctx.Err() != context.Canceled {
-		r.logger.WithError(err).Warnf("audio-receiver: ffmpeg terminó con error: %s", string(out))
+		r.logger.WithError(err).Warnf("audio-receiver: ffmpeg ended with an error: %s", string(out))
 	}
 	return err
 }

@@ -9,29 +9,30 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// mediaDrainBufSize es el tamaño de buffer de lectura por paquete. Un paquete SRTP típico
-// (audio o vídeo H.264 empaquetado) cabe holgado en 2048 bytes; si llegase algo mayor, ReadFrom
-// simplemente lo trunca (no nos interesa el contenido, solo drenarlo).
+// mediaDrainBufSize is the read buffer size per packet. A typical SRTP packet
+// (audio or packetized H.264 video) fits easily in 2048 bytes; anything larger
+// is simply truncated by ReadFrom (the content does not matter, only draining it).
 const mediaDrainBufSize = 2048
 
-// mediaDrainLogInterval es la cadencia del resumen de paquetes/bytes drenados.
+// mediaDrainLogInterval is the interval of the drained packets/bytes summary.
 const mediaDrainLogInterval = 2 * time.Second
 
-// mediaDrain drena (lee y descarta) la media SRTP que bt_vct envía directamente a los puertos
-// negociados en el SDP del contestador. El bridge no descifra ni usa este tráfico — lo útil llega
-// en claro por los taps v0.24 en lo:5000/5007 — este drenaje existe solo para que el kernel no
-// responda ICMP port-unreachable (lo que podría cortar la llamada RTP/SRTP del lado de la placa).
+// mediaDrain drains (reads and discards) the SRTP media bt_vct sends directly to the ports
+// negotiated in the answerer's SDP. The bridge neither decrypts nor uses this traffic (the
+// useful part arrives in cleartext through the lo:5000/5007 taps); the drain only exists so
+// the kernel does not answer with ICMP port-unreachable, which could cut the entrance panel's
+// RTP/SRTP call.
 type mediaDrain struct {
 	audioConn *net.UDPConn
 	videoConn *net.UDPConn
 	logger    *logrus.Logger
 
-	// Contadores atómicos. Se usa atomic.Int64 (no int64 crudo + atomic.AddInt64)
-	// porque en ARM de 32 bits (GOARCH=arm, nuestro target) un int64 solo queda
-	// alineado a 4 bytes si no es el primer campo del struct, y atomic.AddInt64
-	// sobre una dirección no alineada a 8 provoca "panic: unaligned 64-bit atomic
-	// operation" (crash del proceso al armar el drain en una llamada real).
-	// atomic.Int64 lo alinea a 8 bytes en todas las plataformas.
+	// Atomic counters. atomic.Int64 is used (not a raw int64 + atomic.AddInt64)
+	// because on 32-bit ARM (GOARCH=arm, our target) an int64 is only 4-byte
+	// aligned unless it is the first struct field, and atomic.AddInt64 on an
+	// address not aligned to 8 causes "panic: unaligned 64-bit atomic
+	// operation" (a process crash when the drain is armed on a real call).
+	// atomic.Int64 is 8-byte aligned on all platforms.
 	packetsAudio atomic.Int64
 	bytesAudio   atomic.Int64
 	packetsVideo atomic.Int64
@@ -42,11 +43,11 @@ type mediaDrain struct {
 	stopOnce sync.Once
 }
 
-// startMediaDrain abre sockets UDP en loopback (127.0.0.1) para audioPort y, si videoPort>0,
-// también para videoPort, y arranca una goroutine de lectura por cada uno más una goroutine de
-// log periódico. Si audioPort==0 (o videoPort==0 junto a audioPort==0, ver nota) se usa un puerto
-// efímero elegido por el SO — pensado para tests. En producción se pasan los puertos concretos
-// del AnswererConfig (10100/10102 por defecto).
+// startMediaDrain opens loopback UDP sockets (127.0.0.1) for audioPort and, if videoPort>0,
+// also for videoPort, and starts one read goroutine per socket plus a periodic log goroutine.
+// If audioPort==0 (or videoPort==0 together with audioPort==0, see note) an ephemeral port
+// chosen by the OS is used, meant for tests. In use, the concrete ports of AnswererConfig are
+// passed (10100/10102 by default).
 func startMediaDrain(audioPort, videoPort int, logger *logrus.Logger) (*mediaDrain, error) {
 	if logger == nil {
 		logger = logrus.New()
@@ -74,27 +75,27 @@ func startMediaDrain(audioPort, videoPort int, logger *logrus.Logger) (*mediaDra
 	if d.videoConn != nil {
 		go d.readLoop(d.videoConn, &d.packetsVideo, &d.bytesVideo)
 	}
-	// nota: readLoop recibe punteros a atomic.Int64 (no se copian: atomic.Int64
-	// contiene noCopy) — se pasa &d.campo directamente.
+	// note: readLoop gets pointers to atomic.Int64 (they are not copied:
+	// atomic.Int64 contains noCopy), so &d.field is passed directly.
 	go d.logLoop()
 	return d, nil
 }
 
-// readLoop lee y descarta paquetes de conn hasta que Stop() cierra el socket (ReadFrom devuelve
-// error y la goroutine sale).
+// readLoop reads and discards packets from conn until Stop() closes the socket (ReadFrom returns
+// an error and the goroutine exits).
 func (d *mediaDrain) readLoop(conn *net.UDPConn, packets, bytes *atomic.Int64) {
 	buf := make([]byte, mediaDrainBufSize)
 	for {
 		n, _, err := conn.ReadFrom(buf)
 		if err != nil {
-			return // socket cerrado por Stop(): fin normal de la goroutine
+			return // socket closed by Stop(): normal end of the goroutine
 		}
 		packets.Add(1)
 		bytes.Add(int64(n))
 	}
 }
 
-// logLoop resume cada ~2s cuánto se ha drenado, o sale al cerrarse done (Stop()).
+// logLoop summarizes every ~2 s how much was drained, or exits when done closes (Stop()).
 func (d *mediaDrain) logLoop() {
 	for {
 		select {
@@ -102,7 +103,7 @@ func (d *mediaDrain) logLoop() {
 			return
 		case <-d.ticker.C:
 			d.logger.Debugf(
-				"[ANSWERER] drenaje media: audio %d paquetes/%d bytes, vídeo %d paquetes/%d bytes",
+				"[ANSWERER] media drain: audio %d packets/%d bytes, video %d packets/%d bytes",
 				d.packetsAudio.Load(), d.bytesAudio.Load(),
 				d.packetsVideo.Load(), d.bytesVideo.Load(),
 			)
@@ -110,8 +111,8 @@ func (d *mediaDrain) logLoop() {
 	}
 }
 
-// Stop cierra los sockets (desbloquea ReadFrom → las goroutines de lectura salen) y para el
-// ticker de log. Idempotente: llamar dos veces no entra en pánico.
+// Stop closes the sockets (unblocks ReadFrom, so the read goroutines exit) and stops the log
+// ticker. Idempotent: calling it twice does not panic.
 func (d *mediaDrain) Stop() {
 	d.stopOnce.Do(func() {
 		close(d.done)
@@ -125,7 +126,7 @@ func (d *mediaDrain) Stop() {
 	})
 }
 
-// AudioAddr devuelve la dirección local del socket de audio (útil en tests con puerto efímero).
+// AudioAddr returns the local address of the audio socket (useful in tests with an ephemeral port).
 func (d *mediaDrain) AudioAddr() string {
 	if d.audioConn == nil {
 		return ""
@@ -133,7 +134,7 @@ func (d *mediaDrain) AudioAddr() string {
 	return d.audioConn.LocalAddr().String()
 }
 
-// VideoAddr devuelve la dirección local del socket de vídeo, o "" si no se abrió (videoPort<=0).
+// VideoAddr returns the local address of the video socket, or "" if it was not opened (videoPort<=0).
 func (d *mediaDrain) VideoAddr() string {
 	if d.videoConn == nil {
 		return ""
@@ -141,12 +142,12 @@ func (d *mediaDrain) VideoAddr() string {
 	return d.videoConn.LocalAddr().String()
 }
 
-// PacketsAudio devuelve el número de paquetes de audio drenados hasta ahora.
+// PacketsAudio returns the number of audio packets drained so far.
 func (d *mediaDrain) PacketsAudio() int64 {
 	return d.packetsAudio.Load()
 }
 
-// PacketsVideo devuelve el número de paquetes de vídeo drenados hasta ahora.
+// PacketsVideo returns the number of video packets drained so far.
 func (d *mediaDrain) PacketsVideo() int64 {
 	return d.packetsVideo.Load()
 }

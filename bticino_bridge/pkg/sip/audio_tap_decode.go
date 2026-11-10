@@ -13,9 +13,9 @@ import (
 
 const defaultAudioTapTimeout = 60 * time.Second
 
-// BuildTapDecodeSDP genera el SDP que ffmpeg lee para decodificar el RTP Speex
-// EN CLARO reenviado por el tap a listenHost:listenPort. Sin a=crypto (el leg
-// interno 5000 no va cifrado, a diferencia del leg SRTP hacia la app).
+// BuildTapDecodeSDP generates the SDP ffmpeg reads to decode the CLEARTEXT
+// Speex RTP the tap forwards to listenHost:listenPort. No a=crypto (the
+// internal 5000 leg is not encrypted, unlike the SRTP leg to the app).
 func BuildTapDecodeSDP(listenHost string, listenPort int, payloadType int) string {
 	return fmt.Sprintf(
 		"v=0\r\no=- 0 0 IN IP4 %s\r\ns=Tap\r\nc=IN IP4 %s\r\nt=0 0\r\n"+
@@ -24,7 +24,7 @@ func BuildTapDecodeSDP(listenHost string, listenPort int, payloadType int) strin
 	)
 }
 
-// AudioTapDecoder decodifica el RTP Speex del tap a un WAV vía ffmpeg.
+// AudioTapDecoder decodes the tap's Speex RTP to a WAV via ffmpeg.
 type AudioTapDecoder struct {
 	ffmpeg  string
 	timeout time.Duration
@@ -41,11 +41,11 @@ func NewAudioTapDecoder(ffmpegPath string, logger *logrus.Logger) *AudioTapDecod
 	return &AudioTapDecoder{ffmpeg: ffmpegPath, timeout: defaultAudioTapTimeout, logger: logger}
 }
 
-// SetTimeout alarga (o acorta) el tope duro de ffmpeg. Por defecto
-// defaultAudioTapTimeout (60s, pensado como protección anti-DoS genérica
-// para invocaciones puntuales); llamadores que orquestan sesiones más largas
-// (p.ej. AudioListenOnCall durante una llamada real) lo alargan para no
-// cortar el audio a mitad. Solo afecta a ESTA instancia.
+// SetTimeout extends (or shortens) the hard ffmpeg cap. The default is
+// defaultAudioTapTimeout (60 s, a generic anti-DoS guard for one-off calls);
+// callers that run longer sessions (e.g. AudioListenOnCall during a real
+// call) extend it so the audio is not cut halfway. Only affects THIS
+// instance.
 func (d *AudioTapDecoder) SetTimeout(dur time.Duration) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -58,17 +58,18 @@ func (d *AudioTapDecoder) buildArgs(sdpPath, sinkPath string) []string {
 		"-protocol_whitelist", "file,rtp,udp",
 		"-i", sdpPath,
 		"-c:a", "pcm_s16le", "-ar", "8000", "-ac", "1",
-		// ffmpeg bufferiza la salida (AVIO buffer); sin esto el WAV sale a 0 bytes
-		// al parar el decoder con kill/cancel (en lugar de exit limpio).
-		// Con -flush_packets 1, ffmpeg flushea después de cada paquete, por lo que
-		// el WAV crece continuamente y sobrevive al teardown.
+		// ffmpeg buffers its output (AVIO buffer); without this the WAV ends up
+		// with 0 bytes when the decoder is stopped by kill/cancel instead of a
+		// clean exit. With -flush_packets 1, ffmpeg flushes after every packet,
+		// so the WAV grows continuously and survives the teardown.
 		"-flush_packets", "1",
 		"-f", "wav", "-y", sinkPath,
 	}
 }
 
-// Decode escribe el SDP a un temporal, lanza ffmpeg (timeout duro) y bloquea
-// hasta fin/Stop. El tap debe estar reenviando a listenPort ANTES o durante.
+// Decode writes the SDP to a temp file, starts ffmpeg (hard timeout) and
+// blocks until the end or Stop. The tap must forward to listenPort BEFORE or
+// during this.
 func (d *AudioTapDecoder) Decode(listenHost string, listenPort, payloadType int, sinkPath string) error {
 	sdp := BuildTapDecodeSDP(listenHost, listenPort, payloadType)
 	f, err := os.CreateTemp("", "tap-*.sdp")
@@ -97,16 +98,15 @@ func (d *AudioTapDecoder) Decode(listenHost string, listenPort, payloadType int,
 	d.cancel = cancel
 	d.mu.Unlock()
 
-	d.logger.Infof("audio-tap: decodificando rtp %s:%d → %s (speex PT%d, tope %s)", listenHost, listenPort, sinkPath, payloadType, timeout)
+	d.logger.Infof("audio-tap: decoding rtp %s:%d → %s (speex PT%d, limit %s)", listenHost, listenPort, sinkPath, payloadType, timeout)
 	out, err := cmd.CombinedOutput()
-	// DeadlineExceeded (tope duro de fin de sesión) y Canceled (Stop()) son
-	// terminaciones normales de fin de sesión, no fallos reales de ffmpeg —
-	// no se loguean como error (hallazgo 3, revisión final de rama
-	// feat/audio-tap-5000). Un fallo genuino de ffmpeg (ctx aún no vencido/
-	// cancelado) sí se loguea.
+	// DeadlineExceeded (hard end-of-session cap) and Canceled (Stop()) are
+	// normal session ends, not real ffmpeg failures, so they are not logged
+	// as errors. A genuine ffmpeg failure (ctx not yet expired or cancelled)
+	// is logged.
 	ctxErr := ctx.Err()
 	if err != nil && ctxErr != context.Canceled && ctxErr != context.DeadlineExceeded {
-		d.logger.WithError(err).Warnf("audio-tap: ffmpeg terminó con error: %s", string(out))
+		d.logger.WithError(err).Warnf("audio-tap: ffmpeg ended with an error: %s", string(out))
 	}
 	return err
 }

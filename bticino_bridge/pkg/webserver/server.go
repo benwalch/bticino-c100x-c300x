@@ -148,10 +148,9 @@ type CallController interface {
 	Hangup() error // send BYE to end the active call
 }
 
-// Answerer expone el control del contestador SIP (F1) al API web. Opcional
-// (nil si el subsistema SIP answerer no está activo). Nombre local en
-// webserver; la satisface *sip.Answerer de forma estructural (sin import de
-// pkg/sip aquí, para poder inyectar un fake en tests).
+// Answerer exposes the SIP answerer controls to the web API. Optional (nil
+// when the SIP answerer is not running). *sip.Answerer satisfies it
+// structurally, without importing pkg/sip here, so tests can inject a fake.
 type Answerer interface {
 	Answer() error
 	Hangup() error
@@ -159,10 +158,10 @@ type Answerer interface {
 	IsRegistered() bool
 }
 
-// AudioSayer es la interfaz mínima que necesita el endpoint de talk-back
-// (POST /api/talkback/say) — la implementa *sip.AudioCall (Task 7/8). Se
-// define aquí (en vez de acoplar directamente al tipo concreto) para poder
-// inyectar un stub en tests del webserver sin importar pkg/sip.
+// AudioSayer is the minimal interface the talk-back endpoint
+// (POST /api/talkback/say) needs; *sip.AudioCall implements it. It is defined
+// here instead of using the concrete type so webserver tests can inject a
+// stub without importing pkg/sip.
 type AudioSayer interface {
 	Say(wavPath string) error
 }
@@ -204,9 +203,9 @@ type WebServer struct {
 	audioCall                AudioSayer            // Talk-back v2: own local audio call
 	restartBridgeFunc        func()                // Bridge restart action (injectable in tests)
 	rebootDeviceFunc         func()                // Device reboot action (injectable in tests)
-	duplexController         DuplexController      // Audio full-duplex de validación local (sdd 2026-08-21); IsActive() es autoritativo para /status
-	audioListenController    AudioListenController // Oído pasivo (tap lo:5000, sdd 2026-08-21-audio-tap-5000); IsActive() es autoritativo para /status
-	answerer                 Answerer              // Contestador SIP (F1, sdd 2026-08-23-sip-answerer-f1); opcional
+	duplexController         DuplexController      // full-duplex audio for local validation; IsActive() is authoritative for /status
+	audioListenController    AudioListenController // passive listening (tap lo:5000); IsActive() is authoritative for /status
+	answerer                 Answerer              // SIP answerer; optional
 }
 
 // NewWebServer creates a new web server instance
@@ -308,9 +307,8 @@ func (ws *WebServer) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/snapshot", ws.handleAPISnapshot)
 	mux.HandleFunc("/api/call", ws.handleAPICallState)
 	mux.HandleFunc("/api/controls/call/hangup", ws.handleCallHangup)
-	// Contestador SIP (F1, sdd 2026-08-23-sip-answerer-f1). 503 si el
-	// subsistema no está activo (answerer == nil); Basic Auth heredado del
-	// authMiddleware(mux) global.
+	// SIP answerer. 503 when the subsystem is not running (answerer == nil);
+	// Basic Auth comes from the global authMiddleware(mux).
 	mux.HandleFunc("/api/doorcall/answer", ws.handleDoorcallAnswer)
 	mux.HandleFunc("/api/doorcall/hangup", ws.handleDoorcallHangup)
 	mux.HandleFunc("/api/doorcall/status", ws.handleDoorcallStatus)
@@ -342,18 +340,18 @@ func (ws *WebServer) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/talkback/stop", ws.handleTalkbackStop)
 	mux.HandleFunc("/api/talkback/status", ws.handleTalkbackStatus)
 	mux.HandleFunc("/api/talkback/say", ws.handleTalkbackSay)
-	mux.HandleFunc("/api/talkback/greeting", ws.handleGreeting) // talk-back v1: saludo del contestador → puerta
+	mux.HandleFunc("/api/talkback/greeting", ws.handleGreeting) // talk-back v1: answering machine greeting → door
 
-	// Audio full-duplex de validación local (sdd 2026-08-21-duplex-door-audio).
-	// Gateado por audio.duplex_enabled (404 si off, ver audio_duplex_handlers.go).
+	// Full-duplex audio for local validation.
+	// Gated by audio.duplex_enabled (404 when off, see audio_duplex_handlers.go).
 	mux.HandleFunc("/api/audio/duplex/start", ws.handleAudioDuplexStart)
 	mux.HandleFunc("/api/audio/duplex/stop", ws.handleAudioDuplexStop)
 	mux.HandleFunc("/api/audio/duplex/status", ws.handleAudioDuplexStatus)
 
-	// Oído pasivo del portero: espejo del leg de audio nativo (tap lo:5000,
-	// sdd 2026-08-21-audio-tap-5000). Gateado por audio.listen_tap_enabled
-	// (404 si off, ver audio_listen_handlers.go). Vía de validación local; el
-	// armado en producción es por eventos del bus, cableado en cmd/main.go.
+	// Passive door listening: mirror of the native audio leg (tap lo:5000).
+	// Gated by audio.listen_tap_enabled (404 when off, see
+	// audio_listen_handlers.go). This is the local validation path; in use it
+	// is armed by bus events, wired in cmd/main.go.
 	mux.HandleFunc("/api/audio/listen/start", ws.handleAudioListenStart)
 	mux.HandleFunc("/api/audio/listen/stop", ws.handleAudioListenStop)
 	mux.HandleFunc("/api/audio/listen/status", ws.handleAudioListenStatus)
@@ -770,16 +768,16 @@ func (ws *WebServer) handleCallHangup(w http.ResponseWriter, r *http.Request) {
 	ws.writeJSON(w, map[string]interface{}{"success": true, "action": "hangup"})
 }
 
-// handleDoorcallAnswer descuelga la llamada entrante vía el contestador SIP
-// (F1). 503 si el subsistema no está activo; 409 si el answerer rechaza la
-// acción (p.ej. ErrNotRinging: no hay llamada en RINGING).
+// handleDoorcallAnswer picks up the incoming call through the SIP answerer.
+// 503 when the subsystem is not running; 409 when the answerer refuses the
+// action (e.g. ErrNotRinging: no call is RINGING).
 func (ws *WebServer) handleDoorcallAnswer(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	if ws.answerer == nil {
-		http.Error(w, "contestador no activo", http.StatusServiceUnavailable)
+		http.Error(w, "answerer not running", http.StatusServiceUnavailable)
 		return
 	}
 	if err := ws.answerer.Answer(); err != nil {
@@ -789,16 +787,16 @@ func (ws *WebServer) handleDoorcallAnswer(w http.ResponseWriter, r *http.Request
 	ws.writeJSON(w, map[string]interface{}{"success": true, "action": "answer", "state": ws.answerer.StateString()})
 }
 
-// handleDoorcallHangup cuelga la llamada en curso del contestador SIP (F1).
-// 503 si el subsistema no está activo; 409 si el answerer rechaza la acción
-// (p.ej. ErrNotInCall: no hay llamada activa).
+// handleDoorcallHangup hangs up the answerer's current call. 503 when the
+// subsystem is not running; 409 when the answerer refuses the action (e.g.
+// ErrNotInCall: no active call).
 func (ws *WebServer) handleDoorcallHangup(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	if ws.answerer == nil {
-		http.Error(w, "contestador no activo", http.StatusServiceUnavailable)
+		http.Error(w, "answerer not running", http.StatusServiceUnavailable)
 		return
 	}
 	if err := ws.answerer.Hangup(); err != nil {
@@ -808,11 +806,11 @@ func (ws *WebServer) handleDoorcallHangup(w http.ResponseWriter, r *http.Request
 	ws.writeJSON(w, map[string]interface{}{"success": true, "action": "hangup", "state": ws.answerer.StateString()})
 }
 
-// handleDoorcallStatus reporta el estado actual del contestador SIP (F1).
-// 503 si el subsistema no está activo.
+// handleDoorcallStatus reports the current SIP answerer state.
+// 503 when the subsystem is not running.
 func (ws *WebServer) handleDoorcallStatus(w http.ResponseWriter, r *http.Request) {
 	if ws.answerer == nil {
-		http.Error(w, "contestador no activo", http.StatusServiceUnavailable)
+		http.Error(w, "answerer not running", http.StatusServiceUnavailable)
 		return
 	}
 	ws.writeJSON(w, map[string]interface{}{"state": ws.answerer.StateString(), "registered": ws.answerer.IsRegistered()})

@@ -10,9 +10,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// TCPTransport es el transporte concreto del contestador: una conexión TCP persistente contra el
-// Flexisip local (implementa AnswererTransport). Send serializa escrituras con un mutex; Close es
-// idempotente (sync.Once) porque Answerer.Stop() puede invocarlo más de una vez.
+// TCPTransport is the answerer's concrete transport: a persistent TCP connection to the local
+// Flexisip (implements AnswererTransport). Send serializes writes with a mutex; Close is
+// idempotent (sync.Once) because Answerer.Stop() can call it more than once.
 type TCPTransport struct {
 	conn      net.Conn
 	reader    *bufio.Reader
@@ -24,9 +24,9 @@ type TCPTransport struct {
 	lport     int
 }
 
-// NewTCPTransport abre la conexión TCP contra serverAddr (host:puerto) con timeout de conexión de
-// 10s, activa TCP_NODELAY (los frames SIP son pequeños y latencia-sensibles) y envuelve la lectura
-// en un bufio.Reader para ReadSIPFrame.
+// NewTCPTransport opens the TCP connection to serverAddr (host:port) with a 10 s connect
+// timeout, enables TCP_NODELAY (SIP frames are small and latency sensitive) and wraps the
+// reader in a bufio.Reader for ReadSIPFrame.
 func NewTCPTransport(serverAddr string, logger *logrus.Logger) (*TCPTransport, error) {
 	if logger == nil {
 		logger = logrus.New()
@@ -48,8 +48,8 @@ func NewTCPTransport(serverAddr string, logger *logrus.Logger) (*TCPTransport, e
 	}, nil
 }
 
-// Send escribe un frame SIP crudo en la conexión. Serializado con writeMu: run() (lectura) y las
-// llamadas desde Answer/Hangup/registerOnce (bajo a.mu) pueden invocar Send concurrentemente.
+// Send writes a raw SIP frame to the connection. Serialized with writeMu: run() (reading) and
+// calls from Answer/Hangup/registerOnce (under a.mu) can call Send concurrently.
 func (t *TCPTransport) Send(raw string) error {
 	t.writeMu.Lock()
 	defer t.writeMu.Unlock()
@@ -57,19 +57,19 @@ func (t *TCPTransport) Send(raw string) error {
 	return err
 }
 
-// Recv bloquea hasta leer el siguiente frame SIP completo (o error/EOF si se cierra la conexión).
+// Recv blocks until it reads the next complete SIP frame (or error/EOF when the connection closes).
 func (t *TCPTransport) Recv() (*SIPMessage, error) {
 	return ReadSIPFrame(t.reader)
 }
 
-// LocalHost devuelve la IP local usada para el REGISTER/Contact (la de la conexión saliente).
+// LocalHost returns the local IP used for REGISTER/Contact (that of the outgoing connection).
 func (t *TCPTransport) LocalHost() string { return t.lhost }
 
-// LocalPort devuelve el puerto local efímero de la conexión saliente.
+// LocalPort returns the ephemeral local port of the outgoing connection.
 func (t *TCPTransport) LocalPort() int { return t.lport }
 
-// Close cierra la conexión. Idempotente: una segunda llamada es un no-op seguro (Answerer.Stop()
-// puede invocarlo más de una vez y no debe entrar en pánico sobre una conn ya cerrada).
+// Close closes the connection. Idempotent: a second call is a safe no-op (Answerer.Stop()
+// can call it more than once and must not panic on a closed conn).
 func (t *TCPTransport) Close() error {
 	t.closeOnce.Do(func() {
 		t.closeErr = t.conn.Close()
@@ -77,8 +77,8 @@ func (t *TCPTransport) Close() error {
 	return t.closeErr
 }
 
-// splitHostPort separa "127.0.0.1:41000" en ("127.0.0.1", 41000). Ante un fallo de parseo (no
-// debería ocurrir sobre conn.LocalAddr()) devuelve el string completo y puerto 0.
+// splitHostPort splits "127.0.0.1:41000" into ("127.0.0.1", 41000). On a parse failure (should
+// not happen for conn.LocalAddr()) it returns the whole string and port 0.
 func splitHostPort(addr string) (string, int) {
 	host, portStr, err := net.SplitHostPort(addr)
 	if err != nil {

@@ -61,8 +61,8 @@ type RTPRelay struct {
 	stopCh    chan struct{}
 	udpSender *net.UDPConn // reusable socket for sending UDP to consumers
 	startTime time.Time
-	fill      *relayFill // modo "pista de audio siempre viva" (ver rtp_relay_fill.go)
-	vfill     *videoFill // modo "vídeo nunca mudo" (ver rtp_relay_vfill.go)
+	fill      *relayFill // "audio track always alive" mode (see rtp_relay_fill.go)
+	vfill     *videoFill // "video never silent" mode (see rtp_relay_vfill.go)
 }
 
 // NewRTPRelay creates a new relay for the given media type and port.

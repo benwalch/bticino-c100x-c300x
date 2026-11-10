@@ -9,8 +9,8 @@ import (
 	"time"
 )
 
-// placeholderH264 es un fotograma IDR negro con la MISMA cabecera que la placa
-// (Constrained Baseline 3.0, 688x480 progresivo, medido en pcaps de lo:5007):
+// placeholderH264 is a black IDR frame with the SAME header as the entrance
+// panel (Constrained Baseline 3.0, 688x480 progressive, measured in lo:5007 pcaps):
 //
 //	ffmpeg -f lavfi -i color=c=black:s=688x480:r=1 -frames:v 1 -pix_fmt yuv420p \
 //	       -c:v libx264 -profile:v baseline -level 3.0 -x264-params keyint=1:repeat-headers=1 -f h264
@@ -19,36 +19,37 @@ import (
 var placeholderH264 []byte
 
 const (
-	vfillIdle     = 1500 * time.Millisecond // sin vídeo real durante esto => fondo de reposo
-	vfillInterval = time.Second             // cadencia del fondo (1 fps)
+	vfillIdle     = 1500 * time.Millisecond // no real video for this long => idle background
+	vfillInterval = time.Second             // background rate (1 fps)
 	vfillTick     = 100 * time.Millisecond
-	vfillMTU      = 1200 // payload RTP máximo antes de fragmentar en FU-A
+	vfillMTU      = 1200 // largest RTP payload before FU-A fragmentation
 	videoClock    = 90000
 )
 
-// videoFill es el modo "RTSP de vídeo nunca mudo" de un RTPRelay.
+// videoFill is an RTPRelay's "video RTSP never silent" mode.
 //
-// Por qué: el stream `doorbell` de go2rtc es un exec de ffmpeg que, sin vídeo, muere
-// por timeout a los 30 s y go2rtc lo relanza cada ~90 s. Si el ojo (30 s) cae en ese
-// hueco, la tarjeta HA no ve nada; si cae dentro, la imagen llega tarde. Con un fondo
-// negro a 1 fps en reposo, ffmpeg sigue conectado y el vídeo real pasa al instante.
-// Todo sale con UN SSRC y secuencia continua; el vídeo real conserva su marker y la
-// separación de timestamps (desplazada para continuar la línea de tiempo).
+// Why: go2rtc's `doorbell` stream is an ffmpeg exec that dies after a 30 s
+// timeout without video, and go2rtc restarts it every ~90 s. If the panel view
+// (30 s) falls into that gap, the HA card shows nothing; if it falls inside,
+// the picture arrives late. With a black 1 fps background at rest, ffmpeg
+// stays connected and real video passes at once. Everything goes out with ONE
+// SSRC and a continuous sequence; real video keeps its marker and timestamp
+// spacing (shifted to continue the timeline).
 type videoFill struct {
 	pt     byte
 	ssrc   uint32
 	start  time.Time
-	frame  [][]byte // payloads RTP del fondo (SPS, PPS, IDR fragmentado)
+	frame  [][]byte // RTP payloads of the background (SPS, PPS, fragmented IDR)
 	seq    uint16
 	mu     sync.Mutex
-	srcID  uint32 // SSRC de la fuente real en curso
+	srcID  uint32 // SSRC of the current real source
 	inReal bool
-	offset uint32 // desplazamiento de timestamps de la fuente real
+	offset uint32 // timestamp offset of the real source
 
 	lastReal, lastFill time.Time
 }
 
-// EnableVideoFill activa el fondo de reposo con el PT de vídeo pt. Llamar antes de Start.
+// EnableVideoFill enables the idle background with video PT pt. Call before Start.
 func (r *RTPRelay) EnableVideoFill(pt byte) {
 	r.vfill = &videoFill{pt: pt, ssrc: rand.Uint32(), frame: packetizeH264(annexBNALs(placeholderH264), vfillMTU)}
 }
@@ -57,7 +58,7 @@ func (v *videoFill) wallTS(now time.Time) uint32 {
 	return uint32(now.Sub(v.start).Nanoseconds() * videoClock / int64(time.Second))
 }
 
-// vfillMain reescribe un paquete de vídeo real.
+// vfillMain rewrites a real video packet.
 func (r *RTPRelay) vfillMain(packet []byte) {
 	v := r.vfill
 	payload := rtpPayload(packet)
@@ -71,7 +72,7 @@ func (r *RTPRelay) vfillMain(packet []byte) {
 	defer v.mu.Unlock()
 	now := time.Now()
 	if !v.inReal || srcID != v.srcID {
-		// Nueva fuente (o vuelta del fondo): continuar la línea de tiempo de salida.
+		// New source (or back from the background): continue the output timeline.
 		v.offset = v.wallTS(now) - srcTS
 		v.srcID, v.inReal = srcID, true
 	}
@@ -79,7 +80,7 @@ func (r *RTPRelay) vfillMain(packet []byte) {
 	r.vemitLocked(payload, marker, srcTS+v.offset)
 }
 
-// vfillTickLoop emite el fondo cuando no llega vídeo real y hay consumidores.
+// vfillTickLoop sends the background when no real video arrives and there are consumers.
 func (r *RTPRelay) vfillTickLoop() {
 	t := time.NewTicker(vfillTick)
 	defer t.Stop()
@@ -107,7 +108,7 @@ func (r *RTPRelay) vfillTickLoop() {
 	}
 }
 
-// vemitLocked construye el RTP de salida y lo reparte. Asume v.mu tomado.
+// vemitLocked builds the outgoing RTP and fans it out. Assumes v.mu is held.
 func (r *RTPRelay) vemitLocked(payload []byte, marker bool, ts uint32) {
 	v := r.vfill
 	pkt := make([]byte, 12+len(payload))
@@ -123,11 +124,11 @@ func (r *RTPRelay) vemitLocked(payload []byte, marker bool, ts uint32) {
 	r.fanOut(pkt)
 }
 
-// annexBNALs parte un flujo Annex-B en NALs, descartando SEI (tipo 6) y AUD (9).
+// annexBNALs splits an Annex-B stream into NALs, dropping SEI (type 6) and AUD (9).
 func annexBNALs(b []byte) [][]byte {
 	var out [][]byte
 	for _, n := range bytes.Split(b, []byte{0, 0, 1}) {
-		n = bytes.TrimRight(n, "\x00") // ceros de un start code de 4 bytes
+		n = bytes.TrimRight(n, "\x00") // zeros of a 4-byte start code
 		if len(n) == 0 {
 			continue
 		}
@@ -139,8 +140,8 @@ func annexBNALs(b []byte) [][]byte {
 	return out
 }
 
-// packetizeH264 empaqueta NALs en payloads RTP (RFC 6184): NAL único si cabe,
-// si no fragmentación FU-A.
+// packetizeH264 packs NALs into RTP payloads (RFC 6184): a single NAL if it
+// fits, FU-A fragmentation otherwise.
 func packetizeH264(nals [][]byte, mtu int) [][]byte {
 	var out [][]byte
 	for _, n := range nals {

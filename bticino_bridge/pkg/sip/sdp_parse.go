@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// AudioAnswer son los datos del leg de audio del portero extraídos de su SDP.
+// AudioAnswer holds the unit's audio leg data taken from its SDP.
 type AudioAnswer struct {
 	Port        int
 	PayloadType int
@@ -16,9 +16,9 @@ type AudioAnswer struct {
 
 const srtpSuiteAESCM = "AES_CM_128_HMAC_SHA1_80"
 
-// ParseAudioAnswer extrae el puerto de audio, el PT de speex/8000 y la clave
-// SRTP de la suite AES_CM_128_HMAC_SHA1_80 del SDP de respuesta del portero.
-// Tolera CRLF o LF. Devuelve error si falta m=audio o la suite soportada.
+// ParseAudioAnswer extracts the audio port, the speex/8000 PT and the SRTP key
+// of the AES_CM_128_HMAC_SHA1_80 suite from the unit's answer SDP. It accepts
+// CRLF or LF and returns an error if m=audio or the supported suite is missing.
 func ParseAudioAnswer(sdp string) (AudioAnswer, error) {
 	var a AudioAnswer
 	lines := strings.Split(strings.ReplaceAll(sdp, "\r\n", "\n"), "\n")
@@ -36,7 +36,7 @@ func ParseAudioAnswer(sdp string) (AudioAnswer, error) {
 				a.Port, _ = strconv.Atoi(f[1])
 			}
 		case strings.HasPrefix(ln, "m="):
-			inAudio = false // otro media block
+			inAudio = false // another media block
 		case inAudio && strings.HasPrefix(ln, "a=rtpmap:"):
 			// a=rtpmap:98 speex/8000
 			if strings.Contains(strings.ToLower(ln), "speex/8000") {
@@ -49,7 +49,7 @@ func ParseAudioAnswer(sdp string) (AudioAnswer, error) {
 			// a=crypto:<tag> AES_CM_128_HMAC_SHA1_80 inline:<key>[ ...]
 			if idx := strings.Index(ln, "inline:"); idx >= 0 {
 				key := ln[idx+len("inline:"):]
-				key = strings.Fields(key)[0] // corta lifetime/MKI si los hubiera
+				key = strings.Fields(key)[0] // drop lifetime/MKI, if any
 				a.CryptoSuite = srtpSuiteAESCM
 				a.CryptoKey = key
 			}
@@ -57,13 +57,13 @@ func ParseAudioAnswer(sdp string) (AudioAnswer, error) {
 	}
 
 	if a.Port == 0 {
-		return a, fmt.Errorf("SDP sin m=audio o puerto inválido")
+		return a, fmt.Errorf("SDP without m=audio or with an invalid port")
 	}
 	if a.CryptoKey == "" {
-		return a, fmt.Errorf("SDP sin a=crypto %s (no soportada la negociada)", srtpSuiteAESCM)
+		return a, fmt.Errorf("SDP without a=crypto %s (the negotiated suite is not supported)", srtpSuiteAESCM)
 	}
 	if speexPT < 0 {
-		return a, fmt.Errorf("SDP sin rtpmap speex/8000")
+		return a, fmt.Errorf("SDP without rtpmap speex/8000")
 	}
 	a.PayloadType = speexPT
 	return a, nil

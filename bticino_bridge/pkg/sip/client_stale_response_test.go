@@ -13,7 +13,7 @@ import (
 	"bticino_bridge/pkg/events"
 )
 
-// sipHeader extrae el valor de una cabecera de un mensaje SIP en crudo.
+// sipHeader extracts a header value from a raw SIP message.
 func sipHeader(raw, name string) string {
 	for _, ln := range strings.Split(raw, "\r\n") {
 		if strings.HasPrefix(strings.ToLower(ln), strings.ToLower(name)+":") {
@@ -39,20 +39,20 @@ func sipBye(callID string) string {
 		"Call-ID: %s\r\nCSeq: 20 BYE\r\nContent-Length: 0\r\n\r\n", callID)
 }
 
-// TestInviteWithSDPIgnoraRespuestasAjenas reproduce el bug de teardown del ojo
-// (2026-10-13): en el socket webrtc quedaban respuestas de diálogos previos (el
-// 200 del BYE anterior, 200 retransmitidos de un INVITE sin ACK, BYE del nativo).
-// InviteWithSDP tomaba el PRIMER "200" como respuesta propia → SDP vacío/ajeno.
-// Debe aceptar solo la respuesta con SU Call-ID y CSeq de INVITE, y contestar
-// 200 a los BYE que el nativo envía por ese socket.
-func TestInviteWithSDPIgnoraRespuestasAjenas(t *testing.T) {
+// TestInviteWithSDPIgnoresForeignResponses reproduces the panel view teardown
+// bug (2026-10-13): responses of earlier dialogs were left on the webrtc socket
+// (the 200 of the previous BYE, retransmitted 200s of an unACKed INVITE, native
+// BYEs). InviteWithSDP took the FIRST "200" as its own → empty/foreign SDP.
+// It must accept only the response with ITS Call-ID and INVITE CSeq, and answer
+// 200 to the BYEs the native side sends on that socket.
+func TestInviteWithSDPIgnoresForeignResponses(t *testing.T) {
 	cfg := &SIPConfig{ServerAddr: "127.0.0.1:5060", Domain: "example.com", Username: "webrtc",
 		LocalIP: "127.0.0.1", LocalPort: 5090, DevAddr: "20", Transport: "udp"}
 	logger := logrus.New()
 	logger.SetOutput(io.Discard)
 	c := NewBTicinoSIPClient(cfg, events.NewEventBus(10, logger), logger)
-	// UDP real en loopback (como en producción): los datagramas se encolan y
-	// un Write no bloquea esperando lectura (net.Pipe produciría deadlock).
+	// Real UDP on loopback (as in production): datagrams are queued and a Write
+	// does not block waiting for a read (net.Pipe would deadlock).
 	peer, err := net.ListenPacket("udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -80,18 +80,18 @@ func TestInviteWithSDPIgnoraRespuestasAjenas(t *testing.T) {
 		}
 		send := func(m string) { _, _ = peer.WriteTo([]byte(m), from) }
 		cid := sipHeader(string(buf[:n]), "Call-ID")
-		// 1) 200 del BYE del ojo anterior (sin SDP).
+		// 1) 200 of the previous panel view BYE (no SDP).
 		send(sipResponse("200 OK", "old1@127.0.0.1", "538 BYE", ""))
-		// 2) 200 retransmitido de un INVITE previo nunca ACKeado (otro Call-ID).
+		// 2) retransmitted 200 of an earlier INVITE never ACKed (another Call-ID).
 		send(sipResponse("200 OK", "old2@127.0.0.1", "537 INVITE", staleSDP))
-		// 3) BYE del nativo de un diálogo previo: hay que contestarle 200.
+		// 3) native BYE of an earlier dialog: it must get a 200.
 		send(sipBye("old2@127.0.0.1"))
 		n, _, err = peer.ReadFrom(buf)
 		if err != nil {
 			return
 		}
 		byeReply <- string(buf[:n])
-		// 4) La respuesta buena.
+		// 4) The right response.
 		send(sipResponse("100 Trying", cid, "1 INVITE", ""))
 		send(sipResponse("200 OK", cid, "1 INVITE", realSDP))
 		n, _, err = peer.ReadFrom(buf)
@@ -106,22 +106,22 @@ func TestInviteWithSDPIgnoraRespuestasAjenas(t *testing.T) {
 		t.Fatalf("InviteWithSDP: %v", err)
 	}
 	if got != realSDP {
-		t.Fatalf("SDP equivocado (tomó una respuesta ajena):\n%q", got)
+		t.Fatalf("wrong SDP (took a foreign response):\n%q", got)
 	}
 	select {
 	case r := <-byeReply:
 		if !strings.HasPrefix(r, "SIP/2.0 200") || sipHeader(r, "Call-ID") != "old2@127.0.0.1" {
-			t.Fatalf("respuesta al BYE del nativo inesperada:\n%s", r)
+			t.Fatalf("unexpected response to the native BYE:\n%s", r)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("no se contestó 200 al BYE del nativo")
+		t.Fatal("no 200 was sent to the native BYE")
 	}
 	select {
 	case a := <-ack:
 		if !strings.HasPrefix(a, "ACK ") {
-			t.Fatalf("esperaba ACK, llegó:\n%s", a)
+			t.Fatalf("expected ACK, got:\n%s", a)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("no se envió ACK a la respuesta buena")
+		t.Fatal("no ACK was sent to the right response")
 	}
 }

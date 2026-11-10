@@ -10,21 +10,21 @@ func TestValidateAudioFilePath(t *testing.T) {
 	}
 	for _, p := range ok {
 		if err := validateAudioFilePath(p); err != nil {
-			t.Errorf("esperaba válido %q, error: %v", p, err)
+			t.Errorf("expected %q to be valid, error: %v", p, err)
 		}
 	}
 
 	bad := []string{
-		"",                      // vacío
-		"relativo.wav",          // no absoluto
-		"../../etc/passwd",      // relativo con traversal
-		"/tmp/../etc/passwd",    // traversal que escapa a /etc
-		"/etc/passwd",           // fuera de los directorios permitidos
-		"/home/bticino/.ssh/id", // fuera del subdir permitido
+		"",                      // empty
+		"relative.wav",          // not absolute
+		"../../etc/passwd",      // relative with traversal
+		"/tmp/../etc/passwd",    // traversal escaping to /etc
+		"/etc/passwd",           // outside the allowed directories
+		"/home/bticino/.ssh/id", // outside the allowed subdirectory
 	}
 	for _, p := range bad {
 		if err := validateAudioFilePath(p); err == nil {
-			t.Errorf("esperaba rechazo de %q, pero pasó", p)
+			t.Errorf("expected %q to be rejected, but it passed", p)
 		}
 	}
 }

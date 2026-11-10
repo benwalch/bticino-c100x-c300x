@@ -59,7 +59,7 @@ func TestReleaseSelfCallHangsUpOwnCallWithNilClient(t *testing.T) {
 	// state and publish sip.call.ended WITHOUT panicking.
 	r, ended := newTestRTSP(t)
 	r.mutex.Lock()
-	r.callActive = true // interna: no marcada por SetCallActive
+	r.callActive = true // internal: not set by SetCallActive
 	r.mutex.Unlock()
 
 	r.releaseSelfCallIfIdle("test")

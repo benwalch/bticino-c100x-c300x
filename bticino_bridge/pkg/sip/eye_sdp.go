@@ -2,11 +2,12 @@ package sip
 
 import "fmt"
 
-// BuildEyeOfferSDP construye el SDP del "ojo" (autoaccensione): vídeo recvonly +
-// audio sendrecv + atributo de sesión DEVADDR (la placa a encender). El vídeo NO
-// se consume in-band (lo da el tap pasivo lo:5007); videoPort solo existe para que
-// bt_vct monte la sesión de placa. srtpKey es NUESTRA clave (cifra lo que enviamos).
-// Formato igual que BuildAudioOfferSDP: crypto tag 2, AES_CM_128_HMAC_SHA1_80, speex PT 98.
+// BuildEyeOfferSDP builds the SDP of the panel view call ("eye",
+// autoaccensione): video recvonly + audio sendrecv + the DEVADDR session
+// attribute (the entrance panel to turn on). The video is NOT consumed in-band
+// (the passive tap on lo:5007 provides it); videoPort only exists so bt_vct
+// sets up the panel session. srtpKey is OUR key (it encrypts what we send).
+// Same format as BuildAudioOfferSDP: crypto tag 2, AES_CM_128_HMAC_SHA1_80, speex PT 98.
 func BuildEyeOfferSDP(localIP string, audioPort, videoPort int, srtpKey, devaddr string) string {
 	return fmt.Sprintf(
 		"v=0\r\n"+

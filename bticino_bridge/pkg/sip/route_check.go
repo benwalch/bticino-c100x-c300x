@@ -7,11 +7,11 @@ import (
 	"strings"
 )
 
-// CheckAnswererRoute lee route_ext.conf y comprueba si <sip:user@domain> figura en la línea alluser.
+// CheckAnswererRoute reads route_ext.conf and checks whether <sip:user@domain> is on the alluser line.
 func CheckAnswererRoute(routeFile, user, domain string) (bool, error) {
 	f, err := os.Open(routeFile)
 	if err != nil {
-		return false, fmt.Errorf("abriendo %s: %w", routeFile, err)
+		return false, fmt.Errorf("opening %s: %w", routeFile, err)
 	}
 	defer f.Close()
 	aor := fmt.Sprintf("sip:%s@%s", user, domain)

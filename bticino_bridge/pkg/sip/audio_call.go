@@ -10,8 +10,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// CallOriginator origina un INVITE con SDP y puede cerrar el diálogo (Hangup ya
-// existe en *BTicinoSIPClient: envía BYE con el Call-ID/tag del diálogo actual).
+// CallOriginator places an INVITE with an SDP and can close the dialog (Hangup
+// exists on *BTicinoSIPClient: it sends a BYE with the current dialog's Call-ID/tag).
 type CallOriginator interface {
 	InviteWithSDP(target, sdp string) (answerSDP string, err error)
 	Hangup() error
@@ -24,8 +24,8 @@ type AudioPlayer interface {
 	Stop()
 }
 
-// ErrAudioLegBusy: ya hay una pata de audio activa (coexistencia: una sola pata).
-var ErrAudioLegBusy = errors.New("audio: ya hay una pata de audio activa")
+// ErrAudioLegBusy: an audio leg is already active (coexistence: a single leg).
+var ErrAudioLegBusy = errors.New("audio: an audio leg is already active")
 
 type AudioCall struct {
 	orig      CallOriginator
@@ -47,10 +47,10 @@ func NewAudioCall(orig CallOriginator, own OWNSender, player AudioPlayer, captur
 	return &AudioCall{orig: orig, own: own, player: player, capturer: capturer, localIP: localIP, audioPort: audioPort, logger: logger}
 }
 
-// Say (talk-back v2, compat): pata de solo-envío que reproduce un WAV a la puerta.
-// Ocupa la pata única (ErrAudioLegBusy) y cuelga SIEMPRE al terminar: antes el
-// diálogo quedaba vivo hasta que el nativo lo cortaba, y el vigilante del cliente
-// SIP retenía el socket webrtc (re-REGISTER aplazado) todo ese tiempo.
+// Say (talk-back v2, compat): a send-only leg that plays a WAV at the door.
+// It takes the single leg (ErrAudioLegBusy) and ALWAYS hangs up at the end:
+// before, the dialog stayed alive until the native side cut it, and the SIP
+// client's watcher held the webrtc socket (re-REGISTER deferred) all that time.
 func (a *AudioCall) Say(wavPath string) error {
 	a.mu.Lock()
 	if a.active {
@@ -63,17 +63,17 @@ func (a *AudioCall) Say(wavPath string) error {
 
 	key, err := NewSRTPMasterKey()
 	if err != nil {
-		return fmt.Errorf("clave SRTP: %w", err)
+		return fmt.Errorf("SRTP key: %w", err)
 	}
 	offer := BuildAudioOfferSDP(a.localIP, a.audioPort, key)
 	answerSDP, err := a.orig.InviteWithSDP(bticino.SIPUsernameForVariant(bticino.DeviceVariant), offer)
 	if err != nil {
 		return fmt.Errorf("INVITE: %w", err)
 	}
-	// Hay diálogo vivo (200 OK): colgar al salir, pase lo que pase.
+	// A dialog is alive (200 OK): hang up on the way out, whatever happens.
 	defer func() {
 		if herr := a.orig.Hangup(); herr != nil {
-			a.logger.WithError(herr).Debug("audio-call: BYE al terminar Say")
+			a.logger.WithError(herr).Debug("audio-call: BYE at the end of Say")
 		}
 	}()
 	ans, err := ParseAudioAnswer(answerSDP)
@@ -82,19 +82,19 @@ func (a *AudioCall) Say(wavPath string) error {
 	}
 	if a.own != nil {
 		if err := a.own.SendOpenWebNetCommand(bticino.CmdAnswerPickup); err != nil {
-			a.logger.WithError(err).Debug("audio-call: WHO=8 arm sin ACK (continuo)")
+			a.logger.WithError(err).Debug("audio-call: WHO=8 arm without ACK (continuing)")
 		}
 	}
 	return a.player.Play(wavPath, "127.0.0.1", ans)
 }
 
-// OpenDuplex abre la pata full-duplex: INVITE c300x → answer → arm WHO=8 →
-// RECEIVER (siempre, → sinkPath) y SENDER (si talkWav != "") en paralelo.
-// Devuelve la AudioAnswer negociada. Una sola pata activa (ErrAudioLegBusy).
+// OpenDuplex opens the full-duplex leg: INVITE c300x → answer → arm WHO=8 →
+// RECEIVER (always, → sinkPath) and SENDER (if talkWav != "") in parallel.
+// It returns the negotiated AudioAnswer. A single active leg (ErrAudioLegBusy).
 func (a *AudioCall) OpenDuplex(sinkPath, talkWav string) (AudioAnswer, error) {
-	// Reserva la pata en la MISMA sección crítica que el check (evita TOCTOU:
-	// dos llamadas concurrentes no deben pasar ambas, y un Close() concurrente
-	// no debe ver active=false mientras el INVITE está en vuelo).
+	// Reserve the leg in the SAME critical section as the check (avoids TOCTOU:
+	// two concurrent calls must not both pass, and a concurrent Close() must
+	// not see active=false while the INVITE is in flight).
 	a.mu.Lock()
 	if a.active {
 		a.mu.Unlock()
@@ -106,7 +106,7 @@ func (a *AudioCall) OpenDuplex(sinkPath, talkWav string) (AudioAnswer, error) {
 	key, err := NewSRTPMasterKey()
 	if err != nil {
 		a.releaseActive()
-		return AudioAnswer{}, fmt.Errorf("clave SRTP: %w", err)
+		return AudioAnswer{}, fmt.Errorf("SRTP key: %w", err)
 	}
 	offer := BuildAudioOfferSDP(a.localIP, a.audioPort, key)
 	answerSDP, err := a.orig.InviteWithSDP(bticino.SIPUsernameForVariant(bticino.DeviceVariant), offer)
@@ -116,12 +116,12 @@ func (a *AudioCall) OpenDuplex(sinkPath, talkWav string) (AudioAnswer, error) {
 	}
 	ans, err := ParseAudioAnswer(answerSDP)
 	if err != nil {
-		// El INVITE llegó a 200 OK (hay diálogo SIP vivo) pero no pudimos
-		// parsear el answer: colgar para no dejar un diálogo huérfano en el
-		// dispositivo (restricción de no-interferencia).
+		// The INVITE reached 200 OK (a SIP dialog is alive) but the answer could
+		// not be parsed: hang up so no orphaned dialog stays on the device
+		// (non-interference rule).
 		if a.orig != nil {
 			if herr := a.orig.Hangup(); herr != nil {
-				a.logger.WithError(herr).Debug("audio-call: BYE tras fallo de parse de answer")
+				a.logger.WithError(herr).Debug("audio-call: BYE after the answer failed to parse")
 			}
 		}
 		a.releaseActive()
@@ -129,65 +129,63 @@ func (a *AudioCall) OpenDuplex(sinkPath, talkWav string) (AudioAnswer, error) {
 	}
 	if a.own != nil {
 		if err := a.own.SendOpenWebNetCommand(bticino.CmdAnswerPickup); err != nil {
-			a.logger.WithError(err).Debug("audio-call: WHO=8 arm sin ACK (continuo)")
+			a.logger.WithError(err).Debug("audio-call: WHO=8 arm without ACK (continuing)")
 		}
 	}
 
-	// Receiver siempre; bloquea → goroutine. Lo corta Close(), pero también
-	// puede retornar por sí solo (timeout duro de 60s en Capture, o ffmpeg
-	// muerto por su cuenta). En ese caso nadie más va a liberar la pata: hay
-	// que cerrar aquí también, si no queda encallada (active=true para
-	// siempre, diálogo SIP huérfano, y todo OpenDuplex posterior devuelve
-	// ErrAudioLegBusy hasta el próximo /stop manual). Close() es idempotente
-	// (guardado por el flag active bajo a.mu), así que:
-	//   - /stop normal: Close() ya puso active=false y llamó a
-	//     capturer.Stop() (que mata ffmpeg) ANTES de que este Capture()
-	//     retorne; cuando retorna, este Close() ve active=false y es un
-	//     no-op.
-	//   - fin natural (timeout/ffmpeg muerto): Capture() retorna solo, este
-	//     Close() es el primero en verlo y hace active=false + player.Stop()
-	//     + Hangup() (BYE).
-	// Solo se hace para el receiver (la dirección continua/"listen"): el
-	// sender (Say/Play) es un one-shot que no debe tumbar la pata al acabar.
+	// The receiver always runs; it blocks → goroutine. Close() cuts it, but it
+	// can also return by itself (60 s hard timeout in Capture, or ffmpeg died
+	// on its own). Then nobody else frees the leg, so it is closed here too;
+	// otherwise it stays stuck (active=true forever, an orphaned SIP dialog,
+	// and every later OpenDuplex returns ErrAudioLegBusy until the next manual
+	// /stop). Close() is idempotent (guarded by the active flag under a.mu), so:
+	//   - normal /stop: Close() already set active=false and called
+	//     capturer.Stop() (which kills ffmpeg) BEFORE this Capture() returns;
+	//     when it returns, this Close() sees active=false and is a no-op.
+	//   - natural end (timeout/ffmpeg died): Capture() returns by itself, this
+	//     Close() sees it first and does active=false + player.Stop() +
+	//     Hangup() (BYE).
+	// Only for the receiver (the continuous "listen" direction): the sender
+	// (Say/Play) is a one-shot that must not take the leg down when it ends.
 	go func() {
 		if err := a.capturer.Capture(a.localIP, a.audioPort, sinkPath, ans); err != nil {
-			a.logger.WithError(err).Debug("audio-call: receiver terminó")
+			a.logger.WithError(err).Debug("audio-call: receiver ended")
 		}
 		if err := a.Close(); err != nil {
-			a.logger.WithError(err).Debug("audio-call: Close tras fin del receiver")
+			a.logger.WithError(err).Debug("audio-call: Close after the receiver ended")
 		}
 	}()
-	// Sender opcional.
+	// Optional sender.
 	if talkWav != "" {
 		go func() {
 			if err := a.player.Play(talkWav, "127.0.0.1", ans); err != nil {
-				a.logger.WithError(err).Debug("audio-call: sender terminó")
+				a.logger.WithError(err).Debug("audio-call: sender ended")
 			}
 		}()
 	}
-	a.logger.Info("audio-call: pata full-duplex abierta")
+	a.logger.Info("audio-call: full-duplex leg open")
 	return ans, nil
 }
 
-// IsActive indica si la pata full-duplex sigue activa. Es la fuente de
-// verdad para /api/audio/duplex/status: la pata puede autocerrarse (fin
-// natural del receiver, ver OpenDuplex) sin pasar por /stop, así que un flag
-// espejo en el webserver quedaría obsoleto tras ese cierre.
+// IsActive reports whether the full-duplex leg is still active. It is the
+// source of truth for /api/audio/duplex/status: the leg can close by itself
+// (natural end of the receiver, see OpenDuplex) without /stop, so a mirror
+// flag in the webserver would go stale after that close.
 func (a *AudioCall) IsActive() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.active
 }
 
-// releaseActive libera la reserva de pata activa (rollback ante error tras el
-// check-and-set de OpenDuplex).
+// releaseActive frees the active leg reservation (rollback on an error after
+// the check-and-set in OpenDuplex).
 func (a *AudioCall) releaseActive() {
 	a.mu.Lock()
 	a.active = false
 	a.mu.Unlock()
 }
 
-// Close para receiver+sender, envía BYE y libera. Idempotente.
+// Close stops receiver+sender, sends a BYE and frees the leg. Idempotent.
 func (a *AudioCall) Close() error {
 	a.mu.Lock()
 	if !a.active {
@@ -205,9 +203,9 @@ func (a *AudioCall) Close() error {
 	}
 	if a.orig != nil {
 		if err := a.orig.Hangup(); err != nil {
-			a.logger.WithError(err).Debug("audio-call: BYE con error")
+			a.logger.WithError(err).Debug("audio-call: BYE failed")
 		}
 	}
-	a.logger.Info("audio-call: pata full-duplex cerrada")
+	a.logger.Info("audio-call: full-duplex leg closed")
 	return nil
 }

@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-// BuildBackchannelSDP describe (para ffmpeg como RECEPTOR) el RTP speex que el backchannel de
-// go2rtc envía a 127.0.0.1:<port> con el payload type <payloadType>. ffmpeg abre ese puerto y
-// reenvía lo que llegue; con el formato declarado en el SDP no necesita sondear el stream.
+// BuildBackchannelSDP describes (for ffmpeg as the RECEIVER) the speex RTP that the go2rtc
+// backchannel sends to 127.0.0.1:<port> with payload type <payloadType>. ffmpeg opens that
+// port and forwards what arrives; with the format declared in the SDP it need not probe the stream.
 func BuildBackchannelSDP(port, payloadType int) string {
 	var b strings.Builder
 	b.WriteString("v=0\r\n")

@@ -13,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// rtpPkt es lo que el test lee de la salida del relé.
+// rtpPkt is what the test reads from the relay's output.
 type rtpPkt struct {
 	pt      byte
 	seq     uint16
@@ -25,7 +25,7 @@ func listenOut(t *testing.T) (*net.UDPConn, int) {
 	t.Helper()
 	c, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
 	if err != nil {
-		t.Fatalf("listen salida: %v", err)
+		t.Fatalf("listen output: %v", err)
 	}
 	return c, c.LocalAddr().(*net.UDPAddr).Port
 }
@@ -46,7 +46,7 @@ func readPkt(t *testing.T, c *net.UDPConn, timeout time.Duration) (rtpPkt, bool)
 	}, true
 }
 
-// micPacket construye un RTP mínimo (cabecera de 12 bytes) como el que manda go2rtc.
+// micPacket builds a minimal RTP packet (12-byte header) like the one go2rtc sends.
 func micPacket(seq uint16, payload []byte) []byte {
 	h := make([]byte, 12)
 	h[0] = 0x80
@@ -66,9 +66,9 @@ func sendMic(t *testing.T, port int, pkt []byte) {
 	c.Write(pkt)
 }
 
-// Sin micrófono el relé emite silencio speex continuo, con su propio PT y secuencia consecutiva:
-// es lo que mantiene "viva" la subida para que la placa abra el audio de bajada.
-func TestKeepalive_SinMic_SilencioContinuo(t *testing.T) {
+// Without a microphone the relay emits continuous speex silence, with its own PT and a
+// consecutive sequence: this keeps the upstream "alive" so the entrance panel opens the downstream audio.
+func TestKeepalive_NoMic_ContinuousSilence(t *testing.T) {
 	out, outPort := listenOut(t)
 	defer out.Close()
 	k, err := startUpstreamKeepalive("127.0.0.1", 0, outPort, 97, logrus.New())
@@ -80,24 +80,24 @@ func TestKeepalive_SinMic_SilencioContinuo(t *testing.T) {
 	for i := 0; i < 6; i++ {
 		p, ok := readPkt(t, out, time.Second)
 		if !ok {
-			t.Fatalf("paquete %d: no llegó (el relé debe emitir sin entrada)", i)
+			t.Fatalf("packet %d: did not arrive (the relay must emit without input)", i)
 		}
 		if p.pt != 97 {
-			t.Fatalf("PT=%d, esperaba 97", p.pt)
+			t.Fatalf("PT=%d, expected 97", p.pt)
 		}
 		if !bytes.Equal(p.payload, speexSilenceFrame) {
-			t.Fatalf("payload no es la trama de silencio: %x", p.payload)
+			t.Fatalf("payload is not the silence frame: %x", p.payload)
 		}
 		if prev != nil && p.seq != prev.seq+1 {
-			t.Fatalf("secuencia no consecutiva: %d tras %d", p.seq, prev.seq)
+			t.Fatalf("non-consecutive sequence: %d after %d", p.seq, prev.seq)
 		}
 		pp := p
 		prev = &pp
 	}
 }
 
-// Cuando llega voz del micrófono de HA, se reenvía su payload tal cual, sin huecos de secuencia.
-func TestKeepalive_ReenviaPayloadDelMic(t *testing.T) {
+// When voice arrives from the HA microphone, its payload is forwarded as is, with no sequence gaps.
+func TestKeepalive_ForwardsMicPayload(t *testing.T) {
 	out, outPort := listenOut(t)
 	defer out.Close()
 	k, err := startUpstreamKeepalive("127.0.0.1", 0, outPort, 97, logrus.New())
@@ -105,8 +105,8 @@ func TestKeepalive_ReenviaPayloadDelMic(t *testing.T) {
 		t.Fatalf("start: %v", err)
 	}
 	defer k.Stop()
-	if _, ok := readPkt(t, out, time.Second); !ok { // ya está emitiendo silencio
-		t.Fatal("el relé no arrancó a emitir")
+	if _, ok := readPkt(t, out, time.Second); !ok { // already emitting silence
+		t.Fatal("the relay did not start emitting")
 	}
 	voz := []byte("VOZ-DE-HA-0001")
 	sendMic(t, k.InPort(), micPacket(500, voz))
@@ -119,18 +119,18 @@ func TestKeepalive_ReenviaPayloadDelMic(t *testing.T) {
 			continue
 		}
 		if have && p.seq != prevSeq+1 {
-			t.Fatalf("hueco de secuencia: %d tras %d", p.seq, prevSeq)
+			t.Fatalf("sequence gap: %d after %d", p.seq, prevSeq)
 		}
 		prevSeq, have = p.seq, true
 		if bytes.Equal(p.payload, voz) {
 			return // OK
 		}
 	}
-	t.Fatal("el payload del micrófono no se reenvió")
+	t.Fatal("the microphone payload was not forwarded")
 }
 
-// Tras callar el micrófono, el relé vuelve a meter silencio.
-func TestKeepalive_VuelveASilencioTrasMic(t *testing.T) {
+// After the microphone goes silent, the relay inserts silence again.
+func TestKeepalive_BackToSilenceAfterMic(t *testing.T) {
 	out, outPort := listenOut(t)
 	defer out.Close()
 	k, err := startUpstreamKeepalive("127.0.0.1", 0, outPort, 97, logrus.New())
@@ -140,7 +140,7 @@ func TestKeepalive_VuelveASilencioTrasMic(t *testing.T) {
 	defer k.Stop()
 	voz := []byte("VOZ-DE-HA-0002")
 	sendMic(t, k.InPort(), micPacket(1, voz))
-	sawVoz := false
+	sawVoice := false
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
 		p, ok := readPkt(t, out, 300*time.Millisecond)
@@ -148,27 +148,27 @@ func TestKeepalive_VuelveASilencioTrasMic(t *testing.T) {
 			continue
 		}
 		if bytes.Equal(p.payload, voz) {
-			sawVoz = true
+			sawVoice = true
 			continue
 		}
-		if sawVoz && bytes.Equal(p.payload, speexSilenceFrame) {
-			return // OK: silencio de nuevo tras la voz
+		if sawVoice && bytes.Equal(p.payload, speexSilenceFrame) {
+			return // OK: silence again after the voice
 		}
 	}
-	t.Fatalf("no volvió el silencio tras la voz (vio voz=%v)", sawVoz)
+	t.Fatalf("silence did not come back after the voice (saw voice=%v)", sawVoice)
 }
 
-// Integración con un ffmpeg REAL (se salta si no hay ffmpeg en el PATH): con el micro callado,
-// ffmpeg leyendo del relé (mismos argumentos que en producción) debe sacar SRTP continuo.
-// Es justo el caso que rompía el diseño ingenuo con amix (ffmpeg se colgaba sin paquetes de micro).
-func TestKeepalive_IntegracionFFmpegSacaSRTPSinMic(t *testing.T) {
+// Integration with a REAL ffmpeg (skipped if there is no ffmpeg in PATH): with the mic silent,
+// ffmpeg reading from the relay (same arguments as in production) must output continuous SRTP.
+// This is exactly the case that broke the naive amix design (ffmpeg hung without mic packets).
+func TestKeepalive_IntegrationFFmpegOutputsSRTPWithoutMic(t *testing.T) {
 	ff, err := exec.LookPath("ffmpeg")
 	if err != nil {
-		t.Skip("ffmpeg no disponible")
+		t.Skip("ffmpeg not available")
 	}
-	srtpOut, srtpPort := listenOut(t) // hace de "placa"
+	srtpOut, srtpPort := listenOut(t) // acts as the "entrance panel"
 	defer srtpOut.Close()
-	ffIn := freeUDPPort(t) // donde escucha ffmpeg (salida del relé)
+	ffIn := freeUDPPort(t) // where ffmpeg listens (the relay's output)
 	sdpFile := filepath.Join(t.TempDir(), "talk.sdp")
 	if err := os.WriteFile(sdpFile, []byte(BuildBackchannelSDP(ffIn, 97)), 0o600); err != nil {
 		t.Fatal(err)
@@ -184,7 +184,7 @@ func TestKeepalive_IntegracionFFmpegSacaSRTPSinMic(t *testing.T) {
 	defer func() { cmd.Process.Kill(); cmd.Wait() }()
 	k, err := startUpstreamKeepalive("127.0.0.1", 0, ffIn, 97, logrus.New())
 	if err != nil {
-		t.Fatalf("relé: %v", err)
+		t.Fatalf("relay: %v", err)
 	}
 	defer k.Stop()
 	got := 0
@@ -195,12 +195,12 @@ func TestKeepalive_IntegracionFFmpegSacaSRTPSinMic(t *testing.T) {
 		}
 	}
 	if got < 25 {
-		t.Fatalf("ffmpeg solo sacó %d paquetes SRTP sin micro (esperaba flujo continuo)", got)
+		t.Fatalf("ffmpeg only output %d SRTP packets without mic (expected a continuous stream)", got)
 	}
 }
 
-// Stop libera el puerto de entrada (el del micrófono) y es idempotente.
-func TestKeepalive_StopLiberaPuerto(t *testing.T) {
+// Stop frees the input port (the microphone's) and is idempotent.
+func TestKeepalive_StopFreesPort(t *testing.T) {
 	out, outPort := listenOut(t)
 	defer out.Close()
 	k, err := startUpstreamKeepalive("127.0.0.1", 0, outPort, 97, logrus.New())
@@ -212,7 +212,7 @@ func TestKeepalive_StopLiberaPuerto(t *testing.T) {
 	k.Stop()
 	c, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: in})
 	if err != nil {
-		t.Fatalf("el puerto %d sigue ocupado tras Stop: %v", in, err)
+		t.Fatalf("port %d still in use after Stop: %v", in, err)
 	}
 	c.Close()
 }

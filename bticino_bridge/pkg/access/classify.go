@@ -1,56 +1,56 @@
-// Package access clasifica aperturas del portal (telefonillo vs llave/RFID)
-// correlacionando con timbres/llamadas previos. Es un suscriptor puro del
-// EventBus: no abre sockets ni envía comandos al bus.
+// Package access classifies door openings (visitor vs resident) by correlating
+// them with earlier rings and calls. It only subscribes to the EventBus: it
+// opens no sockets and sends nothing on the bus.
 package access
 
 import "time"
 
-// Etiquetas de acceso.
+// Access labels.
 const (
-	TypeTelefonillo = "telefonillo" // apertura correlacionada con timbre/llamada previos
-	TypeLlave       = "llave"       // apertura sin timbre/llamada previos (RFID/residente)
-	TypeDesconocido = "desconocido" // señales en conflicto
+	TypeVisitor  = "visitor"  // opening after a ring or call
+	TypeResident = "resident" // opening without an earlier ring or call (RFID, resident)
+	TypeUnknown  = "unknown"  // conflicting signals
 )
 
-// Niveles de confianza (acuerdo entre correlación y duración).
+// Confidence levels (how well correlation and duration agree).
 const (
-	ConfAlta  = "alta"
-	ConfBaja  = "baja"
-	ConfMedia = "media" // sin dato de duración para desempatar
+	ConfHigh   = "high"
+	ConfLow    = "low"
+	ConfMedium = "medium" // no duration to decide
 )
 
-// ClassifyInput son las señales ya resueltas en el momento de decidir.
+// ClassifyInput holds the signals known at decision time.
 type ClassifyInput struct {
-	HadCall       bool          // hubo timbre/llamada dentro de la ventana, antes de abrir
-	Duration      time.Duration // tiempo con la cerradura energizada (19→20)
-	DurationKnown bool          // false si no llegó el cierre a tiempo
-	VisitorMax    time.Duration // umbral de "duración de visita"
+	HadCall       bool          // a ring or call within the window, before the opening
+	Duration      time.Duration // time the lock was energized (19→20)
+	DurationKnown bool          // false if the close did not arrive in time
+	VisitorMax    time.Duration // threshold for a "visitor" pulse
 }
 
-// ClassifyResult es la etiqueta y su confianza.
+// ClassifyResult is the label and its confidence.
 type ClassifyResult struct {
 	Type       string
 	Confidence string
 }
 
-// Classify es determinista y pura. La correlación fija la etiqueta; la duración
-// fija la confianza; el único conflicto real (sin llamada pero pulso corto)
-// produce "desconocido". Ver la tabla de decisión en el spec.
+// Classify is deterministic and pure. The correlation sets the label, the
+// duration sets the confidence; the only real conflict (no call but a short
+// pulse) gives "unknown".
 func Classify(in ClassifyInput) ClassifyResult {
 	if in.HadCall {
 		if !in.DurationKnown {
-			return ClassifyResult{TypeTelefonillo, ConfMedia}
+			return ClassifyResult{TypeVisitor, ConfMedium}
 		}
 		if in.Duration <= in.VisitorMax {
-			return ClassifyResult{TypeTelefonillo, ConfAlta}
+			return ClassifyResult{TypeVisitor, ConfHigh}
 		}
-		return ClassifyResult{TypeTelefonillo, ConfBaja}
+		return ClassifyResult{TypeVisitor, ConfLow}
 	}
 	if !in.DurationKnown {
-		return ClassifyResult{TypeLlave, ConfMedia}
+		return ClassifyResult{TypeResident, ConfMedium}
 	}
 	if in.Duration > in.VisitorMax {
-		return ClassifyResult{TypeLlave, ConfAlta}
+		return ClassifyResult{TypeResident, ConfHigh}
 	}
-	return ClassifyResult{TypeDesconocido, ConfBaja}
+	return ClassifyResult{TypeUnknown, ConfLow}
 }

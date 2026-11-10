@@ -15,11 +15,11 @@ func TestBuildAudioOfferSDP(t *testing.T) {
 		"c=IN IP4 127.0.0.1",
 	} {
 		if !strings.Contains(sdp, want) {
-			t.Fatalf("SDP no contiene %q. SDP:\n%s", want, sdp)
+			t.Fatalf("SDP does not contain %q. SDP:\n%s", want, sdp)
 		}
 	}
-	// El offer de audio NO debe negociar suites GCM (ffmpeg no las hace).
+	// The audio offer must NOT negotiate GCM suites (ffmpeg does not support them).
 	if strings.Contains(sdp, "GCM") {
-		t.Fatal("el offer no debe ofrecer suites GCM")
+		t.Fatal("the offer must not offer GCM suites")
 	}
 }

@@ -8,20 +8,20 @@ func TestIsMediaChannelUp(t *testing.T) {
 		raw  string
 		want bool
 	}{
-		// Verdaderos: canal-up de audio y vídeo (capturados en vivo 2026-08-22)
+		// True: audio and video channel-up (captured live 2026-08-22)
 		{"audio 5000 up", "*7*300#127#0#0#1#5000#2*##", true},
 		{"video 5007 up", "*7*300#127#0#0#1#5007#0*##", true},
-		{"audio 5000 otro subvalor", "*7*300#127#0#0#1#5000#1*##", true},
-		// Falsos: otros WHO=7 que NO son canal-up de media
+		{"audio 5000 other subvalue", "*7*300#127#0#0#1#5000#1*##", true},
+		// False: other WHO=7 frames that are NOT media channel-up
 		{"video mode display", "*7*220#0*##", false},
-		{"brillo pantalla", "*7*73#0#0*##", false},
-		{"otro 300 sin puerto media", "*7*300#127#0#0#1#5002#1*##", false},
-		// Falsos: no es WHO=7
+		{"screen brightness", "*7*73#0#0*##", false},
+		{"other 300 without a media port", "*7*300#127#0#0#1#5002#1*##", false},
+		// False: not WHO=7
 		{"hangup WHO=8", "*8*3#5#4*416##", false},
 		{"intercom activo WHO=8", "*8*2#5#4*16##", false},
-		// Falsos: basura / vacío
-		{"vacío", "", false},
-		{"5000 sin prefijo 300", "*7*301#127#0#0#1#5000#2*##", false},
+		// False: garbage / empty
+		{"empty", "", false},
+		{"5000 without the 300 prefix", "*7*301#127#0#0#1#5000#2*##", false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -11,6 +11,7 @@ Breaking changes since 0.29.4 (details below):
 - Home Assistant unique_ids use a model-neutral prefix.
 - Home Assistant entities renamed from Spanish to English.
 - `sip.native_dev_addr` no longer falls back to a built-in unit address.
+- Access and call-type values on MQTT and the greeting API are English.
 
 Known limits:
 - Tested on a Classe 100X only. The Classe 300X paths (answering machine,
@@ -21,6 +22,32 @@ Known limits:
 - Saving settings from the web UI drops the comments in `config.yaml`.
 
 ### Changes
+
+- **Breaking:** values that were Spanish are English. Home Assistant
+  automations that compare them need the new values:
+
+  | Field | Old | New |
+  |---|---|---|
+  | access `event_type`, Last Door Access state | `telefonillo` / `llave` / `desconocido` | `visitor` / `resident` / `unknown` |
+  | access `confidence` | `alta` / `media` / `baja` | `high` / `medium` / `low` |
+  | access `ring_source` | `doorbell` | `doorbell_entrance` (`doorbell_floor`, `sip` unchanged) |
+  | answerer `call_type` | `placa` / `intercom` / `desconocido` | `entrance` / `intercom` / `unknown` |
+  | greeting API `answering_machine` | `activado` / `desactivado` | `enabled` / `disabled` |
+
+  Log texts, flag help, HTTP error messages, code comments, test names and
+  the route setup script are English too. `docs/ha_config/access_automations.yaml`
+  uses the new values and the entity IDs discovery creates.
+
+- The info log level keeps what happens instead of what repeats: the 30 s
+  liveness probe (`OpenWebNet command sent`), the GPIO publish every 30 s, raw
+  bus frames, the 5-minute doorbell query with its echo, and the 5-minute
+  `BTicino Bridge Status` line moved to debug. User commands, GPIO and LED
+  changes and the activity log stay at info. On a Classe 100X this cuts an
+  18-hour log from 5922 to about 500 lines. Log texts say "OpenWebNet" instead
+  of "OWN", the bus frame entity is named "OpenWebNet Bus (Event)" (its
+  entity ID stays `event.bticino_bus_frame_event`), the status field
+  `mega_bridge_version` is now `bridge_version`, and the startup line no
+  longer claims commands go through netcat.
 
 - Docs describe this fork: the READMEs say it is a fork of
   fquinto/bticinoClasse300x and tested on a Classe 100X, firmware build and

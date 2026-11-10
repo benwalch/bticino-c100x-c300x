@@ -1041,9 +1041,9 @@ func (r *EnhancedRTSPServer) sessionCleanup() {
 var _ CallActiveMarker = (*EnhancedRTSPServer)(nil)
 var _ CallActiveChecker = (*EnhancedRTSPServer)(nil)
 
-// IsCallActive indica si hay una llamada en curso (nativa marcada por SetCallActive
-// o self-INVITE propio). Lo consulta PanelView para no originar el ojo si el
-// nativo ya ocupa los slots (no-interferencia).
+// IsCallActive reports whether a call is in progress (a native one marked by
+// SetCallActive, or our own self-INVITE). PanelView checks it so it does not
+// place the panel view call while the native side holds the slots.
 func (r *EnhancedRTSPServer) IsCallActive() bool {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()

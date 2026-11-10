@@ -1037,7 +1037,7 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 
 	// --- Event: OpenWebNet bus frame (raw) ---
 	b.discovery("event", "bticino_bus_frame_event", map[string]interface{}{
-		"name":         "OWN Bus (Event)",
+		"name":         "OpenWebNet Bus (Event)",
 		"unique_id":    "bticino_intercom_bus_frame_event",
 		"object_id":    "bticino_bus_frame_event",
 		"state_topic":  dp + "/bus/frame/event",
@@ -1155,7 +1155,7 @@ func (b *MQTTBridge) publishHomeAssistantDiscovery() {
 			"unique_id":    "bticino_intercom_access_event",
 			"object_id":    "bticino_access_event",
 			"state_topic":  dp + "/access/event",
-			"event_types":  []string{"telefonillo", "llave", "desconocido"},
+			"event_types":  []string{"visitor", "resident", "unknown"},
 			"icon":         "mdi:door-open",
 			"device":       device,
 			"availability": avail,
@@ -1209,8 +1209,8 @@ func localOutboundIP() string {
 	return bticino.LocalOutboundIP()
 }
 
-// accessEventPayload arma el payload JSON de la entidad HA `event` a partir de
-// un AccessEvent (HA exige el campo event_type dentro del state_topic).
+// accessEventPayload builds the JSON payload of the HA `event` entity from an
+// AccessEvent (HA requires the event_type field in the state_topic).
 func accessEventPayload(ev access.AccessEvent) string {
 	b, err := json.Marshal(map[string]interface{}{
 		"event_type":  ev.Type,
@@ -1226,11 +1226,11 @@ func accessEventPayload(ev access.AccessEvent) string {
 	return string(b)
 }
 
-// answererIncomingAttrs arma los atributos JSON del sensor "Contestador" a partir del payload
-// de doorcall.incoming: el tipo de la llamada (placa / intercom / desconocido). Sin tipo en el
-// evento => "desconocido", nunca vacío.
+// answererIncomingAttrs builds the JSON attributes of the answerer sensor from the
+// doorcall.incoming payload: the call type (entrance / intercom / unknown). Without a
+// type in the event it is "unknown", never empty.
 func answererIncomingAttrs(data interface{}) string {
-	callType := "desconocido"
+	callType := "unknown"
 	if m, ok := data.(map[string]interface{}); ok {
 		if ct, ok := m["call_type"].(string); ok && ct != "" {
 			callType = ct
@@ -1238,7 +1238,7 @@ func answererIncomingAttrs(data interface{}) string {
 	}
 	b, err := json.Marshal(map[string]interface{}{"call_type": callType})
 	if err != nil {
-		return `{"call_type":"desconocido"}`
+		return `{"call_type":"unknown"}`
 	}
 	return string(b)
 }
@@ -1678,7 +1678,7 @@ func (b *MQTTBridge) handleMarkAllReadCommand(client pahomqtt.Client, msg pahomq
 
 func (b *MQTTBridge) handleRawCommand(client pahomqtt.Client, msg pahomqtt.Message) {
 	cmd := string(msg.Payload())
-	b.logger.WithField("command", cmd).Info("MQTT: Raw OWN command")
+	b.logger.WithField("command", cmd).Info("MQTT: Raw OpenWebNet command")
 	b.incCommands()
 
 	if _, err := b.executeOWN(cmd); err != nil {
@@ -1848,11 +1848,11 @@ func (b *MQTTBridge) setupEventSubscriptions() {
 		b.incEvents()
 	})
 
-	// Estado del contestador SIP (F1): reflejar doorcall.* en el sensor
-	// bticino_contestador. Acoplamiento suelto vía EventBus, sin referencia
-	// directa al Answerer.
+	// SIP answerer state: mirror doorcall.* in the bticino_answerer_state
+	// sensor. Loosely coupled through the EventBus, with no reference to the
+	// Answerer.
 	b.eventBus.Subscribe("doorcall.incoming", func(event *events.Event) {
-		// Atributos ANTES del estado: cuando HA vea "ringing", el call_type ya es el de esta llamada.
+		// Attributes BEFORE the state: when HA sees "ringing", call_type already belongs to this call.
 		b.publish(dp+"/answerer/attributes", answererIncomingAttrs(event.Data), true)
 		b.publish(dp+"/answerer/state", "ringing", true)
 	})
@@ -1863,7 +1863,7 @@ func (b *MQTTBridge) setupEventSubscriptions() {
 		b.publish(dp+"/answerer/state", "idle", true)
 	})
 
-	// Estado de PanelView (ver placa): sensor bticino_placa_en_vista.
+	// PanelView state: sensor bticino_panel_view_state.
 	for _, ev := range []string{"panelview.started", "panelview.connected"} {
 		b.eventBus.Subscribe(ev, func(event *events.Event) {
 			b.publish(dp+"/panelview/state", "viewing", true)
@@ -1875,15 +1875,15 @@ func (b *MQTTBridge) setupEventSubscriptions() {
 		})
 	}
 
-	// Acceso clasificado (pkg/access): event entity + sensor "Último acceso".
+	// Classified access (pkg/access): event entity + "Last Door Access" sensor.
 	b.eventBus.Subscribe("access.classified", func(event *events.Event) {
 		ev, ok := event.Data.(access.AccessEvent)
 		if !ok {
 			return
 		}
-		// Entidad event: payload con event_type; retain=false (evento discreto).
+		// Event entity: payload with event_type; retain=false (discrete event).
 		b.publish(dp+"/access/event", accessEventPayload(ev), false)
-		// Sensor: estado = tipo; atributos = detalle. retain=true (estado).
+		// Sensor: state = type; attributes = details. retain=true (state).
 		b.publish(dp+"/access/last", ev.Type, true)
 		attrs, err := json.Marshal(map[string]interface{}{
 			"confidence":  ev.Confidence,
@@ -2294,11 +2294,11 @@ func (b *MQTTBridge) PublishMessage(topic, payload string, retain bool) {
 
 func (b *MQTTBridge) executeOWN(command string) (bool, error) {
 	if err := openwebnet.SendLocalFrame(command); err != nil {
-		b.logger.WithError(err).WithField("command", command).Error("OWN command failed")
-		return false, fmt.Errorf("OWN command %q failed: %w", command, err)
+		b.logger.WithError(err).WithField("command", command).Error("OpenWebNet command failed")
+		return false, fmt.Errorf("OpenWebNet command %q failed: %w", command, err)
 	}
 
-	b.logger.WithField("command", command).Info("OWN command sent")
+	b.logger.WithField("command", command).Debug("OpenWebNet command sent")
 	return true, nil
 }
 
@@ -2312,7 +2312,7 @@ func (b *MQTTBridge) ExecuteCommand(command string) (bool, error) {
 // then sends the command and reads the response (data + ACK) on the same socket.
 // This is needed because port 30006 only returns ACK/NACK without response data.
 func (b *MQTTBridge) executeOWNWithResponse(command string) (string, error) {
-	b.logger.WithField("command", command).Debug("Executing OWN query via TCP command session (port 20000)")
+	b.logger.WithField("command", command).Debug("Executing OpenWebNet query via TCP command session (port 20000)")
 
 	// Connect to port 20000 with a 5s timeout
 	conn, err := net.DialTimeout("tcp", "127.0.0.1:20000", 5*time.Second)
@@ -2345,7 +2345,7 @@ func (b *MQTTBridge) executeOWNWithResponse(command string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error reading greeting: %w", err)
 	}
-	b.logger.WithField("greeting", greeting).Debug("OWN query session greeting")
+	b.logger.WithField("greeting", greeting).Debug("OpenWebNet query session greeting")
 
 	// If it requires authentication (*98*2##), we do not support queries via TCP in that case
 	if strings.Contains(greeting, "*98*") {
@@ -2400,7 +2400,7 @@ func (b *MQTTBridge) executeOWNWithResponse(command string) (string, error) {
 	b.logger.WithFields(logrus.Fields{
 		"command":  command,
 		"response": result,
-	}).Info("OWN query response received via TCP session")
+	}).Debug("OpenWebNet query response received via TCP session")
 	return result, nil
 }
 

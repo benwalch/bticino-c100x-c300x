@@ -9,21 +9,21 @@ import (
 
 func TestAccessEventPayload(t *testing.T) {
 	ev := access.AccessEvent{
-		Type: access.TypeTelefonillo, Confidence: access.ConfAlta,
-		Where: "20", HadCall: true, RingSource: "doorbell", DurationS: 2.5,
+		Type: access.TypeVisitor, Confidence: access.ConfHigh,
+		Where: "20", HadCall: true, RingSource: "doorbell_entrance", DurationS: 2.5,
 	}
 	var m map[string]interface{}
 	if err := json.Unmarshal([]byte(accessEventPayload(ev)), &m); err != nil {
-		t.Fatalf("payload no es JSON válido: %v", err)
+		t.Fatalf("payload is not valid JSON: %v", err)
 	}
-	// HA exige el campo event_type dentro del payload del state_topic.
-	if m["event_type"] != "telefonillo" {
-		t.Errorf("event_type = %v, quiero telefonillo", m["event_type"])
+	// HA requires the event_type field in the state_topic payload.
+	if m["event_type"] != "visitor" {
+		t.Errorf("event_type = %v, want visitor", m["event_type"])
 	}
 	if m["had_call"] != true {
-		t.Errorf("had_call = %v, quiero true", m["had_call"])
+		t.Errorf("had_call = %v, want true", m["had_call"])
 	}
 	if m["where"] != "20" {
-		t.Errorf("where = %v, quiero 20", m["where"])
+		t.Errorf("where = %v, want 20", m["where"])
 	}
 }

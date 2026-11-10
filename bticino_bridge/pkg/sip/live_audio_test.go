@@ -9,10 +9,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// fakeAudioTap es el doble de test para VideoTap en los tests de LiveAudioOnCall.
-// Cuando entered/release no son nil, Start() bloquea: cierra entered al entrar
-// y espera a que el test cierre release, para poder ejercer la ventana de
-// carrera con un Stop concurrente (test del leak).
+// fakeAudioTap is the test double for VideoTap in the LiveAudioOnCall tests.
+// When entered/release are not nil, Start() blocks: it closes entered on entry
+// and waits for the test to close release, so the race window with a
+// concurrent Stop can be exercised (leak test).
 type fakeAudioTap struct {
 	mu            sync.Mutex
 	starts, stops int
@@ -52,10 +52,10 @@ func TestLiveAudioStartArmsTap(t *testing.T) {
 	l.Start("test")
 
 	if !l.IsActive() {
-		t.Fatal("esperaba IsActive()=true tras Start")
+		t.Fatal("expected IsActive()=true after Start")
 	}
 	if starts, _ := tap.counts(); starts != 1 {
-		t.Fatalf("esperaba 1 arranque del tap, hubo %d", starts)
+		t.Fatalf("expected 1 tap start, got %d", starts)
 	}
 }
 
@@ -65,7 +65,7 @@ func TestLiveAudioStartIdempotent(t *testing.T) {
 	l.Start("a")
 	l.Start("b")
 	if starts, _ := tap.counts(); starts != 1 {
-		t.Fatalf("esperaba 1 arranque (idempotente), hubo %d", starts)
+		t.Fatalf("expected 1 start (idempotent), got %d", starts)
 	}
 }
 
@@ -75,14 +75,14 @@ func TestLiveAudioStopDisarmsAndAllowsRestart(t *testing.T) {
 	l.Start("a")
 	l.Stop()
 	if l.IsActive() {
-		t.Fatal("esperaba IsActive()=false tras Stop")
+		t.Fatal("expected IsActive()=false after Stop")
 	}
 	if _, stops := tap.counts(); stops != 1 {
-		t.Fatalf("esperaba 1 parada del tap, hubo %d", stops)
+		t.Fatalf("expected 1 tap stop, got %d", stops)
 	}
 	l.Start("b")
 	if starts, _ := tap.counts(); starts != 2 {
-		t.Fatalf("esperaba 2 arranques tras re-Start, hubo %d", starts)
+		t.Fatalf("expected 2 starts after re-Start, got %d", starts)
 	}
 }
 
@@ -91,22 +91,22 @@ func TestLiveAudioStopWithoutStartIsNoop(t *testing.T) {
 	l := NewLiveAudioOnCall(tap, logrus.New())
 	l.Stop()
 	if _, stops := tap.counts(); stops != 0 {
-		t.Fatalf("Stop sin Start no debe parar el tap (hubo %d)", stops)
+		t.Fatalf("Stop without Start must not stop the tap (got %d)", stops)
 	}
 }
 
 func TestLiveAudioTapErrorIsNonFatal(t *testing.T) {
 	tap := &fakeAudioTap{err: errors.New("operation not permitted")}
 	l := NewLiveAudioOnCall(tap, logrus.New())
-	l.Start("sin-permisos") // no debe entrar en pánico
+	l.Start("no-permissions") // must not panic
 	if !l.IsActive() {
-		t.Fatal("esperaba IsActive()=true aunque el tap falle")
+		t.Fatal("expected IsActive()=true even if the tap fails")
 	}
 }
 
 func TestLiveAudioNilTapIsSafe(t *testing.T) {
 	l := NewLiveAudioOnCall(nil, logrus.New())
-	l.Start("a") // no debe entrar en pánico
+	l.Start("a") // must not panic
 	l.Stop()
 }
 
@@ -121,10 +121,10 @@ func TestLiveAudioGuardAutoStopsWhenHangupIsMissed(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	if l.IsActive() {
-		t.Fatal("esperaba auto-stop por guard, sigue activo")
+		t.Fatal("expected auto-stop by the guard, still active")
 	}
 	if _, stops := tap.counts(); stops != 1 {
-		t.Fatalf("esperaba 1 parada del tap por guard, hubo %d", stops)
+		t.Fatalf("expected 1 tap stop by the guard, got %d", stops)
 	}
 }
 
@@ -134,22 +134,22 @@ func TestLiveAudioGuardCanceledByStop(t *testing.T) {
 	l.SetGuardTimeout(30 * time.Millisecond)
 	l.Start("a")
 	l.Stop()
-	time.Sleep(80 * time.Millisecond) // el guard ya habría vencido
+	time.Sleep(80 * time.Millisecond) // the guard would have expired by now
 	if _, stops := tap.counts(); stops != 1 {
-		t.Fatalf("el guard cancelado no debe parar otra vez (stops=%d)", stops)
+		t.Fatalf("the cancelled guard must not stop again (stops=%d)", stops)
 	}
-	// un re-Start tras el guard vencido debe funcionar con guard nuevo
+	// a re-Start after the guard expired must work with a new guard
 	l.Start("b")
 	if !l.IsActive() {
-		t.Fatal("esperaba activo tras re-Start")
+		t.Fatal("expected active after re-Start")
 	}
 	l.Stop()
 }
 
-// TestLiveAudioStopDuringStartDoesNotLeakTap ejerce el fix del leak: si Stop()
-// gana la carrera mientras tap.Start() está en curso (bloqueado), Start debe
-// re-chequear el estado tras el retorno de tap.Start() y parar el tap huérfano
-// en vez de dejarlo corriendo con active=false.
+// TestLiveAudioStopDuringStartDoesNotLeakTap exercises the leak fix: if Stop()
+// wins the race while tap.Start() is running (blocked), Start must re-check the
+// state after tap.Start() returns and stop the orphaned tap instead of leaving
+// it running with active=false.
 func TestLiveAudioStopDuringStartDoesNotLeakTap(t *testing.T) {
 	tap := &fakeAudioTap{
 		entered: make(chan struct{}),
@@ -163,33 +163,33 @@ func TestLiveAudioStopDuringStartDoesNotLeakTap(t *testing.T) {
 		close(startDone)
 	}()
 
-	// Esperar a que Start() esté bloqueado dentro de tap.Start().
+	// Wait until Start() is blocked inside tap.Start().
 	<-tap.entered
 
-	// Stop concurrente durante la ventana bloqueante: como el tap aún no ha
-	// devuelto, Stop() solo puede voltear active=false (el tap real seguirá
-	// arrancando en segundo plano hasta que tap.Start() retorne).
+	// Concurrent Stop during the blocking window: since the tap has not
+	// returned yet, Stop() can only flip active=false (the real tap keeps
+	// starting in the background until tap.Start() returns).
 	l.Stop()
 
-	// Liberar tap.Start() para que retorne y Start() pueda re-chequear active.
+	// Release tap.Start() so it returns and Start() can re-check active.
 	close(tap.release)
 	<-startDone
 
 	if l.IsActive() {
-		t.Fatal("esperaba IsActive()=false tras Stop concurrente durante Start")
+		t.Fatal("expected IsActive()=false after a concurrent Stop during Start")
 	}
 
 	starts, stops := tap.counts()
 	if starts != 1 {
-		t.Fatalf("esperaba 1 arranque del tap, hubo %d", starts)
+		t.Fatalf("expected 1 tap start, got %d", starts)
 	}
-	// Secuencia determinista dado el channel-sync: Stop() ve active=true (ya lo
-	// puso Start antes de bloquear en tap.Start) y para el tap una vez (stops=1)
-	// aunque tap.Start() siga en curso; al liberarse y retornar, el re-chequeo
-	// del fix del leak ve active=false (orphaned) y para el tap otra vez
-	// (stops=2). Sin el fix, stops se quedaría en 1 y el tap real (cuyo Start
-	// termina de montarse DESPUÉS del primer Stop) quedaría fugado corriendo.
+	// Deterministic sequence given the channel sync: Stop() sees active=true
+	// (Start set it before blocking in tap.Start) and stops the tap once
+	// (stops=1) even though tap.Start() is still running; once released and
+	// returned, the leak fix's re-check sees active=false (orphaned) and stops
+	// the tap again (stops=2). Without the fix, stops would stay at 1 and the
+	// real tap (whose Start finishes AFTER the first Stop) would leak, running.
 	if stops != 2 {
-		t.Fatalf("tap fugado: esperaba 2 paradas (Stop directo + re-chequeo del fix), hubo %d (starts=%d)", stops, starts)
+		t.Fatalf("tap leaked: expected 2 stops (direct Stop + the fix's re-check), got %d (starts=%d)", stops, starts)
 	}
 }

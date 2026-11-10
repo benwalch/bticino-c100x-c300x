@@ -20,7 +20,7 @@ func testCfg() config.AccessConfig {
 	}
 }
 
-// collect suscribe access.classified y devuelve un canal con el evento.
+// collect subscribes to access.classified and returns a channel with the events.
 func collect(t *testing.T, bus events.EventBus) <-chan AccessEvent {
 	t.Helper()
 	ch := make(chan AccessEvent, 4)
@@ -38,16 +38,15 @@ func waitEvent(t *testing.T, ch <-chan AccessEvent) AccessEvent {
 	case ev := <-ch:
 		return ev
 	case <-time.After(2 * time.Second):
-		t.Fatal("timeout esperando access.classified")
+		t.Fatal("timeout waiting for access.classified")
 		return AccessEvent{}
 	}
 }
 
-// newTestClassifier crea un Classifier con reloj controlado y afterFunc que
-// captura TODAS las funciones de timeout armadas (una por cada onUnlocked),
-// en orden, para poder dispararlas a mano — incluido el caso de supersesión,
-// donde interesa poder disparar un timer "viejo" ya reemplazado y comprobar
-// que queda inerte.
+// newTestClassifier creates a Classifier with a controlled clock and an
+// afterFunc that captures ALL armed timeout functions (one per onUnlocked), in
+// order, so tests can fire them by hand, including an old timer that was
+// already superseded, to check that it stays inert.
 func newTestClassifier(bus events.EventBus) (*Classifier, *time.Time, *[]func()) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.PanicLevel)
@@ -62,193 +61,190 @@ func newTestClassifier(bus events.EventBus) (*Classifier, *time.Time, *[]func())
 	return c, &nowVal, &fired
 }
 
-func TestClassifier_Telefonillo(t *testing.T) {
+func TestClassifier_Visitor(t *testing.T) {
 	bus := events.NewEventBus(4, nil)
 	defer bus.Close()
 	ch := collect(t, bus)
 	c, now, _ := newTestClassifier(bus)
 
-	c.recordRing("doorbell")
+	c.recordRing("doorbell_entrance")
 	*now = now.Add(2 * time.Second)
 	c.onUnlocked("20")
 	*now = now.Add(2500 * time.Millisecond)
 	c.onLocked("20")
 
 	ev := waitEvent(t, ch)
-	if ev.Type != TypeTelefonillo || ev.Confidence != ConfAlta {
-		t.Errorf("got {%s,%s}, quiero {telefonillo,alta}", ev.Type, ev.Confidence)
+	if ev.Type != TypeVisitor || ev.Confidence != ConfHigh {
+		t.Errorf("got {%s,%s}, want {visitor,high}", ev.Type, ev.Confidence)
 	}
-	if !ev.HadCall || ev.RingSource != "doorbell" {
-		t.Errorf("had_call/ring_source mal: %+v", ev)
+	if !ev.HadCall || ev.RingSource != "doorbell_entrance" {
+		t.Errorf("wrong had_call/ring_source: %+v", ev)
 	}
 	if ev.DurationS < 2.4 || ev.DurationS > 2.6 {
-		t.Errorf("duration_s = %v, quiero ~2.5", ev.DurationS)
+		t.Errorf("duration_s = %v, want ~2.5", ev.DurationS)
 	}
 }
 
-func TestClassifier_Llave(t *testing.T) {
+func TestClassifier_Resident(t *testing.T) {
 	bus := events.NewEventBus(4, nil)
 	defer bus.Close()
 	ch := collect(t, bus)
 	c, now, _ := newTestClassifier(bus)
 
-	c.onUnlocked("20") // sin timbre previo
+	c.onUnlocked("20") // no ring before
 	*now = now.Add(4500 * time.Millisecond)
 	c.onLocked("20")
 
 	ev := waitEvent(t, ch)
-	if ev.Type != TypeLlave || ev.Confidence != ConfAlta {
-		t.Errorf("got {%s,%s}, quiero {llave,alta}", ev.Type, ev.Confidence)
+	if ev.Type != TypeResident || ev.Confidence != ConfHigh {
+		t.Errorf("got {%s,%s}, want {resident,high}", ev.Type, ev.Confidence)
 	}
 	if ev.HadCall {
-		t.Errorf("had_call = true, quiero false")
+		t.Errorf("had_call = true, want false")
 	}
 }
 
-func TestClassifier_TimeoutSinCierre(t *testing.T) {
+func TestClassifier_TimeoutWithoutClose(t *testing.T) {
 	bus := events.NewEventBus(4, nil)
 	defer bus.Close()
 	ch := collect(t, bus)
 	c, _, fired := newTestClassifier(bus)
 
-	c.onUnlocked("20") // sin timbre
+	c.onUnlocked("20") // no ring
 	if len(*fired) == 0 {
-		t.Fatal("no se armó el timer de max_hold_wait")
+		t.Fatal("max_hold_wait timer was not armed")
 	}
-	(*fired)[len(*fired)-1]() // simular vencimiento sin cierre
+	(*fired)[len(*fired)-1]() // simulate expiry without a close
 
 	ev := waitEvent(t, ch)
-	if ev.Type != TypeLlave || ev.Confidence != ConfMedia {
-		t.Errorf("got {%s,%s}, quiero {llave,media}", ev.Type, ev.Confidence)
+	if ev.Type != TypeResident || ev.Confidence != ConfMedium {
+		t.Errorf("got {%s,%s}, want {resident,medium}", ev.Type, ev.Confidence)
 	}
 	if ev.DurationS != 0 {
-		t.Errorf("duration_s = %v, quiero 0 (sin cierre)", ev.DurationS)
+		t.Errorf("duration_s = %v, want 0 (no close)", ev.DurationS)
 	}
 }
 
-func TestClassifier_VentanaExpirada(t *testing.T) {
+func TestClassifier_WindowExpired(t *testing.T) {
 	bus := events.NewEventBus(4, nil)
 	defer bus.Close()
 	ch := collect(t, bus)
 	c, now, _ := newTestClassifier(bus)
 
-	c.recordRing("doorbell")
-	*now = now.Add(40 * time.Second) // fuera de la ventana de 30s
+	c.recordRing("doorbell_entrance")
+	*now = now.Add(40 * time.Second) // outside the 30 s window
 	c.onUnlocked("20")
 	*now = now.Add(2 * time.Second)
 	c.onLocked("20")
 
 	ev := waitEvent(t, ch)
 	if ev.HadCall {
-		t.Errorf("had_call = true; el timbre está fuera de ventana")
+		t.Errorf("had_call = true; the ring is outside the window")
 	}
-	if ev.Type != TypeDesconocido { // sin llamada + pulso corto = conflicto
-		t.Errorf("type = %s, quiero desconocido", ev.Type)
+	if ev.Type != TypeUnknown { // no call + short pulse = conflict
+		t.Errorf("type = %s, want unknown", ev.Type)
 	}
 }
 
-// TestClassifier_DobleAperturaMismaWhere cubre la supersesión: una segunda
-// apertura del mismo WHERE llega antes de que cierre la primera (dos
-// aperturas de RFID/llave, o un rebote del relé, back-to-back). No debe
-// perderse el primer acceso: debe volcarse (flush) con duración desconocida
-// antes de que arranque el segundo pendiente.
-func TestClassifier_DobleAperturaMismaWhere(t *testing.T) {
+// TestClassifier_DoubleOpeningSameWhere covers supersede: a second opening of
+// the same WHERE arrives before the first one closes (two RFID openings or a
+// relay bounce, back to back). The first access must not be lost: it is
+// flushed with an unknown duration before the second entry starts.
+func TestClassifier_DoubleOpeningSameWhere(t *testing.T) {
 	bus := events.NewEventBus(4, nil)
 	defer bus.Close()
 	ch := collect(t, bus)
 	c, now, _ := newTestClassifier(bus)
 
-	c.recordRing("doorbell")
+	c.recordRing("doorbell_entrance")
 	*now = now.Add(1 * time.Second)
-	c.onUnlocked("20") // primera apertura, correlacionada con el timbre
+	c.onUnlocked("20") // first opening, correlated with the ring
 
 	*now = now.Add(3 * time.Second)
-	c.onUnlocked("20") // segunda apertura del mismo WHERE, sin cierre de la primera
+	c.onUnlocked("20") // second opening of the same WHERE, the first never closed
 
 	*now = now.Add(2 * time.Second)
-	c.onLocked("20") // cierra la segunda
+	c.onLocked("20") // closes the second
 
 	first := waitEvent(t, ch)
 	second := waitEvent(t, ch)
 
-	// El bus reparte cada handler en su propia goroutine (varios workers) sin
-	// garantía de orden entre eventos consecutivos — también entre dos
-	// publicaciones del mismo nombre. Identificamos cada evento por su
-	// contenido (duration_s), no por el orden de llegada al canal.
+	// The bus runs each handler in its own goroutine (several workers) with no
+	// order between consecutive events, even two of the same name. Each event
+	// is identified by its content (duration_s), not by arrival order.
 	flushed, closed := first, second
 	if flushed.DurationS != 0 {
 		flushed, closed = second, first
 	}
 
 	if flushed.DurationS != 0 {
-		t.Errorf("evento de volcado por supersesión duration_s = %v, quiero 0", flushed.DurationS)
+		t.Errorf("superseded flush event duration_s = %v, want 0", flushed.DurationS)
 	}
 	if !flushed.HadCall {
-		t.Errorf("evento de volcado debería tener had_call=true (correlacionado con el timbre)")
+		t.Errorf("flush event should have had_call=true (correlated with the ring)")
 	}
-	if flushed.Confidence != ConfMedia {
-		t.Errorf("evento de volcado confidence = %s, quiero media (sin duración conocida)", flushed.Confidence)
+	if flushed.Confidence != ConfMedium {
+		t.Errorf("flush event confidence = %s, want medium (unknown duration)", flushed.Confidence)
 	}
 	if closed.DurationS < 1.9 || closed.DurationS > 2.1 {
-		t.Errorf("evento de cierre real duration_s = %v, quiero ~2", closed.DurationS)
+		t.Errorf("real close event duration_s = %v, want ~2", closed.DurationS)
 	}
 }
 
-// TestClassifier_TimerViejoInerteTrasSupersesion confirma la parte 2 del
-// fix: el timer de max_hold_wait de un pendiente superseído no debe producir
-// un evento adicional ni interferir con el pendiente nuevo si se dispara
-// (identidad de puntero en finalize).
-func TestClassifier_TimerViejoInerteTrasSupersesion(t *testing.T) {
+// TestClassifier_OldTimerInertAfterSupersede: the max_hold_wait timer of a
+// superseded entry must not publish an extra event or touch the new entry
+// when it fires (pointer identity in finalize).
+func TestClassifier_OldTimerInertAfterSupersede(t *testing.T) {
 	bus := events.NewEventBus(4, nil)
 	defer bus.Close()
 	ch := collect(t, bus)
 	c, now, fired := newTestClassifier(bus)
 
-	c.onUnlocked("20") // primera apertura, sin timbre
+	c.onUnlocked("20") // first opening, no ring
 	if len(*fired) != 1 {
-		t.Fatalf("se esperaba 1 timer armado, hay %d", len(*fired))
+		t.Fatalf("expected 1 armed timer, have %d", len(*fired))
 	}
 	oldTimer := (*fired)[0]
 
 	*now = now.Add(1 * time.Second)
-	c.onUnlocked("20") // segunda apertura del mismo WHERE: supersede a la primera
+	c.onUnlocked("20") // second opening of the same WHERE supersedes the first
 
 	if len(*fired) != 2 {
-		t.Fatalf("se esperaba 2 timers armados, hay %d", len(*fired))
+		t.Fatalf("expected 2 armed timers, have %d", len(*fired))
 	}
 
-	// La primera apertura ya se volcó (evento de supersesión).
+	// The first opening was already flushed (supersede event).
 	ev1 := waitEvent(t, ch)
 	if ev1.DurationS != 0 {
-		t.Errorf("evento de supersesión duration_s = %v, quiero 0", ev1.DurationS)
+		t.Errorf("supersede event duration_s = %v, want 0", ev1.DurationS)
 	}
 
-	// Disparar el timer VIEJO a mano: no debe publicar nada ni tocar el
-	// pendiente nuevo.
+	// Fire the OLD timer by hand: it must publish nothing and leave the new
+	// entry alone.
 	oldTimer()
 
 	select {
 	case ev := <-ch:
-		t.Fatalf("el timer viejo, tras supersesión, no debería publicar nada; llegó %+v", ev)
+		t.Fatalf("the old timer published after supersede: %+v", ev)
 	case <-time.After(200 * time.Millisecond):
-		// esperado: no llega nada
+		// expected: nothing arrives
 	}
 
-	// El pendiente nuevo sigue vivo: cerrarlo produce su propio evento normal.
+	// The new entry is still alive: closing it gives its own normal event.
 	*now = now.Add(2 * time.Second)
 	c.onLocked("20")
 	ev2 := waitEvent(t, ch)
 	if ev2.DurationS < 1.9 || ev2.DurationS > 2.1 {
-		t.Errorf("segundo evento (cierre real tras supersesión) duration_s = %v, quiero ~2", ev2.DurationS)
+		t.Errorf("second event (real close after supersede) duration_s = %v, want ~2", ev2.DurationS)
 	}
 }
 
 func TestWhereOf(t *testing.T) {
 	e := &events.Event{Name: "door.unlocked", Data: &handlers.OpenWebNetEvent{Where: "20"}}
 	if got := whereOf(e); got != "20" {
-		t.Errorf("whereOf = %q, quiero 20", got)
+		t.Errorf("whereOf = %q, want 20", got)
 	}
-	if got := whereOf(&events.Event{Data: "no-es-owe"}); got != "" {
-		t.Errorf("whereOf con tipo raro = %q, quiero vacío", got)
+	if got := whereOf(&events.Event{Data: "not-an-own-event"}); got != "" {
+		t.Errorf("whereOf with an odd type = %q, want empty", got)
 	}
 }

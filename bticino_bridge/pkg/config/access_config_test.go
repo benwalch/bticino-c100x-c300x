@@ -12,28 +12,28 @@ func writeTempConfig(t *testing.T, body string) string {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "config.yaml")
 	if err := os.WriteFile(p, []byte(body), 0644); err != nil {
-		t.Fatalf("no se pudo escribir config temporal: %v", err)
+		t.Fatalf("could not write the temporary config: %v", err)
 	}
 	return p
 }
 
 func TestAccessDefaultsApplied(t *testing.T) {
-	// Sin bloque access: las duraciones toman sus defaults; Enabled queda en false.
+	// No access block: durations take their defaults; Enabled stays false.
 	cfg, err := LoadConfig(writeTempConfig(t, "bridge:\n  name: x\n"))
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
 	if cfg.Access.CorrelationWindow != 30*time.Second {
-		t.Errorf("CorrelationWindow = %v, quiero 30s", cfg.Access.CorrelationWindow)
+		t.Errorf("CorrelationWindow = %v, want 30s", cfg.Access.CorrelationWindow)
 	}
 	if cfg.Access.MaxHoldWait != 8*time.Second {
-		t.Errorf("MaxHoldWait = %v, quiero 8s", cfg.Access.MaxHoldWait)
+		t.Errorf("MaxHoldWait = %v, want 8s", cfg.Access.MaxHoldWait)
 	}
 	if cfg.Access.DurationVisitorMax != 3500*time.Millisecond {
-		t.Errorf("DurationVisitorMax = %v, quiero 3500ms", cfg.Access.DurationVisitorMax)
+		t.Errorf("DurationVisitorMax = %v, want 3500ms", cfg.Access.DurationVisitorMax)
 	}
 	if cfg.Access.Enabled {
-		t.Errorf("Enabled = true sin bloque access; quiero false (fail-closed)")
+		t.Errorf("Enabled = true without an access block; want false (fail-closed)")
 	}
 }
 
@@ -44,12 +44,12 @@ func TestAccessValuesRespected(t *testing.T) {
 		t.Fatalf("LoadConfig: %v", err)
 	}
 	if !cfg.Access.Enabled {
-		t.Errorf("Enabled = false; quiero true")
+		t.Errorf("Enabled = false; want true")
 	}
 	if cfg.Access.CorrelationWindow != 15*time.Second {
-		t.Errorf("CorrelationWindow = %v, quiero 15s", cfg.Access.CorrelationWindow)
+		t.Errorf("CorrelationWindow = %v, want 15s", cfg.Access.CorrelationWindow)
 	}
 	if cfg.Access.DurationVisitorMax != 2*time.Second {
-		t.Errorf("DurationVisitorMax = %v, quiero 2s", cfg.Access.DurationVisitorMax)
+		t.Errorf("DurationVisitorMax = %v, want 2s", cfg.Access.DurationVisitorMax)
 	}
 }

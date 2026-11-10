@@ -12,7 +12,7 @@ import (
 	"bticino_bridge/pkg/events"
 )
 
-// fakeTransport implementa AnswererTransport con canales scriptables.
+// fakeTransport implements AnswererTransport with scriptable channels.
 type fakeTransport struct {
 	mu     sync.Mutex
 	sent   []string
@@ -100,7 +100,7 @@ func newTestAnswerer(f *fakeTransport, bus events.EventBus) *Answerer {
 	return a
 }
 
-func TestAnswerer_TimbrazoSinContestar_CANCEL(t *testing.T) {
+func TestAnswerer_UnansweredRing_CANCEL(t *testing.T) {
 	f := newFakeTransport()
 	bus := events.NewEventBus(2, logrus.New())
 	defer bus.Close()
@@ -110,32 +110,32 @@ func TestAnswerer_TimbrazoSinContestar_CANCEL(t *testing.T) {
 	f.in <- inviteMsg("c1", "20")
 	waitFor(t, func() bool { return f.lastSentContaining("180 Ringing") != "" }, "180 Ringing")
 	if a.StateString() != "ringing" {
-		t.Fatalf("estado=%q, esperaba ringing", a.StateString())
+		t.Fatalf("state=%q, expected ringing", a.StateString())
 	}
-	// CANCEL con Via propia distinta a la del INVITE y su CSeq "20 CANCEL".
+	// CANCEL with its own Via, other than the INVITE's, and its CSeq "20 CANCEL".
 	cancel := &SIPMessage{Method: "CANCEL",
 		Headers:    map[string]string{"Call-ID": "c1", "CSeq": "20 CANCEL"},
 		ViaHeaders: []string{"SIP/2.0/TCP 127.0.0.1:5060;branch=z9hG4bKcancel"}}
 	f.in <- cancel
 	waitFor(t, func() bool { return f.lastSentContaining("487 Request Terminated") != "" }, "487")
-	waitFor(t, func() bool { return a.StateString() == "idle" }, "vuelta a idle")
-	// El 200 al CANCEL debe llevar el CSeq y la Via del propio CANCEL, no los del INVITE.
+	waitFor(t, func() bool { return a.StateString() == "idle" }, "back to idle")
+	// The 200 to the CANCEL must carry the CANCEL's own CSeq and Via, not the INVITE's.
 	ok200 := f.sentMatching(func(s string) bool {
 		return strings.Contains(s, "SIP/2.0 200 OK") && strings.Contains(s, "CSeq: 20 CANCEL")
 	})
 	if ok200 == "" {
-		t.Fatal("no se envió 200 OK al CANCEL con CSeq: 20 CANCEL")
+		t.Fatal("no 200 OK was sent to the CANCEL with CSeq: 20 CANCEL")
 	}
 	if !strings.Contains(ok200, "z9hG4bKcancel") {
-		t.Fatalf("el 200-a-CANCEL no refleja la Via del CANCEL:\n%s", ok200)
+		t.Fatalf("the 200 to CANCEL does not echo the CANCEL's Via:\n%s", ok200)
 	}
-	// El 487 (respuesta al INVITE) SÍ usa el CSeq del INVITE.
+	// The 487 (response to the INVITE) DOES use the INVITE's CSeq.
 	if !strings.Contains(f.lastSentContaining("487 Request Terminated"), "CSeq: 20 INVITE") {
-		t.Fatal("el 487 debe conservar CSeq: 20 INVITE")
+		t.Fatal("the 487 must keep CSeq: 20 INVITE")
 	}
 }
 
-func TestAnswerer_Contestar_200_ACK_IN_CALL_luego_BYE(t *testing.T) {
+func TestAnswerer_Answer_200_ACK_IN_CALL_then_BYE(t *testing.T) {
 	f := newFakeTransport()
 	bus := events.NewEventBus(2, logrus.New())
 	defer bus.Close()
@@ -149,7 +149,7 @@ func TestAnswerer_Contestar_200_ACK_IN_CALL_luego_BYE(t *testing.T) {
 	}
 	got := f.lastSentContaining("200 OK")
 	if got == "" || !strings.Contains(got, "m=audio 10100") {
-		t.Fatalf("200 OK sin SDP propio:\n%s", got)
+		t.Fatalf("200 OK without our own SDP:\n%s", got)
 	}
 	f.in <- msg("ACK", map[string]string{"Call-ID": "c2", "CSeq": "21 ACK"})
 	waitFor(t, func() bool { return a.StateString() == "in_call" }, "in_call")
@@ -160,11 +160,11 @@ func TestAnswerer_Contestar_200_ACK_IN_CALL_luego_BYE(t *testing.T) {
 	waitFor(t, func() bool { return a.StateString() == "idle" }, "idle")
 }
 
-func TestAnswerer_DoorcallAnsweredLlevaParamsDeMedia(t *testing.T) {
+func TestAnswerer_DoorcallAnsweredCarriesMediaParams(t *testing.T) {
 	f := newFakeTransport()
 	bus := events.NewEventBus(2, logrus.New())
 	defer bus.Close()
-	// Capturar el payload de doorcall.answered.
+	// Capture the doorcall.answered payload.
 	got := make(chan map[string]interface{}, 1)
 	bus.Subscribe("doorcall.answered", func(e *events.Event) {
 		if m, ok := e.Data.(map[string]interface{}); ok {
@@ -174,7 +174,7 @@ func TestAnswerer_DoorcallAnsweredLlevaParamsDeMedia(t *testing.T) {
 	a := newTestAnswerer(f, bus)
 	a.Start()
 	defer a.Stop()
-	f.in <- inviteMsg("cm", "50") // inviteMsg trae m=audio 44590 en el offer
+	f.in <- inviteMsg("cm", "50") // inviteMsg has m=audio 44590 in the offer
 	waitFor(t, func() bool { return f.lastSentContaining("180 Ringing") != "" }, "180")
 	if err := a.Answer(); err != nil {
 		t.Fatalf("Answer: %v", err)
@@ -185,19 +185,19 @@ func TestAnswerer_DoorcallAnsweredLlevaParamsDeMedia(t *testing.T) {
 			t.Errorf("media_host=%v", m["media_host"])
 		}
 		if mp, _ := m["media_port"].(int); mp != 44590 {
-			t.Errorf("media_port=%v, esperaba 44590", m["media_port"])
+			t.Errorf("media_port=%v, expected 44590", m["media_port"])
 		}
 		if k, _ := m["srtp_key"].(string); k == "" {
-			t.Error("srtp_key vacío")
+			t.Error("empty srtp_key")
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("no llegó doorcall.answered")
+		t.Fatal("doorcall.answered did not arrive")
 	}
 }
 
-// doorcall.incoming debe llevar call_type clasificado a partir del SDP del INVITE
-// (inviteMsg trae m=audio + m=video => placa).
-func TestAnswerer_DoorcallIncomingLlevaCallType(t *testing.T) {
+// doorcall.incoming must carry call_type classified from the INVITE's SDP
+// (inviteMsg has m=audio + m=video => entrance).
+func TestAnswerer_DoorcallIncomingCarriesCallType(t *testing.T) {
 	f := newFakeTransport()
 	bus := events.NewEventBus(2, logrus.New())
 	defer bus.Close()
@@ -213,18 +213,18 @@ func TestAnswerer_DoorcallIncomingLlevaCallType(t *testing.T) {
 	f.in <- inviteMsg("ct", "70")
 	select {
 	case m := <-got:
-		if m["call_type"] != CallTypePlaca {
-			t.Errorf("call_type=%v, esperaba %q", m["call_type"], CallTypePlaca)
+		if m["call_type"] != CallTypeEntrance {
+			t.Errorf("call_type=%v, expected %q", m["call_type"], CallTypeEntrance)
 		}
 		if m["call_id"] != "ct" {
-			t.Errorf("call_id=%v, esperaba ct", m["call_id"])
+			t.Errorf("call_id=%v, expected ct", m["call_id"])
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("no llegó doorcall.incoming")
+		t.Fatal("doorcall.incoming did not arrive")
 	}
 }
 
-func TestAnswerer_AnswerTrasCancel_FallaLimpio(t *testing.T) {
+func TestAnswerer_AnswerAfterCancel_FailsCleanly(t *testing.T) {
 	f := newFakeTransport()
 	bus := events.NewEventBus(2, logrus.New())
 	defer bus.Close()
@@ -236,11 +236,11 @@ func TestAnswerer_AnswerTrasCancel_FallaLimpio(t *testing.T) {
 	f.in <- msg("CANCEL", map[string]string{"Call-ID": "c3", "CSeq": "22 CANCEL"})
 	waitFor(t, func() bool { return a.StateString() == "idle" }, "idle")
 	if err := a.Answer(); err == nil {
-		t.Fatal("Answer tras CANCEL debe fallar (ErrNotRinging)")
+		t.Fatal("Answer after CANCEL must fail (ErrNotRinging)")
 	}
 }
 
-func TestAnswerer_SegundoInviteMientrasOcupado_486(t *testing.T) {
+func TestAnswerer_SecondInviteWhileBusy_486(t *testing.T) {
 	f := newFakeTransport()
 	bus := events.NewEventBus(2, logrus.New())
 	defer bus.Close()
@@ -249,14 +249,14 @@ func TestAnswerer_SegundoInviteMientrasOcupado_486(t *testing.T) {
 	defer a.Stop()
 	f.in <- inviteMsg("c4", "23")
 	waitFor(t, func() bool { return f.lastSentContaining("180 Ringing") != "" }, "180")
-	f.in <- inviteMsg("c5", "1") // otro Call-ID
+	f.in <- inviteMsg("c5", "1") // another Call-ID
 	waitFor(t, func() bool { return f.lastSentContaining("486 Busy Here") != "" }, "486")
 	if a.StateString() != "ringing" {
-		t.Fatalf("el 2º INVITE no debe cambiar el estado, got %q", a.StateString())
+		t.Fatalf("the 2nd INVITE must not change the state, got %q", a.StateString())
 	}
 }
 
-func TestAnswerer_BYEEntrante_200_y_idle(t *testing.T) {
+func TestAnswerer_IncomingBYE_200_and_idle(t *testing.T) {
 	f := newFakeTransport()
 	bus := events.NewEventBus(2, logrus.New())
 	defer bus.Close()
@@ -271,19 +271,19 @@ func TestAnswerer_BYEEntrante_200_y_idle(t *testing.T) {
 	before := f.count()
 	f.in <- msg("BYE", map[string]string{"Call-ID": "c6", "CSeq": "25 BYE",
 		"From": "<sip:c300x@YOUR_GATEWAY_ID.bs.iotleg.com>;tag=aa", "To": "<sip:alluser@YOUR_GATEWAY_ID.bs.iotleg.com>;tag=x"})
-	waitFor(t, func() bool { return a.StateString() == "idle" }, "idle tras BYE entrante")
-	// El BYE entrante debe recibir su propio 200 (no confundir con el 200 del Answer previo):
-	// el último enviado tras el BYE debe llevar su Call-ID + CSeq y el 200.
+	waitFor(t, func() bool { return a.StateString() == "idle" }, "idle after an incoming BYE")
+	// The incoming BYE must get its own 200 (not confused with the 200 of the earlier Answer):
+	// the last message sent after the BYE must carry its Call-ID + CSeq and the 200.
 	last := f.last()
 	if f.count() <= before {
-		t.Fatal("el BYE entrante no generó ninguna respuesta")
+		t.Fatal("the incoming BYE produced no response")
 	}
 	if !strings.Contains(last, "200") || !strings.Contains(last, "Call-ID: c6") || !strings.Contains(last, "CSeq: 25 BYE") {
-		t.Fatalf("el 200 al BYE entrante no coincide (Call-ID c6 / CSeq 25 BYE):\n%s", last)
+		t.Fatalf("the 200 to the incoming BYE does not match (Call-ID c6 / CSeq 25 BYE):\n%s", last)
 	}
 }
 
-func TestAnswerer_DedupeRetransmisionINVITE(t *testing.T) {
+func TestAnswerer_DedupeINVITERetransmission(t *testing.T) {
 	f := newFakeTransport()
 	bus := events.NewEventBus(2, logrus.New())
 	defer bus.Close()
@@ -292,22 +292,22 @@ func TestAnswerer_DedupeRetransmisionINVITE(t *testing.T) {
 	defer a.Stop()
 	f.in <- inviteMsg("c7", "26")
 	waitFor(t, func() bool { return f.lastSentContaining("180 Ringing") != "" }, "180")
-	f.in <- inviteMsg("c7", "26") // retransmisión: mismo Call-ID+CSeq
+	f.in <- inviteMsg("c7", "26") // retransmission: same Call-ID+CSeq
 	time.Sleep(50 * time.Millisecond)
-	// Sigue en ringing, no 486 (no lo trata como llamada nueva).
+	// Still ringing, no 486 (not treated as a new call).
 	if a.StateString() != "ringing" {
-		t.Fatalf("retransmisión rompió el estado: %q", a.StateString())
+		t.Fatalf("retransmission broke the state: %q", a.StateString())
 	}
 	if f.lastSentContaining("486 Busy Here") != "" {
-		t.Fatal("retransmisión no debe dar 486")
+		t.Fatal("retransmission must not give 486")
 	}
 }
 
-// TestAnswerer_RingGuard_SinCancel_480YVuelveAIdle: si nadie contesta desde HA y el CANCEL de
-// la placa se pierde, el contestador no puede quedarse en RINGING para siempre (respondería 486
-// a todos los timbrazos siguientes). A los ring_timeout_seconds cierra el INVITE con 480 y vuelve
-// a idle; el siguiente timbrazo recibe 180 de nuevo.
-func TestAnswerer_RingGuard_SinCancel_480YVuelveAIdle(t *testing.T) {
+// TestAnswerer_RingGuard_NoCancel_480AndBackToIdle: if nobody answers from HA and the entrance
+// panel's CANCEL is lost, the answerer must not stay RINGING forever (it would answer 486 to every
+// later ring). After ring_timeout_seconds it closes the INVITE with 480 and returns to idle; the
+// next ring gets 180 again.
+func TestAnswerer_RingGuard_NoCancel_480AndBackToIdle(t *testing.T) {
 	f := newFakeTransport()
 	bus := events.NewEventBus(2, logrus.New())
 	defer bus.Close()
@@ -318,21 +318,21 @@ func TestAnswerer_RingGuard_SinCancel_480YVuelveAIdle(t *testing.T) {
 	defer a.Stop()
 	f.in <- inviteMsg("cr", "40")
 	waitFor(t, func() bool { return f.lastSentContaining("180 Ringing") != "" }, "180")
-	waitFor(t, func() bool { return f.lastSentContaining("480 Temporarily Unavailable") != "" }, "480 por ring guard")
+	waitFor(t, func() bool { return f.lastSentContaining("480 Temporarily Unavailable") != "" }, "480 from the ring guard")
 	if !strings.Contains(f.lastSentContaining("480 Temporarily Unavailable"), "CSeq: 40 INVITE") {
-		t.Fatal("el 480 debe responder al INVITE (CSeq: 40 INVITE)")
+		t.Fatal("the 480 must answer the INVITE (CSeq: 40 INVITE)")
 	}
-	waitFor(t, func() bool { return a.StateString() == "idle" }, "vuelta a idle")
-	// Un timbrazo nuevo debe volver a sonar (180), no 486 Busy.
+	waitFor(t, func() bool { return a.StateString() == "idle" }, "back to idle")
+	// A new ring must ring again (180), not 486 Busy.
 	f.in <- inviteMsg("cr2", "41")
 	waitFor(t, func() bool {
 		return strings.Contains(f.last(), "180 Ringing") && strings.Contains(f.last(), "cr2")
-	}, "180 al segundo timbrazo")
+	}, "180 on the second ring")
 }
 
-// TestAnswerer_RingGuard_NoSaltaTrasContestar: contestar desarma la guarda de timbre; la llamada
-// en curso solo la limita max_call_seconds.
-func TestAnswerer_RingGuard_NoSaltaTrasContestar(t *testing.T) {
+// TestAnswerer_RingGuard_DoesNotFireAfterAnswer: answering disarms the ring guard; the
+// running call is only limited by max_call_seconds.
+func TestAnswerer_RingGuard_DoesNotFireAfterAnswer(t *testing.T) {
 	f := newFakeTransport()
 	bus := events.NewEventBus(2, logrus.New())
 	defer bus.Close()
@@ -350,13 +350,13 @@ func TestAnswerer_RingGuard_NoSaltaTrasContestar(t *testing.T) {
 	waitFor(t, func() bool { return a.StateString() == "in_call" }, "in_call")
 	time.Sleep(1500 * time.Millisecond)
 	if a.StateString() != "in_call" || f.lastSentContaining("480") != "" {
-		t.Fatalf("la guarda de timbre saltó tras contestar: estado=%s", a.StateString())
+		t.Fatalf("the ring guard fired after the answer: state=%s", a.StateString())
 	}
 }
 
-// TestAnswerer_StopConTimbrePendiente_NoPanic: si el bridge se detiene mientras suena, la guarda
-// de timbre no puede saltar después del Stop (publicaría sobre un bus ya cerrado → panic).
-func TestAnswerer_StopConTimbrePendiente_NoPanic(t *testing.T) {
+// TestAnswerer_StopWithPendingRing_NoPanic: if the bridge stops while it rings, the ring guard
+// must not fire after Stop (it would publish on a closed bus → panic).
+func TestAnswerer_StopWithPendingRing_NoPanic(t *testing.T) {
 	f := newFakeTransport()
 	bus := events.NewEventBus(2, logrus.New())
 	cfg := config.AnswererConfig{Enabled: true, User: "bridge", AudioPort: 10100, VideoPort: 10102,
@@ -367,10 +367,10 @@ func TestAnswerer_StopConTimbrePendiente_NoPanic(t *testing.T) {
 	waitFor(t, func() bool { return f.lastSentContaining("180 Ringing") != "" }, "180")
 	a.Stop()
 	bus.Close()
-	time.Sleep(1500 * time.Millisecond) // más que RingTimeoutSeconds: la guarda NO debe disparar
+	time.Sleep(1500 * time.Millisecond) // longer than RingTimeoutSeconds: the guard must NOT fire
 }
 
-func TestAnswerer_GuardTimeoutCuelga(t *testing.T) {
+func TestAnswerer_GuardTimeoutHangsUp(t *testing.T) {
 	f := newFakeTransport()
 	bus := events.NewEventBus(2, logrus.New())
 	defer bus.Close()
@@ -383,18 +383,17 @@ func TestAnswerer_GuardTimeoutCuelga(t *testing.T) {
 	a.Answer()
 	f.in <- msg("ACK", map[string]string{"Call-ID": "cg", "CSeq": "30 ACK"})
 	waitFor(t, func() bool { return a.StateString() == "in_call" }, "in_call")
-	// MaxCallSeconds=1 → a los ~1s debe salir BYE por guard y volver a idle.
+	// MaxCallSeconds=1 → after ~1s the guard must send BYE and return to idle.
 	waitFor(t, func() bool { return f.lastSentContaining("BYE ") != "" && a.StateString() == "idle" }, "guard BYE")
 }
 
-// TestAnswerer_RespuestaREGISTER_NoBloqueaElReadLoop reproduce el bug crítico de la ronda 1 de
-// revisión: dispatch() ya tiene a.mu tomado, así que el handler del 200-al-REGISTER debe fijar
-// a.registered directamente (NO llamar a un helper que vuelva a hacer a.mu.Lock(), porque
-// sync.Mutex no es reentrante y el read-loop se quedaría bloqueado para siempre). El test primero
-// comprueba el flip de IsRegistered() y LUEGO, con el mismo Answerer/goroutine, inyecta un INVITE
-// y comprueba que todavía se responde 180 Ringing — si el read-loop se hubiera quedado colgado en
-// el REGISTER anterior, este segundo waitFor haría timeout.
-func TestAnswerer_RespuestaREGISTER_NoBloqueaElReadLoop(t *testing.T) {
+// TestAnswerer_RegisterResponse_DoesNotBlockReadLoop reproduces a critical bug: dispatch()
+// already holds a.mu, so the REGISTER 200 handler must set a.registered directly (NOT call a
+// helper that does a.mu.Lock() again, because sync.Mutex is not reentrant and the read loop would
+// block forever). The test first checks that IsRegistered() flips and THEN, with the same
+// Answerer/goroutine, injects an INVITE and checks that 180 Ringing is still sent: if the read
+// loop had hung on the earlier REGISTER, this second waitFor would time out.
+func TestAnswerer_RegisterResponse_DoesNotBlockReadLoop(t *testing.T) {
 	f := newFakeTransport()
 	bus := events.NewEventBus(2, logrus.New())
 	defer bus.Close()
@@ -403,15 +402,15 @@ func TestAnswerer_RespuestaREGISTER_NoBloqueaElReadLoop(t *testing.T) {
 	defer a.Stop()
 
 	f.in <- &SIPMessage{StatusCode: "200", Headers: map[string]string{"CSeq": "1 REGISTER"}}
-	waitFor(t, func() bool { return a.IsRegistered() }, "registrado")
+	waitFor(t, func() bool { return a.IsRegistered() }, "registered")
 
-	// El read-loop debe seguir vivo: un INVITE posterior tiene que despacharse con normalidad.
+	// The read loop must stay alive: a later INVITE must be dispatched normally.
 	f.in <- inviteMsg("creg", "40")
-	waitFor(t, func() bool { return f.lastSentContaining("180 Ringing") != "" }, "180 Ringing tras REGISTER 200")
+	waitFor(t, func() bool { return f.lastSentContaining("180 Ringing") != "" }, "180 Ringing after REGISTER 200")
 }
 
-// waitFor sondea cond hasta 5s. El margen holgado evita flakes de timing bajo carga /
-// instrumentación de -race (el guard de 1s y el ida-vuelta INVITE→200→BYE tardan más con -race).
+// waitFor polls cond for up to 5s. The generous margin avoids timing flakes under load /
+// -race instrumentation (the 1s guard and the INVITE→200→BYE round trip take longer with -race).
 func waitFor(t *testing.T, cond func() bool, what string) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -421,5 +420,5 @@ func waitFor(t *testing.T, cond func() bool, what string) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	t.Fatalf("timeout esperando: %s", what)
+	t.Fatalf("timeout waiting: %s", what)
 }

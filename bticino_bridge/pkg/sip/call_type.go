@@ -5,18 +5,19 @@ import (
 	"strings"
 )
 
-// Tipos de llamada entrante que el contestador expone en HA.
+// Incoming call types the answerer reports to HA.
 const (
-	CallTypePlaca       = "placa"       // timbre de la placa de calle (trae vídeo). Evidencia real.
-	CallTypeIntercom    = "intercom"    // solo audio: presumiblemente otro monitor interior. Conjetura.
-	CallTypeDesconocido = "desconocido" // SDP vacío o sin líneas m= legibles.
+	CallTypeEntrance = "entrance" // ring from the entrance panel (carries video); seen on a real unit
+	CallTypeIntercom = "intercom" // audio only: presumably another indoor unit; not verified
+	CallTypeUnknown  = "unknown"  // empty SDP or no readable m= lines
 )
 
-// ClassifyCallType decide el tipo de una llamada entrante a partir del SDP del INVITE.
-// Misma señal que usa la app oficial 1.17.3 (isVideoEnabled del remoto): con un m=video de
-// puerto distinto de 0 es la placa; si solo hay audio, intercom; si no hay m= legibles,
-// desconocido. La app NO clasifica las entrantes más allá de esto, y no hay capturas que
-// respalden distinguir el contestador como llamante, así que no se intenta.
+// ClassifyCallType derives the type of an incoming call from the INVITE SDP.
+// It uses the same signal as the official app 1.17.3 (isVideoEnabled of the
+// remote side): an m=video line with a non-zero port is the entrance panel,
+// audio only is intercom, no readable m= line is unknown. The app classifies
+// incoming calls no further, and no capture supports telling the answering
+// machine apart as a caller, so this does not try.
 func ClassifyCallType(sdp string) string {
 	audio, video := false, false
 	for _, line := range strings.Split(sdp, "\n") {
@@ -35,7 +36,7 @@ func ClassifyCallType(sdp string) string {
 			continue
 		}
 		port, err := strconv.Atoi(fields[1])
-		if err != nil || port == 0 { // puerto 0 = medio rechazado/inactivo
+		if err != nil || port == 0 { // port 0 = media rejected or inactive
 			continue
 		}
 		if media == "video" {
@@ -46,10 +47,10 @@ func ClassifyCallType(sdp string) string {
 	}
 	switch {
 	case video:
-		return CallTypePlaca
+		return CallTypeEntrance
 	case audio:
 		return CallTypeIntercom
 	default:
-		return CallTypeDesconocido
+		return CallTypeUnknown
 	}
 }

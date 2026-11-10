@@ -7,12 +7,12 @@ import (
 
 func TestShouldAutoAnswerIgnoresOwnCall(t *testing.T) {
 	c := &BTicinoSIPClient{originatedCalls: map[string]time.Time{}, nativeCalls: map[string]time.Time{}}
-	c.originatedCalls["mi-call-id@127.0.0.1"] = time.Now()
-	c.nativeCalls["mi-call-id@127.0.0.1"] = time.Now() // InviteWithSDP (ojo)
-	if c.shouldAutoAnswer("mi-call-id@127.0.0.1") {
-		t.Fatal("no debe auto-contestar un INVITE con Call-ID propio (loopback)")
+	c.originatedCalls["my-call-id@127.0.0.1"] = time.Now()
+	c.nativeCalls["my-call-id@127.0.0.1"] = time.Now() // InviteWithSDP (panel view)
+	if c.shouldAutoAnswer("my-call-id@127.0.0.1") {
+		t.Fatal("must not auto-answer an INVITE with our own Call-ID (loopback)")
 	}
-	if !c.shouldAutoAnswer("externo@otro") {
-		t.Fatal("debe auto-contestar un INVITE externo")
+	if !c.shouldAutoAnswer("external@other") {
+		t.Fatal("must auto-answer an external INVITE")
 	}
 }

@@ -123,9 +123,9 @@ func (b *DefaultEventBus) worker(id int) {
 
 // processEvent handles a single event by calling all matching subscribers
 func (b *DefaultEventBus) processEvent(event *Event) {
-	// Lock exclusivo (no RLock): esta función ESCRIBE en b.stats, así que un
-	// RLock aquí permitía que dos workers la mutaran a la vez (data race real,
-	// no solo teórica, en cuanto hay ≥2 eventos en vuelo simultáneamente).
+	// Exclusive lock (not RLock): this function WRITES b.stats, so an RLock
+	// here let two workers mutate it at the same time (a real data race as
+	// soon as two or more events are in flight).
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 

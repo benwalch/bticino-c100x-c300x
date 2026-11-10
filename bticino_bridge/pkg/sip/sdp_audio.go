@@ -2,10 +2,10 @@ package sip
 
 import "fmt"
 
-// BuildAudioOfferSDP construye un SDP de oferta SOLO audio, speex/8000 PT98,
-// SRTP AES_CM_128_HMAC_SHA1_80 (crypto tag 2, la que renderiza el portero y
-// que ffmpeg sabe cifrar). sendrecv: el media real fluye en ambos sentidos.
-// El SSRC va en el propio RTP (lo pone ffmpeg), no en el SDP.
+// BuildAudioOfferSDP builds an audio-ONLY offer SDP, speex/8000 PT98,
+// SRTP AES_CM_128_HMAC_SHA1_80 (crypto tag 2, the one the unit renders and
+// ffmpeg can encrypt). sendrecv: the real media flows both ways. The SSRC is
+// in the RTP itself (set by ffmpeg), not in the SDP.
 func BuildAudioOfferSDP(localIP string, audioPort int, cryptoKeyB64 string) string {
 	return fmt.Sprintf(
 		"v=0\r\n"+

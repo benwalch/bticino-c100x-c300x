@@ -2,22 +2,22 @@ package bticino
 
 import "strings"
 
-// IsMediaChannelUp indica si una trama OWN del bus (raw, tal cual llega del
-// monitor en puerto 20000) es un anuncio de subida de canal de media nativo:
-// audio (lo:5000) o vídeo (lo:5007). Forma real capturada 2026-08-22:
+// IsMediaChannelUp reports whether a raw OpenWebNet bus frame (as it comes
+// from the monitor on port 20000) announces a native media channel going up:
+// audio (lo:5000) or video (lo:5007). Real form captured 2026-08-22:
 //
 //	*7*300#127#0#0#1#5000#2*##   (audio)
-//	*7*300#127#0#0#1#5007#0*##   (vídeo)
+//	*7*300#127#0#0#1#5007#0*##   (video)
 //
-// Es la señal fiable de "hay media en ese puerto" en la auto-activación nativa
-// de la app (que NO genera INVITE SIP). Función pura, solo clasifica; no envía
-// nada al bus.
+// It is the reliable "media is on that port" signal for the app's native
+// auto-activation (which sends NO SIP INVITE). Pure function: it only
+// classifies and sends nothing on the bus.
 func IsMediaChannelUp(raw string) bool {
-	// WHO=7, WHAT con prefijo de canal de media 300#.
+	// WHO=7, WHAT with the media channel prefix 300#.
 	if !strings.HasPrefix(raw, "*7*300#") {
 		return false
 	}
-	// Token de puerto de media (delimitado por # a ambos lados para no casar
-	// 5002 u otros puertos con substring de 5000/5007).
+	// Media port token (delimited by # on both sides so that 5002 or other
+	// ports do not match a 5000/5007 substring).
 	return strings.Contains(raw, "#5000#") || strings.Contains(raw, "#5007#")
 }

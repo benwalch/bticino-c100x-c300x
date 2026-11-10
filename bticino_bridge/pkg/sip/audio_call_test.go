@@ -17,10 +17,10 @@ type fakeOriginator struct {
 	err               error
 	hungUp            bool
 
-	// hungUpCh, si no es nil, se cierra (una sola vez) cuando Hangup() se
-	// invoca. Igual que fakeCapturer.done: sincroniza con el test sin
-	// carreras cuando Hangup() lo dispara una goroutine en segundo plano
-	// (el cierre automático de la pata al fin natural del receiver).
+	// hungUpCh, if not nil, is closed (once) when Hangup() is called. Like
+	// fakeCapturer.done: it syncs with the test without races when a
+	// background goroutine triggers Hangup() (the leg closing by itself at the
+	// natural end of the receiver).
 	hungUpCh   chan struct{}
 	hungUpOnce sync.Once
 }
@@ -45,22 +45,20 @@ type fakeCapturer struct {
 	ans       AudioAnswer
 	stopped   bool
 
-	// block, si no es nil, Capture() bloquea en él hasta que se cierre —
-	// simula el proceso ffmpeg de captura siguiendo vivo (como en producción,
-	// donde Capture() no vuelve hasta que ffmpeg termina). Stop() lo cierra
-	// (una sola vez, vía stopOnce), igual que en la implementación real
-	// Stop() mata el proceso y eso hace que la llamada bloqueante Capture()
-	// retorne. Si es nil, Capture() retorna de inmediato tras registrar los
-	// parámetros — simula el fin natural del receiver (timeout duro de 60s o
-	// ffmpeg muerto por su cuenta), el escenario del Finding 1.
+	// block, if not nil, makes Capture() block on it until it is closed; it
+	// simulates the capture ffmpeg process staying alive (as in production,
+	// where Capture() does not return until ffmpeg ends). Stop() closes it
+	// (once, via stopOnce), just as the real Stop() kills the process and that
+	// makes the blocking Capture() call return. If nil, Capture() returns at
+	// once after recording the parameters; it simulates the natural end of the
+	// receiver (60s hard timeout or ffmpeg dying by itself).
 	block    chan struct{}
 	stopOnce sync.Once
 
-	// done, si no es nil, se cierra justo antes de que Capture() retorne.
-	// OpenDuplex lanza Capture en una goroutine: el test debe esperar en
-	// este canal (con timeout) ANTES de leer los campos de arriba, o el
-	// race detector marca una lectura/escritura sin sincronizar entre la
-	// goroutine y el test.
+	// done, if not nil, is closed right before Capture() returns. OpenDuplex
+	// runs Capture in a goroutine: the test must wait on this channel (with a
+	// timeout) BEFORE reading the fields above, or the race detector flags an
+	// unsynchronized read/write between the goroutine and the test.
 	done chan struct{}
 }
 
@@ -90,7 +88,7 @@ type fakePlayer struct {
 	host   string
 	ans    AudioAnswer
 
-	// done: mismo propósito que en fakeCapturer, para el sender de OpenDuplex.
+	// done: same purpose as in fakeCapturer, for the OpenDuplex sender.
 	done chan struct{}
 }
 
@@ -114,39 +112,39 @@ func TestAudioCallSayHappyPath(t *testing.T) {
 	if err := ac.Say("/tmp/hola.wav"); err != nil {
 		t.Fatalf("Say: %v", err)
 	}
-	// invitó a c300x con un SDP de audio real
+	// invited c300x with a real audio SDP
 	if orig.gotTarget != bticino.SIPUsernameForVariant(bticino.DeviceVariant) {
 		t.Fatalf("target: %q", orig.gotTarget)
 	}
 	if !contains(orig.gotSDP, "m=audio 40100 RTP/SAVP 98") || !contains(orig.gotSDP, "AES_CM_128_HMAC_SHA1_80") {
-		t.Fatalf("SDP offer incorrecto:\n%s", orig.gotSDP)
+		t.Fatalf("wrong SDP offer:\n%s", orig.gotSDP)
 	}
-	// armó el audio con WHO=8
+	// armed the audio with WHO=8
 	if len(own.cmds) == 0 || own.cmds[0] != "*8*2#5#4*16##" {
-		t.Fatalf("no armó WHO=8: %v", own.cmds)
+		t.Fatalf("did not arm WHO=8: %v", own.cmds)
 	}
-	// reprodujo al puerto+clave del portero
+	// played to the intercom's port+key
 	if !pl.played || pl.ans.Port != 7078 || pl.ans.CryptoKey != "KEYXYZ" {
-		t.Fatalf("player mal invocado: %+v", pl)
+		t.Fatalf("player called wrongly: %+v", pl)
 	}
 }
 
 func TestAudioCallSayInviteError(t *testing.T) {
 	ac := NewAudioCall(&fakeOriginator{err: errors.New("403")}, &fakeOWN{}, &fakePlayer{}, &fakeCapturer{}, "127.0.0.1", 40100, logrus.New())
 	if err := ac.Say("/tmp/hola.wav"); err == nil {
-		t.Fatal("esperaba error si el INVITE falla")
+		t.Fatal("expected an error if the INVITE fails")
 	}
 }
 
 func TestAudioCallSayBadAnswer(t *testing.T) {
-	// answer sin crypto soportada → error, y NO debe reproducir.
+	// answer without supported crypto → error, and it must NOT play.
 	pl := &fakePlayer{}
 	ac := NewAudioCall(&fakeOriginator{answer: "m=audio 7078 RTP/SAVP 98\r\na=rtpmap:98 speex/8000\r\n"}, &fakeOWN{}, pl, &fakeCapturer{}, "127.0.0.1", 40100, logrus.New())
 	if err := ac.Say("/tmp/hola.wav"); err == nil {
-		t.Fatal("esperaba error sin crypto soportada")
+		t.Fatal("expected an error without supported crypto")
 	}
 	if pl.played {
-		t.Fatal("no debe reproducir si el answer es inválido")
+		t.Fatal("must not play if the answer is invalid")
 	}
 }
 
@@ -161,42 +159,42 @@ func TestAudioCallOpenDuplexHappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenDuplex: %v", err)
 	}
-	// OpenDuplex lanza receiver y sender en goroutines aparte sin esperarlas;
-	// hay que sincronizar con su finalización ANTES de leer los campos de los
-	// fakes (si no, hay lectura/escritura sin sincronizar → -race la marca).
+	// OpenDuplex runs receiver and sender in separate goroutines without waiting
+	// for them; sync with their end BEFORE reading the fakes' fields (otherwise
+	// there is an unsynchronized read/write → -race flags it).
 	select {
 	case <-cap.done:
 	case <-time.After(2 * time.Second):
-		t.Fatal("timeout esperando a que el receiver (capturer) termine")
+		t.Fatal("timeout waiting for the receiver (capturer) to end")
 	}
 	select {
 	case <-pl.done:
 	case <-time.After(2 * time.Second):
-		t.Fatal("timeout esperando a que el sender (player) termine")
+		t.Fatal("timeout waiting for the sender (player) to end")
 	}
 	if orig.gotTarget != bticino.SIPUsernameForVariant(bticino.DeviceVariant) || !contains(orig.gotSDP, "m=audio 40100 RTP/SAVP 98") {
-		t.Fatalf("offer mal: %q / %s", orig.gotTarget, orig.gotSDP)
+		t.Fatalf("wrong offer: %q / %s", orig.gotTarget, orig.gotSDP)
 	}
 	if len(own.cmds) == 0 || own.cmds[0] != "*8*2#5#4*16##" {
-		t.Fatalf("no armó WHO=8: %v", own.cmds)
+		t.Fatalf("did not arm WHO=8: %v", own.cmds)
 	}
 	if !cap.captured || cap.localPort != 40100 || cap.sinkPath != "/tmp/door.wav" || cap.ans.CryptoKey != "KEYXYZ" {
-		t.Fatalf("capturer mal: %+v", cap)
+		t.Fatalf("wrong capturer: %+v", cap)
 	}
 	if !pl.played || pl.ans.Port != 7078 {
-		t.Fatalf("player mal: %+v", pl)
+		t.Fatalf("wrong player: %+v", pl)
 	}
 	if ans.Port != 7078 {
-		t.Fatalf("answer devuelto mal: %+v", ans)
+		t.Fatalf("wrong answer returned: %+v", ans)
 	}
 }
 
 func TestAudioCallOpenDuplexBusy(t *testing.T) {
-	// block: el receiver no debe autocerrar la pata durante el test (si
-	// Capture() retornara de inmediato, el cierre automático del Finding 1
-	// podría ganarle la carrera al segundo OpenDuplex y dejar de ver la pata
-	// ocupada — falso negativo intermitente). Bloqueando, la pata se
-	// mantiene activa de forma determinista mientras dura el test.
+	// block: the receiver must not close the leg by itself during the test (if
+	// Capture() returned at once, the automatic close could win the race against
+	// the second OpenDuplex and the leg would no longer look busy: an
+	// intermittent false negative). Blocking keeps the leg active
+	// deterministically for the duration of the test.
 	cap := &fakeCapturer{block: make(chan struct{})}
 	ac := NewAudioCall(&fakeOriginator{answer: goodAnswer}, &fakeOWN{}, &fakePlayer{}, cap, "127.0.0.1", 40100, logrus.New())
 	t.Cleanup(func() { _ = ac.Close() })
@@ -204,17 +202,16 @@ func TestAudioCallOpenDuplexBusy(t *testing.T) {
 		t.Fatalf("primera: %v", err)
 	}
 	if _, err := ac.OpenDuplex("/tmp/b.wav", ""); err != ErrAudioLegBusy {
-		t.Fatalf("esperaba ErrAudioLegBusy, got %v", err)
+		t.Fatalf("expected ErrAudioLegBusy, got %v", err)
 	}
 }
 
 func TestAudioCallCloseHangsUp(t *testing.T) {
 	orig := &fakeOriginator{answer: goodAnswer}
-	// block: el receiver se mantiene "vivo" (como ffmpeg corriendo) hasta
-	// que Close() llame a capturer.Stop() explícitamente — así el Close()
-	// del test es siempre quien hace el trabajo de verdad (Hangup +
-	// capturer.Stop) en su propia goroutine, sin carrera con el cierre
-	// automático del receiver (que solo se dispara cuando block se cierra).
+	// block: the receiver stays "alive" (like a running ffmpeg) until Close()
+	// calls capturer.Stop() explicitly, so the test's Close() always does the
+	// real work (Hangup + capturer.Stop) in its own goroutine, with no race
+	// against the receiver's automatic close (which only fires when block closes).
 	cap := &fakeCapturer{block: make(chan struct{})}
 	ac := NewAudioCall(orig, &fakeOWN{}, &fakePlayer{}, cap, "127.0.0.1", 40100, logrus.New())
 	if _, err := ac.OpenDuplex("/tmp/a.wav", ""); err != nil {
@@ -224,10 +221,10 @@ func TestAudioCallCloseHangsUp(t *testing.T) {
 		t.Fatalf("close: %v", err)
 	}
 	if !orig.hungUp || !cap.stopped {
-		t.Fatalf("Close debe Hangup y parar capturer: hungUp=%v stopped=%v", orig.hungUp, cap.stopped)
+		t.Fatalf("Close must Hangup and stop the capturer: hungUp=%v stopped=%v", orig.hungUp, cap.stopped)
 	}
 	if ac.IsActive() {
-		t.Fatal("IsActive debe ser false tras Close")
+		t.Fatal("IsActive must be false after Close")
 	}
 	// idempotente
 	if err := ac.Close(); err != nil {
@@ -235,15 +232,14 @@ func TestAudioCallCloseHangsUp(t *testing.T) {
 	}
 }
 
-// TestAudioCallReceiverNaturalExitTearsDownLeg cubre el Finding 1: si el
-// receiver retorna por sí solo (timeout duro de 60s en Capture, o ffmpeg
-// muerto por su cuenta) SIN pasar por /stop, la pata debe liberarse igual
-// (active=false, BYE enviado) — si no, queda encallada para siempre y todo
-// OpenDuplex posterior devuelve ErrAudioLegBusy.
+// TestAudioCallReceiverNaturalExitTearsDownLeg: if the receiver returns by
+// itself (60s hard timeout in Capture, or ffmpeg dying by itself) WITHOUT
+// /stop, the leg must still be freed (active=false, BYE sent); otherwise it is
+// stuck forever and every later OpenDuplex returns ErrAudioLegBusy.
 func TestAudioCallReceiverNaturalExitTearsDownLeg(t *testing.T) {
 	orig := &fakeOriginator{answer: goodAnswer, hungUpCh: make(chan struct{})}
-	// cap sin block: Capture() retorna de inmediato tras registrar los
-	// parámetros, simulando el fin natural del receiver (no hay /stop).
+	// cap without block: Capture() returns at once after recording the
+	// parameters, simulating the natural end of the receiver (no /stop).
 	cap := &fakeCapturer{}
 	ac := NewAudioCall(orig, &fakeOWN{}, &fakePlayer{}, cap, "127.0.0.1", 40100, logrus.New())
 
@@ -251,29 +247,28 @@ func TestAudioCallReceiverNaturalExitTearsDownLeg(t *testing.T) {
 		t.Fatalf("open: %v", err)
 	}
 
-	// Sincroniza con el cierre automático (Hangup es lo último que hace
-	// Close() antes de retornar) en vez de leer los campos directamente,
-	// para que -race no marque una lectura sin sincronizar con la goroutine
-	// del receiver.
+	// Sync with the automatic close (Hangup is the last thing Close() does
+	// before returning) instead of reading the fields directly, so -race does
+	// not flag an unsynchronized read with the receiver goroutine.
 	select {
 	case <-orig.hungUpCh:
 	case <-time.After(2 * time.Second):
-		t.Fatal("timeout esperando el BYE automático tras el fin natural del receiver")
+		t.Fatal("timeout waiting for the automatic BYE after the natural end of the receiver")
 	}
 
 	if !orig.hungUp {
-		t.Fatal("el fin natural del receiver debe colgar la llamada (BYE)")
+		t.Fatal("the natural end of the receiver must hang up the call (BYE)")
 	}
 	if !cap.stopped {
-		t.Fatal("el fin natural del receiver debe parar también el player/capturer (vía Close)")
+		t.Fatal("the natural end of the receiver must also stop the player/capturer (via Close)")
 	}
 	if ac.IsActive() {
-		t.Fatal("la pata debe quedar inactiva tras el fin natural del receiver (si no, se encalla)")
+		t.Fatal("the leg must be inactive after the natural end of the receiver (otherwise it gets stuck)")
 	}
-	// Una siguiente OpenDuplex NO debe devolver ErrAudioLegBusy: la pata se
-	// liberó sola, sin necesidad de /stop.
+	// A following OpenDuplex must NOT return ErrAudioLegBusy: the leg freed
+	// itself, without /stop.
 	if _, err := ac.OpenDuplex("/tmp/b.wav", ""); err != nil {
-		t.Fatalf("esperaba poder reabrir la pata tras el fin natural del receiver, got %v", err)
+		t.Fatalf("expected to reopen the leg after the natural end of the receiver, got %v", err)
 	}
 }
 
@@ -281,10 +276,10 @@ func TestAudioCallOpenDuplexInviteError(t *testing.T) {
 	cap := &fakeCapturer{}
 	ac := NewAudioCall(&fakeOriginator{err: errors.New("403")}, &fakeOWN{}, &fakePlayer{}, cap, "127.0.0.1", 40100, logrus.New())
 	if _, err := ac.OpenDuplex("/tmp/a.wav", ""); err == nil {
-		t.Fatal("esperaba error si el INVITE falla")
+		t.Fatal("expected an error if the INVITE fails")
 	}
 	if cap.captured {
-		t.Fatal("no debe capturar si el INVITE falla")
+		t.Fatal("must not capture if the INVITE fails")
 	}
 }
 

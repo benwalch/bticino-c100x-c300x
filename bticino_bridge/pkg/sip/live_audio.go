@@ -7,11 +7,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// LiveAudioOnCall arma el audio en vivo de la puerta durante una llamada mediante
-// un espejo PASIVO: tap del leg de audio nativo en lo:5000 (Speex PT110 en claro)
-// → relay de audio del RTSP (10000). CERO decode/transcode (el códec ya casa) y
-// CERO comandos al bus. Espejo de LiveVideoOnCall, sin el CallActiveMarker (el
-// audio no dispara self-INVITE). go2rtc publica /doorbell (audio=pcma) a HA.
+// LiveAudioOnCall arms live door audio during a call through a PASSIVE
+// mirror: a tap of the native audio leg on lo:5000 (cleartext Speex PT110) →
+// the RTSP audio relay (10000). NO decode/transcode (the codec already
+// matches) and NO bus commands. Mirror of LiveVideoOnCall, without the
+// CallActiveMarker (audio does not trigger a self-INVITE). go2rtc publishes
+// /doorbell (audio=pcma) to HA.
 type LiveAudioOnCall struct {
 	tap    VideoTap
 	logger *logrus.Logger
@@ -29,16 +30,16 @@ func NewLiveAudioOnCall(tap VideoTap, logger *logrus.Logger) *LiveAudioOnCall {
 	return &LiveAudioOnCall{tap: tap, logger: logger}
 }
 
-// SetGuardTimeout activa un desarme de seguridad si no llega el fin de llamada.
-// 0 lo desactiva. Llamar antes de Start.
+// SetGuardTimeout enables a safety disarm when the call end never arrives.
+// 0 turns it off. Call before Start.
 func (l *LiveAudioOnCall) SetGuardTimeout(d time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.guard = d
 }
 
-// Start arma el espejo de audio. Idempotente. Leak-safe: si un Stop gana la
-// carrera mientras tap.Start() está en curso, se re-chequea y se para el tap.
+// Start arms the audio mirror. Idempotent. Leak-safe: if a Stop wins the race
+// while tap.Start() is running, it checks again and stops the tap.
 func (l *LiveAudioOnCall) Start(reason string) {
 	l.mu.Lock()
 	if l.active {
@@ -48,30 +49,30 @@ func (l *LiveAudioOnCall) Start(reason string) {
 	l.active = true
 	if l.guard > 0 {
 		l.timer = time.AfterFunc(l.guard, func() {
-			l.logger.Warn("live-audio: guard vencido sin fin de llamada — desarmando")
+			l.logger.Warn("live-audio: guard expired without a call end; disarming")
 			l.Stop()
 		})
 	}
 	l.mu.Unlock()
 
-	l.logger.Infof("live-audio: armando espejo pasivo lo:5000 → relay (motivo=%s)", reason)
+	l.logger.Infof("live-audio: arming passive mirror lo:5000 → relay (reason=%s)", reason)
 	if l.tap != nil {
 		if err := l.tap.Start(); err != nil {
-			l.logger.WithError(err).Warn("live-audio: tap no disponible — degradando sin audio")
+			l.logger.WithError(err).Warn("live-audio: tap unavailable; continuing without audio")
 		}
 	}
-	// Fix del leak: si un Stop concurrente volteó active mientras tap.Start()
-	// estaba en curso, el tap habría arrancado con active=false → pararlo.
+	// Leak fix: if a concurrent Stop flipped active while tap.Start() was
+	// running, the tap would have started with active=false, so stop it.
 	l.mu.Lock()
 	orphaned := !l.active
 	l.mu.Unlock()
 	if orphaned && l.tap != nil {
-		l.logger.Warn("live-audio: Stop ganó la carrera durante Start — parando el tap huérfano")
+		l.logger.Warn("live-audio: Stop won the race during Start; stopping the orphaned tap")
 		l.tap.Stop()
 	}
 }
 
-// Stop desarma (para el tap). Idempotente.
+// Stop disarms (stops the tap). Idempotent.
 func (l *LiveAudioOnCall) Stop() {
 	l.mu.Lock()
 	if !l.active {
@@ -88,7 +89,7 @@ func (l *LiveAudioOnCall) Stop() {
 	if l.tap != nil {
 		l.tap.Stop()
 	}
-	l.logger.Info("live-audio: desarmado")
+	l.logger.Info("live-audio: disarmed")
 }
 
 func (l *LiveAudioOnCall) IsActive() bool {

@@ -2,33 +2,34 @@ package sip
 
 import "testing"
 
-// La app oficial 1.17.3 no clasifica las llamadas entrantes; lo único que mira es si el remoto
-// trae vídeo. Seguimos esa misma señal: con vídeo => placa (la única con evidencia real), solo
-// audio => intercom (conjetura: monitor interior), nada legible => desconocido.
+// The official app 1.17.3 does not classify incoming calls; it only checks
+// whether the remote side has video. Same signal here: video => entrance (the
+// only case seen on a real unit), audio only => intercom (assumed: an indoor
+// unit), nothing readable => unknown.
 func TestClassifyCallType(t *testing.T) {
-	casos := []struct {
-		nombre string
-		sdp    string
-		want   string
+	cases := []struct {
+		name string
+		sdp  string
+		want string
 	}{
-		{"placa: audio+vídeo (SDP real de la placa)",
+		{"entrance: audio+video (real entrance panel SDP)",
 			"v=0\r\no=c300x 1 1 IN IP4 127.0.0.1\r\ns=Talk\r\nm=audio 7078 RTP/SAVP 96 18 101\r\nm=video 9078 RTP/SAVP 96 97\r\n",
-			CallTypePlaca},
-		{"intercom: solo audio",
+			CallTypeEntrance},
+		{"intercom: audio only",
 			"v=0\r\ns=Talk\r\nm=audio 7078 RTP/SAVP 96\r\n",
 			CallTypeIntercom},
-		{"vídeo rechazado (puerto 0) cuenta como solo audio",
+		{"rejected video (port 0) counts as audio only",
 			"v=0\r\nm=audio 7078 RTP/SAVP 96\r\nm=video 0 RTP/SAVP 96\r\n",
 			CallTypeIntercom},
-		{"SDP vacío", "", CallTypeDesconocido},
-		{"sin líneas m=", "v=0\r\ns=Talk\r\n", CallTypeDesconocido},
-		{"solo LF (sin CR) también vale",
+		{"empty SDP", "", CallTypeUnknown},
+		{"no m= lines", "v=0\r\ns=Talk\r\n", CallTypeUnknown},
+		{"LF only (no CR) works too",
 			"v=0\nm=audio 7078 RTP/SAVP 96\nm=video 9078 RTP/SAVP 96\n",
-			CallTypePlaca},
+			CallTypeEntrance},
 	}
-	for _, c := range casos {
+	for _, c := range cases {
 		if got := ClassifyCallType(c.sdp); got != c.want {
-			t.Errorf("%s: ClassifyCallType=%q, esperaba %q", c.nombre, got, c.want)
+			t.Errorf("%s: ClassifyCallType=%q, want %q", c.name, got, c.want)
 		}
 	}
 }

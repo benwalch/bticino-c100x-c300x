@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// ReadSIPFrame lee un mensaje SIP completo de un stream TCP (cabeceras hasta CRLFCRLF +
-// Content-Length bytes de cuerpo). Devuelve io.EOF al cerrarse la conexión.
+// ReadSIPFrame reads a complete SIP message from a TCP stream (headers up to CRLFCRLF +
+// Content-Length bytes of body). It returns io.EOF when the connection closes.
 func ReadSIPFrame(r *bufio.Reader) (*SIPMessage, error) {
 	var head strings.Builder
 	for {
@@ -22,7 +22,7 @@ func ReadSIPFrame(r *bufio.Reader) (*SIPMessage, error) {
 		}
 		head.WriteString(line)
 		if line == "\r\n" || line == "\n" {
-			break // fin de cabeceras
+			break // end of headers
 		}
 	}
 	raw := head.String()
@@ -30,7 +30,7 @@ func ReadSIPFrame(r *bufio.Reader) (*SIPMessage, error) {
 	if cl > 0 {
 		body := make([]byte, cl)
 		if _, err := io.ReadFull(r, body); err != nil {
-			return nil, fmt.Errorf("leyendo cuerpo (%d bytes): %w", cl, err)
+			return nil, fmt.Errorf("reading body (%d bytes): %w", cl, err)
 		}
 		raw += string(body)
 	}
@@ -48,7 +48,7 @@ func contentLengthOf(raw string) int {
 	return 0
 }
 
-// ParseSIPFrame parsea un mensaje SIP ya delimitado. Via y Record-Route se acumulan en slices.
+// ParseSIPFrame parses an already delimited SIP message. Via and Record-Route are collected in slices.
 func ParseSIPFrame(raw string) *SIPMessage {
 	msg := &SIPMessage{Headers: map[string]string{}, Raw: raw}
 	parts := strings.SplitN(raw, "\r\n\r\n", 2)

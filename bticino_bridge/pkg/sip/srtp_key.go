@@ -5,9 +5,9 @@ import (
 	"encoding/base64"
 )
 
-// NewSRTPMasterKey genera el valor inline: de un a=crypto para la suite
-// AES_CM_128_HMAC_SHA1_80: 16 bytes de master key + 14 de master salt,
-// en base64 estándar. Cada llamada usa una clave nueva.
+// NewSRTPMasterKey generates the inline: value of an a=crypto line for the
+// AES_CM_128_HMAC_SHA1_80 suite: 16 bytes of master key + 14 of master salt,
+// in standard base64. Every call uses a new key.
 func NewSRTPMasterKey() (string, error) {
 	raw := make([]byte, 30)
 	if _, err := rand.Read(raw); err != nil {

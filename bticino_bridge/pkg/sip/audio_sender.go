@@ -10,14 +10,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// defaultAudioSenderTimeout es el tope de ejecución de ffmpeg. Evita que un
-// WAV que no termina (p.ej. /dev/zero, un pipe) cuelgue Play/el handler HTTP
-// indefinidamente (anti-DoS). Un WAV de talk-back normal dura pocos segundos.
+// defaultAudioSenderTimeout caps the ffmpeg run time. It keeps a WAV that
+// never ends (e.g. /dev/zero, a pipe) from hanging Play or the HTTP handler
+// forever (anti-DoS). A normal talk-back WAV lasts a few seconds.
 const defaultAudioSenderTimeout = 30 * time.Second
 
-// AudioSender envía un WAV como SRTP speex/8000 al puerto de audio del portero,
-// delegando la capa SRTP en ffmpeg (protocolo srtp + libspeex). SSRC propio
-// (ffmpeg genera uno aleatorio), sesión legítima → el portero lo renderiza.
+// AudioSender sends a WAV as speex/8000 SRTP to the unit's audio port,
+// leaving the SRTP layer to ffmpeg (srtp protocol + libspeex). Its own SSRC
+// (ffmpeg picks a random one) in a legitimate session, so the unit renders it.
 type AudioSender struct {
 	ffmpeg  string
 	timeout time.Duration
@@ -34,7 +34,7 @@ func NewAudioSender(ffmpegPath string, logger *logrus.Logger) *AudioSender {
 	return &AudioSender{ffmpeg: ffmpegPath, timeout: defaultAudioSenderTimeout, logger: logger}
 }
 
-// buildArgs construye los argumentos de ffmpeg (helper testeable sin ejecutar).
+// buildArgs builds the ffmpeg arguments (testable helper, runs nothing).
 func (s *AudioSender) buildArgs(wavPath, host string, ans AudioAnswer) []string {
 	url := fmt.Sprintf("srtp://%s:%d?srtp_out_suite=%s&srtp_out_params=%s",
 		host, ans.Port, ans.CryptoSuite, ans.CryptoKey)
@@ -47,9 +47,9 @@ func (s *AudioSender) buildArgs(wavPath, host string, ans AudioAnswer) []string 
 	}
 }
 
-// Play lanza ffmpeg (con timeout duro) y bloquea hasta que termina el WAV o
-// se alcanza el tope. Errores no fatales. El timeout garantiza que Play retorna
-// aunque la fuente no termine nunca (anti-DoS del handler que lo invoca).
+// Play starts ffmpeg (with a hard timeout) and blocks until the WAV ends or the
+// cap is reached. Errors are not fatal. The timeout ensures Play returns even
+// if the source never ends (anti-DoS for the calling handler).
 func (s *AudioSender) Play(wavPath, host string, ans AudioAnswer) error {
 	timeout := s.timeout
 	if timeout <= 0 {
@@ -64,15 +64,15 @@ func (s *AudioSender) Play(wavPath, host string, ans AudioAnswer) error {
 	s.cancel = cancel
 	s.mu.Unlock()
 
-	s.logger.Infof("audio-sender: enviando %s → srtp %s:%d (speex PT%d, tope %s)", wavPath, host, ans.Port, ans.PayloadType, timeout)
+	s.logger.Infof("audio-sender: sending %s → srtp %s:%d (speex PT%d, limit %s)", wavPath, host, ans.Port, ans.PayloadType, timeout)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		s.logger.WithError(err).Warnf("audio-sender: ffmpeg terminó con error: %s", string(out))
+		s.logger.WithError(err).Warnf("audio-sender: ffmpeg ended with an error: %s", string(out))
 	}
 	return err
 }
 
-// Stop mata el ffmpeg en curso si lo hay (cancela su contexto).
+// Stop kills the running ffmpeg, if any (cancels its context).
 func (s *AudioSender) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()

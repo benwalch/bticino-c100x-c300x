@@ -11,15 +11,15 @@ import (
 	"bticino_bridge/pkg/multicast/handlers"
 )
 
-// stopTimer abstrae *time.Timer para poder inyectar uno falso en tests.
+// stopTimer wraps *time.Timer so tests can inject a fake one.
 type stopTimer interface{ Stop() bool }
 
-// noopTimer es un stopTimer inerte (para tests).
+// noopTimer is an inert stopTimer (for tests).
 type noopTimer struct{}
 
 func (noopTimer) Stop() bool { return true }
 
-// AccessEvent es el Data del evento "access.classified".
+// AccessEvent is the Data of the "access.classified" event.
 type AccessEvent struct {
 	Type       string    `json:"type"`
 	Confidence string    `json:"confidence"`
@@ -44,7 +44,7 @@ type pendingOpen struct {
 	finalized bool
 }
 
-// Classifier escucha el EventBus y publica "access.classified".
+// Classifier listens on the EventBus and publishes "access.classified".
 type Classifier struct {
 	cfg    config.AccessConfig
 	bus    events.EventBus
@@ -55,12 +55,12 @@ type Classifier struct {
 	pending  map[string]*pendingOpen
 	subs     []string
 
-	// Inyectables para test:
+	// Injectable for tests:
 	now       func() time.Time
 	afterFunc func(time.Duration, func()) stopTimer
 }
 
-// NewClassifier crea el clasificador. now/afterFunc usan los reales por defecto.
+// NewClassifier creates the classifier. now/afterFunc default to the real ones.
 func NewClassifier(cfg config.AccessConfig, bus events.EventBus, logger *logrus.Logger) *Classifier {
 	if logger == nil {
 		logger = logrus.New()
@@ -75,19 +75,19 @@ func NewClassifier(cfg config.AccessConfig, bus events.EventBus, logger *logrus.
 	}
 }
 
-// Start registra las suscripciones al EventBus.
+// Start subscribes to the EventBus.
 func (c *Classifier) Start() {
 	c.subs = append(c.subs,
-		c.bus.Subscribe("doorbell.pressed", func(*events.Event) { c.recordRing("doorbell") }),
+		c.bus.Subscribe("doorbell.pressed", func(*events.Event) { c.recordRing("doorbell_entrance") }),
 		c.bus.Subscribe("doorbell.floor.pressed", func(*events.Event) { c.recordRing("doorbell_floor") }),
 		c.bus.Subscribe("sip.call.incoming", func(*events.Event) { c.recordRing("sip") }),
 		c.bus.Subscribe("door.unlocked", func(e *events.Event) { c.onUnlocked(whereOf(e)) }),
 		c.bus.Subscribe("door.locked", func(e *events.Event) { c.onLocked(whereOf(e)) }),
 	)
-	c.logger.Info("Clasificador de accesos: suscripciones activas")
+	c.logger.Info("Access classifier: subscriptions active")
 }
 
-// Stop cancela las suscripciones (tapa timers pendientes vía el bus).
+// Stop cancels the subscriptions.
 func (c *Classifier) Stop() {
 	for _, id := range c.subs {
 		c.bus.Unsubscribe(id)
@@ -95,26 +95,24 @@ func (c *Classifier) Stop() {
 	c.subs = nil
 }
 
-// recordRing guarda el último timbre/llamada visto.
+// recordRing stores the last ring or call seen.
 func (c *Classifier) recordRing(source string) {
 	c.mu.Lock()
 	c.lastRing = ringInfo{at: c.now(), source: source, set: true}
 	c.mu.Unlock()
 }
 
-// onUnlocked abre un pendiente para WHERE y arma el timer de max_hold_wait.
+// onUnlocked opens a pending entry for WHERE and arms the max_hold_wait timer.
 //
-// Si ya había un pendiente sin cerrar para el mismo WHERE (doble apertura
-// del mismo relé sin que llegara el cierre intermedio: p. ej. dos toques de
-// llave/RFID en <max_hold_wait), se le supersede: primero se vuelca (flush)
-// como si hubiera vencido su timeout (duración desconocida), para no perder
-// ese acceso, y luego se arma el nuevo pendiente. La decisión de qué hacer
-// con el viejo (marcarlo finalizado, parar su timer) y el reemplazo por el
-// nuevo ocurren bajo el MISMO lock, sin soltar el mutex entre medias, para
-// que no quede una ventana en la que otro onUnlocked/onLocked/timer
-// concurrente pueda ver el pendiente viejo "vivo" en el mapa a la vez que
-// ya fue decidido su reemplazo. Solo la publicación (I/O) del volcado se
-// hace fuera del lock.
+// If an open entry for the same WHERE is still pending (the same relay
+// opened twice without the close in between, e.g. two RFID taps within
+// max_hold_wait), it is superseded: it is flushed first as if its timeout had
+// expired (unknown duration), so that access is not lost, then the new entry
+// is armed. Deciding about the old entry (mark it finalized, stop its timer)
+// and replacing it happen under the SAME lock, so no concurrent
+// onUnlocked/onLocked/timer can see the old entry "alive" in the map after its
+// replacement was decided. Only publishing the flush (I/O) happens outside
+// the lock.
 func (c *Classifier) onUnlocked(where string) {
 	c.mu.Lock()
 	old, hadOld := c.pending[where]
@@ -136,10 +134,9 @@ func (c *Classifier) onUnlocked(where string) {
 		ringSrc = c.lastRing.source
 	}
 	p := &pendingOpen{openedAt: c.now(), hadCall: hadCall, ringSrc: ringSrc}
-	// El timer captura el puntero p (identidad), no el WHERE a secas: así,
-	// si este pendiente es superseído más tarde, el propio timer viejo
-	// queda inerte en finalize (cur != p) en vez de tocar el pendiente que
-	// lo reemplazó.
+	// The timer captures the pointer p (identity), not just WHERE: if this
+	// entry is superseded later, the old timer stays inert in finalize
+	// (cur != p) instead of touching the entry that replaced it.
 	p.timer = c.afterFunc(c.cfg.MaxHoldWait, func() { c.finalize(where, p, 0, false) })
 	c.pending[where] = p
 	c.mu.Unlock()
@@ -149,7 +146,7 @@ func (c *Classifier) onUnlocked(where string) {
 	}
 }
 
-// onLocked cierra el pendiente de WHERE midiendo la duración del pulso.
+// onLocked closes the pending entry of WHERE and measures the pulse duration.
 func (c *Classifier) onLocked(where string) {
 	c.mu.Lock()
 	p, ok := c.pending[where]
@@ -162,13 +159,12 @@ func (c *Classifier) onLocked(where string) {
 	c.finalize(where, p, dur, true)
 }
 
-// finalize clasifica y publica el pendiente p de WHERE, solo si p sigue
-// siendo el pendiente vigente en el mapa (comparación por identidad de
-// puntero, no solo por clave WHERE) y no fue finalizado ya. Este guard es lo
-// que hace segura la competencia entre el cierre real (onLocked), el timer
-// de max_hold_wait de ESE pendiente concreto, y una eventual supersesión por
-// una nueva apertura del mismo WHERE (que ya habrá marcado p.finalized=true
-// y reemplazado la entrada del mapa antes de que este finalize se ejecute).
+// finalize classifies and publishes the pending entry p of WHERE, but only if
+// p is still the current entry in the map (compared by pointer identity, not
+// just by WHERE) and not finalized yet. This guard makes the race safe between
+// the real close (onLocked), the max_hold_wait timer of THIS entry, and a
+// supersede by a new opening of the same WHERE (which has already set
+// p.finalized=true and replaced the map entry before this finalize runs).
 func (c *Classifier) finalize(where string, p *pendingOpen, dur time.Duration, durKnown bool) {
 	c.mu.Lock()
 	cur, ok := c.pending[where]
@@ -188,8 +184,8 @@ func (c *Classifier) finalize(where string, p *pendingOpen, dur time.Duration, d
 	c.publishAccess(where, hadCall, ringSrc, dur, durKnown, ts)
 }
 
-// publishAccess clasifica (Classify es puro) y publica "access.classified".
-// Se llama siempre fuera de c.mu.
+// publishAccess classifies (Classify is pure) and publishes "access.classified".
+// Always called outside c.mu.
 func (c *Classifier) publishAccess(where string, hadCall bool, ringSrc string, dur time.Duration, durKnown bool, ts time.Time) {
 	res := Classify(ClassifyInput{
 		HadCall:       hadCall,
@@ -211,11 +207,11 @@ func (c *Classifier) publishAccess(where string, hadCall bool, ringSrc string, d
 	c.logger.WithFields(logrus.Fields{
 		"type": ev.Type, "confidence": ev.Confidence, "where": where,
 		"had_call": hadCall, "duration_s": ev.DurationS,
-	}).Info("Acceso clasificado")
+	}).Info("Access classified")
 	c.bus.PublishWithSource("access.classified", ev, "access")
 }
 
-// whereOf extrae el WHERE de un evento door.* (defensivo: "" si no encaja).
+// whereOf extracts WHERE from a door.* event (defensive: "" if it does not fit).
 func whereOf(e *events.Event) string {
 	if e == nil {
 		return ""

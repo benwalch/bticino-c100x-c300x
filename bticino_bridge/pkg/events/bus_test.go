@@ -15,8 +15,8 @@ func TestEventBus_BasicFunctionality(t *testing.T) {
 	bus := NewEventBus(1, logger)
 	defer bus.Close()
 
-	// Test basic subscribe and publish. El handler corre en otra goroutine: el estado
-	// compartido con el test va protegido por mutex (si no, -race lo marca).
+	// Test basic subscribe and publish. The handler runs in another goroutine: state
+	// shared with the test is guarded by a mutex (otherwise -race flags it).
 	var mu sync.Mutex
 	eventReceived := false
 	var receivedData interface{}
@@ -72,7 +72,7 @@ func TestEventBus_PatternMatching(t *testing.T) {
 	bus := NewEventBus(1, logger)
 	defer bus.Close()
 
-	// Los handlers pueden ejecutarse en goroutines concurrentes: append protegido por mutex.
+	// Handlers can run in concurrent goroutines: append guarded by a mutex.
 	var mu sync.Mutex
 	receivedEvents := make([]string, 0)
 
@@ -91,7 +91,7 @@ func TestEventBus_PatternMatching(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	mu.Lock()
-	receivedEvents = append([]string(nil), receivedEvents...) // copia estable para el resto del test
+	receivedEvents = append([]string(nil), receivedEvents...) // stable copy for the rest of the test
 	mu.Unlock()
 
 	if len(receivedEvents) != 2 {

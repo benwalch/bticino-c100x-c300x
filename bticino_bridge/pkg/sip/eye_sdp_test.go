@@ -19,10 +19,10 @@ func TestBuildEyeOfferSDP(t *testing.T) {
 	}
 	for _, c := range checks {
 		if !strings.Contains(sdp, c) {
-			t.Fatalf("SDP no contiene %q:\n%s", c, sdp)
+			t.Fatalf("SDP does not contain %q:\n%s", c, sdp)
 		}
 	}
 	if strings.Contains(sdp, "TVCC") {
-		t.Fatalf("SDP no debe llevar TVCC (no es cámara):\n%s", sdp)
+		t.Fatalf("SDP must not carry TVCC (not a camera):\n%s", sdp)
 	}
 }

@@ -12,12 +12,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// fakeDuplex implementa DuplexController para los tests, sin tocar
-// SIP/RTP real (Task 3, pkg/sip/audio_call.go).
+// fakeDuplex implements DuplexController for the tests, without touching real
+// SIP/RTP (pkg/sip/audio_call.go).
 type fakeDuplex struct {
 	opened, closed bool
 	busy           bool
-	active         bool // simula el estado autoritativo de AudioCall.active
+	active         bool // simulates the authoritative state of AudioCall.active
 }
 
 func (f *fakeDuplex) OpenDuplex(sink, talk string) (sip.AudioAnswer, error) {
@@ -56,36 +56,36 @@ func newTestDuplexWS(enabled bool, fd *fakeDuplex) *WebServer {
 }
 
 func TestAudioDuplexHandlers(t *testing.T) {
-	t.Run("start OK: 202 y sin clave SRTP en el body", func(t *testing.T) {
+	t.Run("start OK: 202 and no SRTP key in the body", func(t *testing.T) {
 		fd := &fakeDuplex{}
 		ws := newTestDuplexWS(true, fd)
 		rec := httptest.NewRecorder()
 		ws.handleAudioDuplexStart(rec, httptest.NewRequest(http.MethodPost, "/api/audio/duplex/start", nil))
 
 		if rec.Code != http.StatusAccepted {
-			t.Fatalf("esperaba 202, got %d (body=%s)", rec.Code, rec.Body.String())
+			t.Fatalf("expected 202, got %d (body=%s)", rec.Code, rec.Body.String())
 		}
 		if strings.Contains(rec.Body.String(), "SECRET") {
-			t.Fatalf("la clave SRTP NO debe aparecer en el body: %s", rec.Body.String())
+			t.Fatalf("the SRTP key must NOT appear in the body: %s", rec.Body.String())
 		}
 		var body map[string]interface{}
 		if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
-			t.Fatalf("body no es JSON válido: %v", err)
+			t.Fatalf("body is not valid JSON: %v", err)
 		}
 		if body["port"] != float64(7078) {
-			t.Errorf("esperaba port=7078, got %v", body["port"])
+			t.Errorf("expected port=7078, got %v", body["port"])
 		}
 		if body["payload_type"] != float64(98) {
-			t.Errorf("esperaba payload_type=98, got %v", body["payload_type"])
+			t.Errorf("expected payload_type=98, got %v", body["payload_type"])
 		}
 		if body["crypto_suite"] != "AES_CM_128_HMAC_SHA1_80" {
-			t.Errorf("esperaba crypto_suite, got %v", body["crypto_suite"])
+			t.Errorf("expected crypto_suite, got %v", body["crypto_suite"])
 		}
 		if _, ok := body["crypto_key"]; ok {
-			t.Error("el body no debe contener la clave 'crypto_key'")
+			t.Error("the body must not contain the key 'crypto_key'")
 		}
 		if !fd.opened {
-			t.Error("esperaba que OpenDuplex fuese invocado")
+			t.Error("expected OpenDuplex to be called")
 		}
 	})
 
@@ -95,10 +95,10 @@ func TestAudioDuplexHandlers(t *testing.T) {
 		rec := httptest.NewRecorder()
 		ws.handleAudioDuplexStart(rec, httptest.NewRequest(http.MethodPost, "/api/audio/duplex/start", nil))
 		if rec.Code != http.StatusNotFound {
-			t.Fatalf("esperaba 404 con duplex_enabled=false, got %d", rec.Code)
+			t.Fatalf("expected 404 with duplex_enabled=false, got %d", rec.Code)
 		}
 		if fd.opened {
-			t.Error("OpenDuplex no debe invocarse si duplex_enabled=false")
+			t.Error("OpenDuplex must not be called if duplex_enabled=false")
 		}
 	})
 
@@ -108,17 +108,17 @@ func TestAudioDuplexHandlers(t *testing.T) {
 		rec := httptest.NewRecorder()
 		ws.handleAudioDuplexStart(rec, httptest.NewRequest(http.MethodPost, "/api/audio/duplex/start", nil))
 		if rec.Code != http.StatusConflict {
-			t.Fatalf("esperaba 409 con pata ocupada, got %d", rec.Code)
+			t.Fatalf("expected 409 with the leg busy, got %d", rec.Code)
 		}
 	})
 
-	t.Run("start rechaza GET", func(t *testing.T) {
+	t.Run("start rejects GET", func(t *testing.T) {
 		fd := &fakeDuplex{}
 		ws := newTestDuplexWS(true, fd)
 		rec := httptest.NewRecorder()
 		ws.handleAudioDuplexStart(rec, httptest.NewRequest(http.MethodGet, "/api/audio/duplex/start", nil))
 		if rec.Code != http.StatusMethodNotAllowed {
-			t.Fatalf("esperaba 405 en GET, got %d", rec.Code)
+			t.Fatalf("expected 405 on GET, got %d", rec.Code)
 		}
 	})
 
@@ -128,10 +128,10 @@ func TestAudioDuplexHandlers(t *testing.T) {
 		rec := httptest.NewRecorder()
 		ws.handleAudioDuplexStop(rec, httptest.NewRequest(http.MethodPost, "/api/audio/duplex/stop", nil))
 		if rec.Code != http.StatusOK {
-			t.Fatalf("esperaba 200 en stop, got %d", rec.Code)
+			t.Fatalf("expected 200 on stop, got %d", rec.Code)
 		}
 		if !fd.closed {
-			t.Error("esperaba que Close fuese invocado")
+			t.Error("expected Close to be called")
 		}
 	})
 
@@ -141,10 +141,10 @@ func TestAudioDuplexHandlers(t *testing.T) {
 		rec := httptest.NewRecorder()
 		ws.handleAudioDuplexStop(rec, httptest.NewRequest(http.MethodPost, "/api/audio/duplex/stop", nil))
 		if rec.Code != http.StatusNotFound {
-			t.Fatalf("esperaba 404, got %d", rec.Code)
+			t.Fatalf("expected 404, got %d", rec.Code)
 		}
 		if fd.closed {
-			t.Error("Close no debe invocarse si duplex_enabled=false")
+			t.Error("Close must not be called if duplex_enabled=false")
 		}
 	})
 
@@ -154,31 +154,31 @@ func TestAudioDuplexHandlers(t *testing.T) {
 		rec := httptest.NewRecorder()
 		ws.handleAudioDuplexStatus(rec, httptest.NewRequest(http.MethodGet, "/api/audio/duplex/status", nil))
 		if rec.Code != http.StatusNotFound {
-			t.Fatalf("esperaba 404, got %d", rec.Code)
+			t.Fatalf("expected 404, got %d", rec.Code)
 		}
 	})
 
-	t.Run("status enabled: 200 con sink_path", func(t *testing.T) {
+	t.Run("status enabled: 200 with sink_path", func(t *testing.T) {
 		fd := &fakeDuplex{}
 		ws := newTestDuplexWS(true, fd)
 		rec := httptest.NewRecorder()
 		ws.handleAudioDuplexStatus(rec, httptest.NewRequest(http.MethodGet, "/api/audio/duplex/status", nil))
 		if rec.Code != http.StatusOK {
-			t.Fatalf("esperaba 200, got %d", rec.Code)
+			t.Fatalf("expected 200, got %d", rec.Code)
 		}
 		var body map[string]interface{}
 		if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
-			t.Fatalf("body no es JSON válido: %v", err)
+			t.Fatalf("body is not valid JSON: %v", err)
 		}
 		if body["sink_path"] != "/tmp/door_audio.wav" {
-			t.Errorf("esperaba sink_path, got %v", body["sink_path"])
+			t.Errorf("expected sink_path, got %v", body["sink_path"])
 		}
 		if body["active"] != false {
-			t.Errorf("esperaba active=false antes de start, got %v", body["active"])
+			t.Errorf("expected active=false before start, got %v", body["active"])
 		}
 	})
 
-	t.Run("status refleja active tras start", func(t *testing.T) {
+	t.Run("status reflects active after start", func(t *testing.T) {
 		fd := &fakeDuplex{}
 		ws := newTestDuplexWS(true, fd)
 		ws.handleAudioDuplexStart(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/api/audio/duplex/start", nil))
@@ -188,23 +188,22 @@ func TestAudioDuplexHandlers(t *testing.T) {
 		var body map[string]interface{}
 		_ = json.NewDecoder(rec.Body).Decode(&body)
 		if body["active"] != true {
-			t.Errorf("esperaba active=true tras start, got %v", body["active"])
+			t.Errorf("expected active=true after start, got %v", body["active"])
 		}
 	})
 
-	t.Run("status es autoritativo: refleja el autocierre de la pata sin pasar por /stop", func(t *testing.T) {
-		// Finding 4: /status debe consultar controller.IsActive() en vez de
-		// un flag local — si la pata se autocierra (Finding 1: fin natural
-		// del receiver tras el timeout de 60s) sin que nadie llame a
-		// /stop, un flag espejo en el webserver quedaría desactualizado en
-		// active=true para siempre.
+	t.Run("status is authoritative: reflects the leg closing by itself without /stop", func(t *testing.T) {
+		// /status must ask controller.IsActive() instead of a local flag: if
+		// the leg closes by itself (natural end of the receiver after the 60s
+		// timeout) without anyone calling /stop, a mirror flag in the webserver
+		// would stay stale at active=true forever.
 		fd := &fakeDuplex{}
 		ws := newTestDuplexWS(true, fd)
 		ws.handleAudioDuplexStart(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/api/audio/duplex/start", nil))
 
-		// Simula el autocierre: la pata se pone inactiva sola (como hace
-		// AudioCall tras el fin natural del receiver), SIN pasar por
-		// handleAudioDuplexStop.
+		// Simulate the self-close: the leg goes inactive by itself (as
+		// AudioCall does after the natural end of the receiver), WITHOUT going
+		// through handleAudioDuplexStop.
 		fd.active = false
 
 		rec := httptest.NewRecorder()
@@ -212,17 +211,16 @@ func TestAudioDuplexHandlers(t *testing.T) {
 		var body map[string]interface{}
 		_ = json.NewDecoder(rec.Body).Decode(&body)
 		if body["active"] != false {
-			t.Errorf("esperaba active=false tras el autocierre (sin /stop), got %v", body["active"])
+			t.Errorf("expected active=false after the self-close (no /stop), got %v", body["active"])
 		}
 	})
 
-	t.Run("status con controller nil: active=false sin panic", func(t *testing.T) {
-		// Construcción directa (NO vía newTestDuplexWS(true, nil)): pasar un
-		// *fakeDuplex nil por ese helper produciría una interfaz
-		// DuplexController NO nil con puntero subyacente nil (el clásico
-		// "nil interface gotcha" de Go), que sí panicaría al llamar
-		// IsActive(). Aquí se deja duplexController con su cero-valor real
-		// (interfaz nil), que es el caso que /status debe tolerar.
+	t.Run("status with nil controller: active=false without panic", func(t *testing.T) {
+		// Built directly (NOT via newTestDuplexWS(true, nil)): passing a nil
+		// *fakeDuplex through that helper would give a NON-nil DuplexController
+		// interface with a nil underlying pointer (Go's classic "nil interface
+		// gotcha"), which would panic on IsActive(). Here duplexController keeps
+		// its real zero value (a nil interface), the case /status must tolerate.
 		ws := &WebServer{
 			logger: logrus.New(),
 			config: &config.Config{
@@ -232,12 +230,12 @@ func TestAudioDuplexHandlers(t *testing.T) {
 		rec := httptest.NewRecorder()
 		ws.handleAudioDuplexStatus(rec, httptest.NewRequest(http.MethodGet, "/api/audio/duplex/status", nil))
 		if rec.Code != http.StatusOK {
-			t.Fatalf("esperaba 200, got %d", rec.Code)
+			t.Fatalf("expected 200, got %d", rec.Code)
 		}
 		var body map[string]interface{}
 		_ = json.NewDecoder(rec.Body).Decode(&body)
 		if body["active"] != false {
-			t.Errorf("esperaba active=false con controller nil, got %v", body["active"])
+			t.Errorf("expected active=false with nil controller, got %v", body["active"])
 		}
 	})
 }

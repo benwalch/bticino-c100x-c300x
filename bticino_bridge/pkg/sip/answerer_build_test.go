@@ -29,12 +29,12 @@ func TestBuildAnswererRegister(t *testing.T) {
 		"Content-Length: 0\r\n",
 	} {
 		if !strings.Contains(reg, want) {
-			t.Errorf("REGISTER no contiene %q\n---\n%s", want, reg)
+			t.Errorf("REGISTER does not contain %q\n---\n%s", want, reg)
 		}
 	}
 }
 
-func TestBuildAnswererResponse_180SinCuerpo(t *testing.T) {
+func TestBuildAnswererResponse_180WithoutBody(t *testing.T) {
 	d := sampleDialog()
 	r := BuildAnswererResponse("180", "Ringing", d, "", "")
 	for _, want := range []string{
@@ -47,15 +47,15 @@ func TestBuildAnswererResponse_180SinCuerpo(t *testing.T) {
 		"Content-Length: 0\r\n",
 	} {
 		if !strings.Contains(r, want) {
-			t.Errorf("180 no contiene %q\n---\n%s", want, r)
+			t.Errorf("180 does not contain %q\n---\n%s", want, r)
 		}
 	}
 	if strings.Contains(r, "Content-Type: application/sdp") {
-		t.Error("180 no debe llevar SDP")
+		t.Error("180 must not carry SDP")
 	}
 }
 
-func TestBuildAnswererResponse_200ConSDP(t *testing.T) {
+func TestBuildAnswererResponse_200WithSDP(t *testing.T) {
 	d := sampleDialog()
 	sdp := BuildAnswerSDP("127.0.0.1", 10100, 10102, "KEY==")
 	contact := "<sip:bridge@127.0.0.1:41000;transport=tcp>"
@@ -68,26 +68,26 @@ func TestBuildAnswererResponse_200ConSDP(t *testing.T) {
 		"m=audio 10100 RTP/SAVP 96",
 	} {
 		if !strings.Contains(r, want) {
-			t.Errorf("200 no contiene %q\n---\n%s", want, r)
+			t.Errorf("200 does not contain %q\n---\n%s", want, r)
 		}
 	}
-	// Content-Length debe casar con el cuerpo.
+	// Content-Length must match the body.
 	if !strings.Contains(r, "Content-Length: "+strconv.Itoa(len(sdp))+"\r\n") {
-		t.Errorf("Content-Length no casa con len(sdp)=%d\n%s", len(sdp), r)
+		t.Errorf("Content-Length does not match len(sdp)=%d\n%s", len(sdp), r)
 	}
 }
 
-func TestBuildAnswererResponse_487SinContactNiSDP(t *testing.T) {
+func TestBuildAnswererResponse_487WithoutContactOrSDP(t *testing.T) {
 	d := sampleDialog()
 	r := BuildAnswererResponse("487", "Request Terminated", d, "", "")
 	if strings.Contains(r, "Contact:") {
-		t.Errorf("487 no debe llevar Contact\n---\n%s", r)
+		t.Errorf("487 must not carry Contact\n---\n%s", r)
 	}
 	if strings.Contains(r, "Content-Type: application/sdp") {
-		t.Error("487 no debe llevar SDP")
+		t.Error("487 must not carry SDP")
 	}
 	if !strings.Contains(r, "Content-Length: 0\r\n") {
-		t.Errorf("487 debe tener Content-Length: 0\n---\n%s", r)
+		t.Errorf("487 must have Content-Length: 0\n---\n%s", r)
 	}
 }
 
@@ -105,7 +105,7 @@ func TestBuildAnswererBYE(t *testing.T) {
 		"Content-Length: 0\r\n",
 	} {
 		if !strings.Contains(b, want) {
-			t.Errorf("BYE no contiene %q\n---\n%s", want, b)
+			t.Errorf("BYE does not contain %q\n---\n%s", want, b)
 		}
 	}
 }

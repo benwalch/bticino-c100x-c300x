@@ -11,20 +11,20 @@ import (
 	"bticino_bridge/pkg/bticino"
 )
 
-// audioAllowedDirs son los directorios bajo los cuales se permite un WAV para
-// /api/talkback/say. Evita lectura de fichero arbitrario (aunque la API ya va
-// tras Basic Auth): la ruta debe ser absoluta, sin `..`, y quedar dentro de
-// uno de estos árboles.
+// audioAllowedDirs are the directories a WAV for /api/talkback/say may live
+// in. This prevents reading arbitrary files (even though the API is behind
+// Basic Auth): the path must be absolute, without `..`, and inside one of
+// these trees.
 var audioAllowedDirs = []string{"/tmp", "/home/bticino/cfg/extra"}
 
-// validateAudioFilePath valida que file sea una ruta absoluta, limpia (sin
-// traversal) y contenida en uno de los directorios permitidos.
+// validateAudioFilePath checks that file is an absolute, clean path (no
+// traversal) inside one of the allowed directories.
 func validateAudioFilePath(file string) error {
 	if file == "" {
-		return fmt.Errorf("ruta vacía")
+		return fmt.Errorf("empty path")
 	}
 	if !filepath.IsAbs(file) {
-		return fmt.Errorf("debe ser una ruta absoluta")
+		return fmt.Errorf("must be an absolute path")
 	}
 	clean := filepath.Clean(file)
 	for _, dir := range audioAllowedDirs {
@@ -33,7 +33,7 @@ func validateAudioFilePath(file string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("fuera de los directorios permitidos (%s)", strings.Join(audioAllowedDirs, ", "))
+	return fmt.Errorf("outside the allowed directories (%s)", strings.Join(audioAllowedDirs, ", "))
 }
 
 // Talk-back (upstream audio app/bridge → door station). EXPERIMENTAL.
@@ -139,14 +139,14 @@ func (ws *WebServer) handleTalkbackStatus(w http.ResponseWriter, r *http.Request
 	})
 }
 
-// handleTalkbackSay implementa el talk-back v2: el bridge origina su propia
-// llamada de audio local a c300x (SDP real, no el dummy del self-INVITE de
-// vídeo) y reproduce el WAV indicado por el altavoz de la puerta. A
-// diferencia de /api/talkback/start (que exige conocer de antemano el
-// puerto/clave SRTP de una sesión ya viva), aquí AudioCall.Say negocia su
-// propia sesión de principio a fin (ver pkg/sip/audio_call.go).
+// handleTalkbackSay implements talk-back v2: the bridge places its own local
+// audio call to the unit (a real SDP, not the dummy of the video
+// self-INVITE) and plays the given WAV on the door speaker. Unlike
+// /api/talkback/start (which needs the port and SRTP key of a live session
+// up front), AudioCall.Say negotiates its own session end to end (see
+// pkg/sip/audio_call.go).
 //
-//	POST /api/talkback/say?file=/ruta/al/audio.wav
+//	POST /api/talkback/say?file=/path/to/audio.wav
 func (ws *WebServer) handleTalkbackSay(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -154,7 +154,7 @@ func (ws *WebServer) handleTalkbackSay(w http.ResponseWriter, r *http.Request) {
 	}
 	if ws.audioCall == nil {
 		ws.writeTalkbackJSON(w, http.StatusServiceUnavailable, map[string]interface{}{
-			"success": false, "error": "talk-back v2 no disponible (SIP/OpenWebNet no inicializados)",
+			"success": false, "error": "talk-back v2 unavailable (SIP/OpenWebNet not initialized)",
 		})
 		return
 	}
@@ -162,19 +162,19 @@ func (ws *WebServer) handleTalkbackSay(w http.ResponseWriter, r *http.Request) {
 	file := r.URL.Query().Get("file")
 	if file == "" {
 		ws.writeTalkbackJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"success": false, "error": "se requiere el parámetro 'file' (ruta al WAV)",
+			"success": false, "error": "the 'file' parameter is required (path to the WAV)",
 		})
 		return
 	}
 	if err := validateAudioFilePath(file); err != nil {
 		ws.writeTalkbackJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"success": false, "error": "ruta de audio no permitida: " + err.Error(),
+			"success": false, "error": "audio path not allowed: " + err.Error(),
 		})
 		return
 	}
 
 	if err := ws.audioCall.Say(file); err != nil {
-		ws.logger.WithError(err).Warn("talkback/say: fallo al originar la llamada de audio o reproducir")
+		ws.logger.WithError(err).Warn("talkback/say: placing the audio call or playing failed")
 		ws.writeTalkbackJSON(w, http.StatusInternalServerError, map[string]interface{}{
 			"success": false, "error": err.Error(),
 		})
@@ -182,7 +182,7 @@ func (ws *WebServer) handleTalkbackSay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ws.writeTalkbackJSON(w, http.StatusOK, map[string]interface{}{
-		"success": true, "file": file, "message": "talk-back v2: WAV enviado",
+		"success": true, "file": file, "message": "talk-back v2: WAV sent",
 	})
 }
 

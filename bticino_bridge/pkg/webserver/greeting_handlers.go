@@ -13,44 +13,44 @@ import (
 	"bticino_bridge/pkg/bticino"
 )
 
-// Talk-back v1 (saludo del contestador → altavoz de la PUERTA).
+// Talk-back v1 (answering machine greeting → DOOR speaker).
 //
-// Vía cooperativa VALIDADA en vivo (2026-08-20): el contestador nativo
-// (bt_answering_machine, un cliente SIP liblinphone) reproduce su mensaje de
-// bienvenida hacia el bus/puerta (estado DSP EN_AUDIO_PLAY_LOC_SCS) cuando
-// auto-responde una llamada de puerta sin contestar. Si sustituimos el fichero
-// del saludo por el nuestro y el contestador está activo, el visitante en la
-// placa oye NUESTRO audio.
+// Cooperative path, validated live (2026-08-20): the native answering
+// machine (bt_answering_machine, a liblinphone SIP client) plays its greeting
+// towards the bus and the door (DSP state EN_AUDIO_PLAY_LOC_SCS) when it
+// answers an unanswered door call by itself. If the greeting file is replaced
+// with ours and the answering machine is on, the visitor at the entrance
+// panel hears OUR audio.
 //
-// A diferencia de talk-back v2 (/api/talkback/say, self-INVITE que solo llega
-// al altavoz INTERIOR por la topología del DSP ZL380), esta vía sí alcanza la
-// puerta — a cambio de ser un saludo one-shot al saltar el contestador, no
-// conversación interactiva.
+// Unlike talk-back v2 (/api/talkback/say, a self-INVITE that only reaches the
+// INDOOR speaker because of the ZL380 DSP topology), this path does reach the
+// door, but only as a one-shot greeting when the answering machine picks up,
+// not as a conversation.
 //
 // Endpoints:
 //
-//	POST   /api/talkback/greeting   (cuerpo = audio; ?activate=true|false)
+//	POST   /api/talkback/greeting   (body = audio; ?activate=true|false)
 //	GET    /api/talkback/greeting
 //	DELETE /api/talkback/greeting   (?deactivate=true|false)
 
 const (
-	// greetingPath es el fichero de saludo que reproduce el contestador
-	// (referenciado por bt_av_media). greetingAltPath es una variante que
-	// algunas builds del firmware leen; escribimos ambos por seguridad.
+	// greetingPath is the greeting file the answering machine plays
+	// (referenced by bt_av_media). greetingAltPath is a variant some firmware
+	// builds read; both are written to be safe.
 	greetingPath    = "/home/bticino/cfg/extra/7/messaggio.wav"
 	greetingAltPath = "/home/bticino/cfg/extra/7/audio.wav"
-	// greetingSentinel marca que el saludo actual lo puso el bridge, para
-	// poder restaurar (borrar) sin tocar un saludo legítimo del usuario.
+	// greetingSentinel marks that the current greeting was set by the
+	// bridge, so it can be restored (deleted) without touching a user's own.
 	greetingSentinel = "/home/bticino/cfg/extra/7/.bridge_greeting"
-	// greetingFFmpeg es el ffmpeg del device (con libspeex/pcm), usado para
-	// normalizar cualquier audio de entrada al formato del pipeline del
-	// portero: PCM s16le, mono, 8000 Hz (filesrc!wavparse!audioconvert, sin
-	// resample → la frecuencia debe ser exactamente 8000).
+	// greetingFFmpeg is the device's ffmpeg (with libspeex/pcm), used to
+	// normalize any input audio to the door pipeline's format: PCM s16le,
+	// mono, 8000 Hz (filesrc!wavparse!audioconvert, no resampling, so the
+	// rate must be exactly 8000).
 	greetingFFmpeg   = "/usr/local/bin/ffmpeg"
-	greetingMaxBytes = 8 << 20 // 8 MiB de audio de entrada como tope
+	greetingMaxBytes = 8 << 20 // at most 8 MiB of input audio
 )
 
-// handleGreeting despacha GET/POST/DELETE sobre /api/talkback/greeting.
+// handleGreeting dispatches GET/POST/DELETE on /api/talkback/greeting.
 func (ws *WebServer) handleGreeting(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
@@ -80,36 +80,37 @@ func (ws *WebServer) rejectWithoutAnsweringMachine(w http.ResponseWriter) bool {
 	return true
 }
 
-// handleGreetingSet recibe un audio en el cuerpo, lo normaliza a PCM s16le
-// mono 8000 y lo instala como saludo del contestador. Salvo ?activate=false,
-// activa además el contestador (*8*91##) para que el saludo llegue a sonar.
+// handleGreetingSet takes audio in the body, normalizes it to PCM s16le mono
+// 8000 and installs it as the answering machine greeting. Unless
+// ?activate=false, it also turns the answering machine on (*8*91##) so the
+// greeting is actually played.
 func (ws *WebServer) handleGreetingSet(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(io.LimitReader(r.Body, greetingMaxBytes+1))
 	if err != nil {
 		ws.writeTalkbackJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"success": false, "error": "no se pudo leer el cuerpo: " + err.Error(),
+			"success": false, "error": "cannot read the body: " + err.Error(),
 		})
 		return
 	}
 	if len(body) == 0 {
 		ws.writeTalkbackJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"success": false, "error": "cuerpo vacío: envía el audio (WAV/MP3/…) en el cuerpo de la petición",
+			"success": false, "error": "empty body: send the audio (WAV/MP3/…) in the request body",
 		})
 		return
 	}
 	if len(body) > greetingMaxBytes {
 		ws.writeTalkbackJSON(w, http.StatusRequestEntityTooLarge, map[string]interface{}{
-			"success": false, "error": fmt.Sprintf("audio demasiado grande (máximo %d bytes)", greetingMaxBytes),
+			"success": false, "error": fmt.Sprintf("audio too large (at most %d bytes)", greetingMaxBytes),
 		})
 		return
 	}
 
-	// Escribir la entrada a un temporal y transcodificar con ffmpeg al formato
-	// exacto del pipeline del portero.
+	// Write the input to a temp file and transcode it with ffmpeg to the
+	// exact format of the door pipeline.
 	tmpIn, err := os.CreateTemp("/tmp", "greeting-in-*")
 	if err != nil {
 		ws.writeTalkbackJSON(w, http.StatusInternalServerError, map[string]interface{}{
-			"success": false, "error": "no se pudo crear temporal: " + err.Error(),
+			"success": false, "error": "cannot create temp file: " + err.Error(),
 		})
 		return
 	}
@@ -117,47 +118,47 @@ func (ws *WebServer) handleGreetingSet(w http.ResponseWriter, r *http.Request) {
 	if _, err := tmpIn.Write(body); err != nil {
 		tmpIn.Close()
 		ws.writeTalkbackJSON(w, http.StatusInternalServerError, map[string]interface{}{
-			"success": false, "error": "no se pudo escribir temporal: " + err.Error(),
+			"success": false, "error": "cannot write temp file: " + err.Error(),
 		})
 		return
 	}
 	tmpIn.Close()
 
 	if err := ws.transcodeGreeting(tmpIn.Name(), greetingPath); err != nil {
-		ws.logger.WithError(err).Warn("greeting: fallo al transcodificar el audio")
+		ws.logger.WithError(err).Warn("greeting: transcoding the audio failed")
 		ws.writeTalkbackJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"success": false, "error": "audio no válido o no transcodificable: " + err.Error(),
+			"success": false, "error": "audio invalid or cannot be transcoded: " + err.Error(),
 		})
 		return
 	}
-	// Copiar también a la variante audio.wav (best-effort).
+	// Also copy to the audio.wav variant (best effort).
 	if data, err := os.ReadFile(greetingPath); err == nil {
 		_ = os.WriteFile(greetingAltPath, data, 0644)
 	}
-	// Marcar que el saludo lo puso el bridge.
+	// Mark the greeting as set by the bridge.
 	_ = os.WriteFile(greetingSentinel, []byte(time.Now().Format(time.RFC3339)+"\n"), 0644)
 
 	result := map[string]interface{}{
 		"success": true,
 		"path":    greetingPath,
-		"message": "saludo del contestador actualizado; sonará en la placa cuando salte el contestador",
+		"message": "answering machine greeting updated; it plays at the entrance panel when the answering machine picks up",
 	}
 
-	// Activar el contestador salvo que se pida explícitamente lo contrario.
+	// Turn the answering machine on unless asked not to.
 	if r.URL.Query().Get("activate") != "false" {
 		if err := ws.bridge.SendOpenWebNetCommand(bticino.CmdVoicemailOn); err != nil {
-			ws.logger.WithError(err).Warn("greeting: fallo al activar el contestador")
+			ws.logger.WithError(err).Warn("greeting: turning the answering machine on failed")
 			result["activate_error"] = err.Error()
 		} else {
-			result["answering_machine"] = "activado"
+			result["answering_machine"] = "enabled"
 		}
 	}
 
-	ws.logger.Info("Talk-back v1: saludo del contestador actualizado vía web dashboard")
+	ws.logger.Info("Talk-back v1: answering machine greeting updated via web dashboard")
 	ws.writeTalkbackJSON(w, http.StatusOK, result)
 }
 
-// handleGreetingStatus informa si hay un saludo puesto por el bridge y su tamaño.
+// handleGreetingStatus reports whether a bridge greeting is set and its size.
 func (ws *WebServer) handleGreetingStatus(w http.ResponseWriter, r *http.Request) {
 	res := map[string]interface{}{
 		"bridge_greeting": fileExists(greetingSentinel),
@@ -170,13 +171,13 @@ func (ws *WebServer) handleGreetingStatus(w http.ResponseWriter, r *http.Request
 	ws.writeTalkbackJSON(w, http.StatusOK, res)
 }
 
-// handleGreetingClear elimina el saludo puesto por el bridge (restaura el
-// saludo por defecto del firmware). Con ?deactivate=true desactiva además el
-// contestador. Solo borra si el saludo lo puso el bridge (sentinel presente).
+// handleGreetingClear removes the bridge's greeting (restoring the firmware
+// default). With ?deactivate=true it also turns the answering machine off.
+// It only deletes a greeting the bridge set (sentinel present).
 func (ws *WebServer) handleGreetingClear(w http.ResponseWriter, r *http.Request) {
 	if !fileExists(greetingSentinel) {
 		ws.writeTalkbackJSON(w, http.StatusOK, map[string]interface{}{
-			"success": true, "message": "no hay saludo puesto por el bridge; nada que restaurar",
+			"success": true, "message": "no greeting set by the bridge; nothing to restore",
 		})
 		return
 	}
@@ -185,23 +186,23 @@ func (ws *WebServer) handleGreetingClear(w http.ResponseWriter, r *http.Request)
 	_ = os.Remove(greetingSentinel)
 
 	result := map[string]interface{}{
-		"success": true, "message": "saludo del bridge eliminado; restaurado el saludo por defecto",
+		"success": true, "message": "bridge greeting removed; default greeting restored",
 	}
 	if r.URL.Query().Get("deactivate") == "true" {
 		if err := ws.bridge.SendOpenWebNetCommand(bticino.CmdVoicemailOff); err != nil {
-			ws.logger.WithError(err).Warn("greeting: fallo al desactivar el contestador")
+			ws.logger.WithError(err).Warn("greeting: turning the answering machine off failed")
 			result["deactivate_error"] = err.Error()
 		} else {
-			result["answering_machine"] = "desactivado"
+			result["answering_machine"] = "disabled"
 		}
 	}
-	ws.logger.Info("Talk-back v1: saludo del contestador restaurado vía web dashboard")
+	ws.logger.Info("Talk-back v1: answering machine greeting restored via web dashboard")
 	ws.writeTalkbackJSON(w, http.StatusOK, result)
 }
 
-// transcodeGreeting normaliza src al formato del pipeline del portero
-// (PCM s16le, mono, 8000 Hz) escribiendo dst. Escribe a un temporal y hace
-// rename atómico para no dejar un saludo a medias si ffmpeg falla.
+// transcodeGreeting normalizes src to the door pipeline's format (PCM s16le,
+// mono, 8000 Hz) and writes dst. It writes a temp file and renames it
+// atomically, so a failed ffmpeg never leaves half a greeting.
 func (ws *WebServer) transcodeGreeting(src, dst string) error {
 	tmpOut := dst + ".tmp"
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -216,7 +217,7 @@ func (ws *WebServer) transcodeGreeting(src, dst string) error {
 	if err != nil {
 		os.Remove(tmpOut)
 		if ctx.Err() == context.DeadlineExceeded {
-			return fmt.Errorf("ffmpeg agotó el tiempo (30s)")
+			return fmt.Errorf("ffmpeg timed out (30s)")
 		}
 		msg := string(out)
 		if len(msg) > 300 {
@@ -226,7 +227,7 @@ func (ws *WebServer) transcodeGreeting(src, dst string) error {
 	}
 	if err := os.Rename(tmpOut, dst); err != nil {
 		os.Remove(tmpOut)
-		return fmt.Errorf("no se pudo instalar el saludo: %w", err)
+		return fmt.Errorf("cannot install the greeting: %w", err)
 	}
 	return nil
 }

@@ -5,18 +5,18 @@ import (
 	"strings"
 )
 
-// AnswererDialog captura la transacción de un INVITE recibido + el to-tag propio del contestador.
+// AnswererDialog holds the transaction of a received INVITE + the answerer's own to-tag.
 type AnswererDialog struct {
 	CallID      string
-	FromHdr     string   // el From original del INVITE (incluye su tag)
-	ToHdr       string   // el To original (sin nuestro tag)
+	FromHdr     string   // the original From of the INVITE (with its tag)
+	ToHdr       string   // the original To (without our tag)
 	CSeq        string   // p.ej. "20 INVITE"
-	Via         []string // TODAS las Via, en orden
+	Via         []string // ALL Via headers, in order
 	RecordRoute []string
-	ToTag       string // tag propio que añadimos al To
+	ToTag       string // our own tag added to To
 }
 
-// BuildAnswererRegister construye el REGISTER TCP del AOR del contestador contra el Flexisip local.
+// BuildAnswererRegister builds the TCP REGISTER of the answerer's AOR against the local Flexisip.
 func BuildAnswererRegister(user, domain, localHost string, localPort, expires int, branch, callID, fromTag string, cseq int) string {
 	aor := fmt.Sprintf("sip:%s@%s", user, domain)
 	lines := []string{
@@ -36,9 +36,9 @@ func BuildAnswererRegister(user, domain, localHost string, localPort, expires in
 	return strings.Join(lines, "\r\n")
 }
 
-// BuildAnswererResponse construye una respuesta a un INVITE (100/180/200/486/487). Copia todas
-// las Via y Record-Route del INVITE, añade nuestro to-tag, Contact (si contact != ""), y SDP (si
-// sdp != "").
+// BuildAnswererResponse builds a response to an INVITE (100/180/200/486/487). It copies all
+// Via and Record-Route headers of the INVITE and adds our to-tag, Contact (if contact != "")
+// and SDP (if sdp != "").
 func BuildAnswererResponse(status, reason string, d AnswererDialog, sdp, contact string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "SIP/2.0 %s %s\r\n", status, reason)
@@ -65,9 +65,9 @@ func BuildAnswererResponse(status, reason string, d AnswererDialog, sdp, contact
 	return b.String()
 }
 
-// BuildAnswererBYE construye el BYE del contestador hacia la placa (in-dialog).
+// BuildAnswererBYE builds the answerer's in-dialog BYE towards the entrance panel.
 func BuildAnswererBYE(d AnswererDialog, user, domain, localHost string, localPort, cseq int, branch string) string {
-	target := d.FromHdr // el remitente del INVITE es el destino del BYE
+	target := d.FromHdr // the INVITE sender is the BYE target
 	if i := strings.Index(target, ";"); i >= 0 {
 		target = target[:i]
 	}
@@ -75,11 +75,11 @@ func BuildAnswererBYE(d AnswererDialog, user, domain, localHost string, localPor
 	var b strings.Builder
 	fmt.Fprintf(&b, "BYE %s SIP/2.0\r\n", target)
 	fmt.Fprintf(&b, "Via: SIP/2.0/TCP %s:%d;alias;branch=%s;rport\r\n", localHost, localPort, branch)
-	for _, rr := range d.RecordRoute { // Route inverso si hubo Record-Route
+	for _, rr := range d.RecordRoute { // reversed Route if there was a Record-Route
 		fmt.Fprintf(&b, "Route: %s\r\n", rr)
 	}
 	b.WriteString("Max-Forwards: 70\r\n")
-	// From/To se invierten respecto al INVITE entrante: nuestro tag va en From.
+	// From/To are swapped relative to the incoming INVITE: our tag goes in From.
 	fmt.Fprintf(&b, "From: %s;tag=%s\r\n", d.ToHdr, d.ToTag)
 	fmt.Fprintf(&b, "To: %s\r\n", d.FromHdr)
 	fmt.Fprintf(&b, "Call-ID: %s\r\n", d.CallID)

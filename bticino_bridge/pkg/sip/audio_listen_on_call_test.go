@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// decodeCall registra los argumentos de una invocación a Decode.
+// decodeCall records the arguments of one call to Decode.
 type decodeCall struct {
 	host string
 	port int
@@ -17,18 +17,18 @@ type decodeCall struct {
 	sink string
 }
 
-// fakeDecoder simula AudioTapDecoder: Decode BLOQUEA (como el ffmpeg real)
-// hasta que Stop() lo libere. invoked se señaliza (canal con buffer) en
-// cuanto Decode entra, para que los tests esperen sin sleeps ni carreras.
-// block se RECREA en cada Decode(): un fakeDecoder puede vivir varios ciclos
-// Start/Stop (restart), y un canal cerrado de una sesión anterior no debe
-// desbloquear instantáneamente la sesión siguiente.
+// fakeDecoder simulates AudioTapDecoder: Decode BLOCKS (like the real ffmpeg)
+// until Stop() releases it. invoked is signalled (buffered channel) as soon as
+// Decode is entered, so tests wait without sleeps or races. block is
+// RECREATED on each Decode(): a fakeDecoder can live through several
+// Start/Stop cycles (restart), and a closed channel from an earlier session
+// must not unblock the next session at once.
 type fakeDecoder struct {
 	mu      sync.Mutex
 	calls   []decodeCall
 	stops   int
 	invoked chan struct{}
-	block   chan struct{} // nil entre sesiones; Decode() lo crea, Stop() lo cierra y lo vacía
+	block   chan struct{} // nil between sessions; Decode() creates it, Stop() closes and clears it
 	err     error
 }
 
@@ -53,12 +53,12 @@ func (f *fakeDecoder) Stop() {
 	f.mu.Lock()
 	f.stops++
 	block := f.block
-	f.block = nil // el próximo Decode() de una futura sesión crea uno nuevo
+	f.block = nil // the next Decode() of a future session creates a new one
 	f.mu.Unlock()
 	if block != nil {
 		select {
 		case <-block:
-			// ya cerrado (Decode ya había vuelto por su cuenta)
+			// already closed (Decode had already returned by itself)
 		default:
 			close(block)
 		}
@@ -80,20 +80,20 @@ func (f *fakeDecoder) lastCall() (decodeCall, bool) {
 	return f.calls[len(f.calls)-1], true
 }
 
-// waitInvoked bloquea hasta que Decode haya sido invocado al menos una vez
-// (sincronización goroutine↔aserción por canal, sin sleeps ni carreras).
+// waitInvoked blocks until Decode has been called at least once
+// (goroutine↔assertion sync via a channel, no sleeps or races).
 func (f *fakeDecoder) waitInvoked(t *testing.T) {
 	t.Helper()
 	select {
 	case <-f.invoked:
 	case <-time.After(2 * time.Second):
-		t.Fatal("decoder.Decode nunca fue invocado")
+		t.Fatal("decoder.Decode was never called")
 	}
 }
 
-// orderCheckTap es un tap de prueba cuyo Start() verifica que el decoder ya
-// fue invocado (canal decoderInvoked) ANTES de marcarse a sí mismo arrancado.
-// Si el productor invirtiera el orden, startedAfterDecoder quedaría en false.
+// orderCheckTap is a test tap whose Start() checks that the decoder was
+// already called (decoderInvoked channel) BEFORE marking itself started. If the
+// producer reversed the order, startedAfterDecoder would stay false.
 type orderCheckTap struct {
 	decoderInvoked <-chan struct{}
 
@@ -124,16 +124,16 @@ func (t *orderCheckTap) snapshot() (int, bool) {
 	return t.starts, t.startedAfterDecoder
 }
 
-// TestAudioListenStartArmsDecoderBeforeTap verifica el orden exigido por el
-// diseño: el decoder debe estar ya invocado (escuchando) antes de que el tap
-// arranque a reenviar. El decoder señaliza un canal EXCLUSIVO del test (vía
-// signalingDecoder) para no competir con otras lecturas del canal interno de
-// fakeDecoder.
+// TestAudioListenStartArmsDecoderBeforeTap checks the order the design
+// requires: the decoder must already be called (listening) before the tap
+// starts forwarding. The decoder signals a channel EXCLUSIVE to the test (via
+// signalingDecoder) so it does not compete with other reads of fakeDecoder's
+// internal channel.
 func TestAudioListenStartArmsDecoderBeforeTap(t *testing.T) {
 	decoderInvoked := make(chan struct{}, 1)
 	dec := newFakeDecoder()
-	// Wrapper: reenvía la señal de invocación a un canal propio del test,
-	// además del canal interno que usa fakeDecoder.
+	// Wrapper: forwards the invocation signal to a channel of the test's own,
+	// besides the internal channel fakeDecoder uses.
 	wrapped := &signalingDecoder{inner: dec, extra: decoderInvoked}
 
 	tap := &orderCheckTap{decoderInvoked: decoderInvoked}
@@ -146,12 +146,12 @@ func TestAudioListenStartArmsDecoderBeforeTap(t *testing.T) {
 		starts, afterDecoder := tap.snapshot()
 		if starts > 0 {
 			if !afterDecoder {
-				t.Fatal("el tap arrancó ANTES de que el decoder fuera invocado (orden incorrecto)")
+				t.Fatal("the tap started BEFORE the decoder was called (wrong order)")
 			}
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatal("el tap nunca arrancó")
+			t.Fatal("the tap never started")
 		}
 		time.Sleep(2 * time.Millisecond)
 	}
@@ -159,8 +159,8 @@ func TestAudioListenStartArmsDecoderBeforeTap(t *testing.T) {
 	l.Stop()
 }
 
-// signalingDecoder envuelve fakeDecoder y además emite en un canal propio del
-// test en el momento en que Decode es invocado (antes de bloquear).
+// signalingDecoder wraps fakeDecoder and also signals a channel of the test's
+// own when Decode is called (before blocking).
 type signalingDecoder struct {
 	inner *fakeDecoder
 	extra chan struct{}
@@ -183,19 +183,19 @@ func TestAudioListenStartCallsDecoderWithExpectedParams(t *testing.T) {
 
 	call, ok := dec.lastCall()
 	if !ok {
-		t.Fatal("esperaba una llamada a Decode")
+		t.Fatal("expected a call to Decode")
 	}
 	if call.host != "127.0.0.1" {
-		t.Fatalf("esperaba host 127.0.0.1, got %q", call.host)
+		t.Fatalf("expected host 127.0.0.1, got %q", call.host)
 	}
 	if call.port != 15000 {
-		t.Fatalf("esperaba port 15000, got %d", call.port)
+		t.Fatalf("expected port 15000, got %d", call.port)
 	}
 	if call.pt != 110 {
-		t.Fatalf("esperaba payloadType 110, got %d", call.pt)
+		t.Fatalf("expected payloadType 110, got %d", call.pt)
 	}
 	if call.sink != "/tmp/sink.wav" {
-		t.Fatalf("esperaba sink /tmp/sink.wav, got %q", call.sink)
+		t.Fatalf("expected sink /tmp/sink.wav, got %q", call.sink)
 	}
 
 	l.Stop()
@@ -208,16 +208,16 @@ func TestAudioListenStartIsIdempotent(t *testing.T) {
 
 	l.Start("a")
 	dec.waitInvoked(t)
-	l.Start("b") // no debe arrancar nada de nuevo
+	l.Start("b") // must not start anything again
 
 	if starts, _ := tap.counts(); starts != 1 {
-		t.Fatalf("esperaba 1 arranque del tap (idempotente), hubo %d", starts)
+		t.Fatalf("expected 1 tap start (idempotent), got %d", starts)
 	}
 	if calls, _ := dec.counts(); calls != 1 {
-		t.Fatalf("esperaba 1 invocación del decoder (idempotente), hubo %d", calls)
+		t.Fatalf("expected 1 decoder call (idempotent), got %d", calls)
 	}
 	if !l.IsActive() {
-		t.Fatal("esperaba IsActive()=true")
+		t.Fatal("expected IsActive()=true")
 	}
 
 	l.Stop()
@@ -233,13 +233,13 @@ func TestAudioListenStopDisarmsBoth(t *testing.T) {
 	l.Stop()
 
 	if l.IsActive() {
-		t.Fatal("esperaba IsActive()=false tras Stop")
+		t.Fatal("expected IsActive()=false after Stop")
 	}
 	if _, stops := tap.counts(); stops != 1 {
-		t.Fatalf("esperaba 1 parada del tap, hubo %d", stops)
+		t.Fatalf("expected 1 tap stop, got %d", stops)
 	}
 	if _, stops := dec.counts(); stops != 1 {
-		t.Fatalf("esperaba 1 parada del decoder, hubo %d", stops)
+		t.Fatalf("expected 1 decoder stop, got %d", stops)
 	}
 }
 
@@ -251,10 +251,10 @@ func TestAudioListenStopWithoutStartIsNoop(t *testing.T) {
 	l.Stop()
 
 	if _, stops := tap.counts(); stops != 0 {
-		t.Fatalf("Stop sin Start no debe parar el tap (hubo %d)", stops)
+		t.Fatalf("Stop without Start must not stop the tap (got %d)", stops)
 	}
 	if _, stops := dec.counts(); stops != 0 {
-		t.Fatalf("Stop sin Start no debe parar el decoder (hubo %d)", stops)
+		t.Fatalf("Stop without Start must not stop the decoder (got %d)", stops)
 	}
 }
 
@@ -270,13 +270,13 @@ func TestAudioListenRestartAfterStop(t *testing.T) {
 	l.Start("b")
 	dec.waitInvoked(t)
 	if !l.IsActive() {
-		t.Fatal("esperaba IsActive()=true tras re-Start")
+		t.Fatal("expected IsActive()=true after re-Start")
 	}
 	if starts, _ := tap.counts(); starts != 2 {
-		t.Fatalf("esperaba 2 arranques del tap, hubo %d", starts)
+		t.Fatalf("expected 2 tap starts, got %d", starts)
 	}
 	if calls, _ := dec.counts(); calls != 2 {
-		t.Fatalf("esperaba 2 invocaciones del decoder, hubo %d", calls)
+		t.Fatalf("expected 2 decoder calls, got %d", calls)
 	}
 
 	l.Stop()
@@ -287,11 +287,11 @@ func TestAudioListenTapErrorIsNonFatal(t *testing.T) {
 	tap := &mockTap{err: errors.New("operation not permitted")}
 	l := NewAudioListenOnCall(tap, dec, 15000, 110, "/tmp/sink.wav", logrus.New())
 
-	l.Start("sin-permisos") // no debe entrar en pánico
+	l.Start("no-permissions") // must not panic
 	dec.waitInvoked(t)
 
 	if !l.IsActive() {
-		t.Fatal("esperaba IsActive()=true aunque el tap falle")
+		t.Fatal("expected IsActive()=true even if the tap fails")
 	}
 
 	l.Stop()
@@ -299,13 +299,13 @@ func TestAudioListenTapErrorIsNonFatal(t *testing.T) {
 
 func TestAudioListenNilTapAndDecoderAreSafe(t *testing.T) {
 	l := NewAudioListenOnCall(nil, nil, 15000, 110, "/tmp/sink.wav", logrus.New())
-	l.Start("a") // no debe entrar en pánico
+	l.Start("a") // must not panic
 	if !l.IsActive() {
-		t.Fatal("esperaba IsActive()=true incluso sin tap/decoder")
+		t.Fatal("expected IsActive()=true even without tap/decoder")
 	}
 	l.Stop()
 	if l.IsActive() {
-		t.Fatal("esperaba IsActive()=false tras Stop")
+		t.Fatal("expected IsActive()=false after Stop")
 	}
 }
 
@@ -322,20 +322,20 @@ func TestAudioListenGuardAutoStopsWhenHangupIsMissed(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	if l.IsActive() {
-		t.Fatal("esperaba auto-stop por guard, sigue activo")
+		t.Fatal("expected auto-stop by the guard, still active")
 	}
 	if _, stops := tap.counts(); stops != 1 {
-		t.Fatalf("esperaba 1 parada del tap por guard, hubo %d", stops)
+		t.Fatalf("expected 1 tap stop by the guard, got %d", stops)
 	}
 	if _, stops := dec.counts(); stops != 1 {
-		t.Fatalf("esperaba 1 parada del decoder por guard, hubo %d", stops)
+		t.Fatalf("expected 1 decoder stop by the guard, got %d", stops)
 	}
 }
 
-// selfEndingDecoder simula un decoder cuyo Decode TERMINA POR SÍ SOLO (p.ej.
-// su tope duro interno) sin que nadie haya llamado a Stop(). invoked
-// señaliza la entrada; stops cuenta las llamadas a Stop (para comprobar que
-// AudioListenOnCall igualmente llama a decoder.Stop() al autodesarmarse).
+// selfEndingDecoder simulates a decoder whose Decode ENDS BY ITSELF (e.g. its
+// internal hard limit) without anyone calling Stop(). invoked signals the
+// entry; stops counts the Stop calls (to check that AudioListenOnCall still
+// calls decoder.Stop() when it disarms itself).
 type selfEndingDecoder struct {
 	mu      sync.Mutex
 	calls   int
@@ -352,7 +352,7 @@ func (d *selfEndingDecoder) Decode(host string, port, pt int, sink string) error
 	d.calls++
 	d.mu.Unlock()
 	d.invoked <- struct{}{}
-	return nil // retorno natural, no provocado por Stop()
+	return nil // natural return, not caused by Stop()
 }
 
 func (d *selfEndingDecoder) Stop() {
@@ -367,8 +367,8 @@ func (d *selfEndingDecoder) counts() (calls, stops int) {
 	return d.calls, d.stops
 }
 
-// signalingTap es un tap de prueba cuyo Stop() señaliza un canal (con
-// buffer), para sincronizar el test con el desarme sin sleeps.
+// signalingTap is a test tap whose Stop() signals a (buffered) channel, to
+// sync the test with the disarm without sleeps.
 type signalingTap struct {
 	mu      sync.Mutex
 	starts  int
@@ -403,12 +403,11 @@ func (t *signalingTap) counts() (starts, stops int) {
 	return t.starts, t.stops
 }
 
-// TestAudioListenSelfDisarmsWhenDecoderReturnsNaturally cubre el hallazgo de
-// revisión: si Decode() vuelve por sí solo (p.ej. su tope duro interno, que
-// AudioListenOnCall alarga pero no hace infinito) sin que nadie haya llamado
-// a Stop(), la sesión debe autodesarmarse (parar el tap, marcar inactive) en
-// vez de quedar en un estado mentiroso (IsActive()=true con el tap
-// reenviando RTP a un socket que ya nadie lee).
+// TestAudioListenSelfDisarmsWhenDecoderReturnsNaturally: if Decode() returns
+// by itself (e.g. its internal hard limit, which AudioListenOnCall raises but
+// does not make infinite) without anyone calling Stop(), the session must
+// disarm itself (stop the tap, mark inactive) instead of staying in a false
+// state (IsActive()=true with the tap forwarding RTP to a socket nobody reads).
 func TestAudioListenSelfDisarmsWhenDecoderReturnsNaturally(t *testing.T) {
 	dec := newSelfEndingDecoder()
 	tap := newSignalingTap()
@@ -419,27 +418,27 @@ func TestAudioListenSelfDisarmsWhenDecoderReturnsNaturally(t *testing.T) {
 	select {
 	case <-tap.stopped:
 	case <-time.After(2 * time.Second):
-		t.Fatal("esperaba que el tap se parara solo tras el retorno natural del decoder")
+		t.Fatal("expected the tap to stop by itself after the natural return of the decoder")
 	}
 
 	if l.IsActive() {
-		t.Fatal("esperaba IsActive()=false tras el retorno natural del decoder")
+		t.Fatal("expected IsActive()=false after the natural return of the decoder")
 	}
 	if _, stops := tap.counts(); stops != 1 {
-		t.Fatalf("esperaba 1 parada del tap, hubo %d", stops)
+		t.Fatalf("expected 1 tap stop, got %d", stops)
 	}
 	if _, stops := dec.counts(); stops != 1 {
-		t.Fatalf("esperaba 1 parada del decoder (Stop llamado al autodesarmar), hubo %d", stops)
+		t.Fatalf("expected 1 decoder stop (Stop called on self-disarm), got %d", stops)
 	}
 }
 
-// racingDecoder simula un Decode() cuyo retorno el TEST controla con
-// precisión, LLAMADA A LLAMADA (un canal de liberación propio por invocación,
-// no compartido). A diferencia de fakeDecoder, Stop() NO libera la llamada en
-// curso: modela un decoder real cuyo proceso puede tardar en morir más allá
-// de la señal de Stop() (p.ej. ffmpeg no ha recibido aún la señal del SO), lo
-// que permite retrasar deliberadamente el retorno "natural" de una sesión ya
-// desarmada hasta después de que otra sesión haya arrancado.
+// racingDecoder simulates a Decode() whose return the TEST controls
+// precisely, CALL BY CALL (a release channel of its own per call, not shared).
+// Unlike fakeDecoder, Stop() does NOT release the running call: it models a
+// real decoder whose process can take longer to die than the Stop() signal
+// (e.g. ffmpeg has not yet received the OS signal), which allows delaying on
+// purpose the "natural" return of an already disarmed session until after
+// another session has started.
 type racingDecoder struct {
 	mu       sync.Mutex
 	calls    int
@@ -467,7 +466,7 @@ func (d *racingDecoder) Stop() {
 	d.mu.Lock()
 	d.stops++
 	d.mu.Unlock()
-	// Deliberadamente no libera ninguna llamada en curso.
+	// Deliberately releases no running call.
 }
 
 func (d *racingDecoder) counts() (calls, stops int) {
@@ -476,27 +475,26 @@ func (d *racingDecoder) counts() (calls, stops int) {
 	return d.calls, d.stops
 }
 
-// releaseCall libera la llamada nº idx (0-based) a Decode().
+// releaseCall releases call no. idx (0-based) to Decode().
 func (d *racingDecoder) releaseCall(t *testing.T, idx int) {
 	t.Helper()
 	d.mu.Lock()
 	if idx >= len(d.releases) {
 		d.mu.Unlock()
-		t.Fatalf("releaseCall(%d): solo hay %d llamadas registradas", idx, len(d.releases))
+		t.Fatalf("releaseCall(%d): only %d calls recorded", idx, len(d.releases))
 	}
 	ch := d.releases[idx]
 	d.mu.Unlock()
 	close(ch)
 }
 
-// TestAudioListenStaleSelfStopDoesNotTearDownNewerSession reproduce, de forma
-// determinista, el escenario del hallazgo de re-revisión: el Decode() de una
-// sesión YA parada (gen=1) vuelve por su cuenta DESPUÉS de que una sesión
-// nueva (gen=2) ya esté armada. selfStopIfCurrent(1), al ejecutarse tarde, no
-// debe desarmar la sesión 2. Verificado por AUSENCIA de efecto tras un margen
-// acotado (una aserción negativa no puede esperarse via canal sin más: se usa
-// un margen fijo, no un sleep como mecanismo de sincronización primario — la
-// señalización de las invocaciones vía `invoked` sí lo es).
+// TestAudioListenStaleSelfStopDoesNotTearDownNewerSession reproduces,
+// deterministically: the Decode() of an ALREADY stopped session (gen=1)
+// returns by itself AFTER a new session (gen=2) is armed. selfStopIfCurrent(1),
+// running late, must not disarm session 2. Checked by the ABSENCE of an effect
+// after a bounded margin (a negative assertion cannot simply be awaited via a
+// channel: a fixed margin is used, not a sleep as the primary sync mechanism;
+// the invocation signalling via `invoked` is that).
 func TestAudioListenStaleSelfStopDoesNotTearDownNewerSession(t *testing.T) {
 	dec := newRacingDecoder()
 	tap := &mockTap{}
@@ -506,29 +504,29 @@ func TestAudioListenStaleSelfStopDoesNotTearDownNewerSession(t *testing.T) {
 	select {
 	case <-dec.invoked:
 	case <-time.After(2 * time.Second):
-		t.Fatal("decoder de la sesión 1 nunca fue invocado")
+		t.Fatal("the session 1 decoder was never called")
 	}
 
-	l.Stop() // desarma la sesión 1: active=false, tap.Stop(), dec.Stop().
-	// El Decode() de la sesión 1 SIGUE bloqueado deliberadamente (releases[0]
-	// no se ha cerrado): su retorno "natural" queda pendiente a propósito.
+	l.Stop() // disarms session 1: active=false, tap.Stop(), dec.Stop().
+	// Session 1's Decode() STAYS blocked on purpose (releases[0] has not
+	// been closed): its "natural" return is left pending deliberately.
 	if _, stops := dec.counts(); stops != 1 {
-		t.Fatalf("esperaba 1 parada del decoder tras Stop(), hubo %d", stops)
+		t.Fatalf("expected 1 decoder stop after Stop(), got %d", stops)
 	}
 
-	l.Start("b") // gen=2: sesión nueva y activa, mientras la 1 sigue "en vuelo"
+	l.Start("b") // gen=2: a new active session, while 1 is still "in flight"
 	select {
 	case <-dec.invoked:
 	case <-time.After(2 * time.Second):
-		t.Fatal("decoder de la sesión 2 nunca fue invocado")
+		t.Fatal("the session 2 decoder was never called")
 	}
 	if !l.IsActive() {
-		t.Fatal("esperaba IsActive()=true tras Start de la sesión 2")
+		t.Fatal("expected IsActive()=true after the Start of session 2")
 	}
 
-	// Ahora dejamos volver, con retraso deliberado, al Decode() de la sesión 1
-	// (gen=1): su selfStopIfCurrent(1) corre con la sesión 2 (gen=2) YA
-	// activa. beginTeardown debe rechazarlo por generación.
+	// Now let session 1's Decode() (gen=1) return, deliberately late: its
+	// selfStopIfCurrent(1) runs with session 2 (gen=2) ALREADY active.
+	// beginTeardown must reject it by generation.
 	dec.releaseCall(t, 0)
 
 	deadline := time.Now().Add(300 * time.Millisecond)
@@ -537,24 +535,24 @@ func TestAudioListenStaleSelfStopDoesNotTearDownNewerSession(t *testing.T) {
 	}
 
 	if !l.IsActive() {
-		t.Fatal("BUG: la sesión 2 quedó desarmada por el auto-stop tardío de la sesión 1")
+		t.Fatal("BUG: session 2 was disarmed by session 1's late auto-stop")
 	}
 	if starts, stops := tap.counts(); starts != 2 || stops != 1 {
-		t.Fatalf("esperaba tap start=2 stop=1 (solo la sesión 1 parada), got start=%d stop=%d", starts, stops)
+		t.Fatalf("expected tap start=2 stop=1 (only session 1 stopped), got start=%d stop=%d", starts, stops)
 	}
 	if calls, stops := dec.counts(); calls != 2 || stops != 1 {
-		t.Fatalf("esperaba decoder calls=2 stops=1 (solo la sesión 1 parada), got calls=%d stops=%d", calls, stops)
+		t.Fatalf("expected decoder calls=2 stops=1 (only session 1 stopped), got calls=%d stops=%d", calls, stops)
 	}
 
-	l.Stop() // limpieza: desarma de verdad la sesión 2
+	l.Stop() // cleanup: really disarms session 2
 	dec.releaseCall(t, 1)
 }
 
-// decoderWithTimeout es un fake decoder que además registra el timeout que
-// AudioListenOnCall le configura (implementa audioDecoderTimeoutSetter).
-// Bloquea en Decode hasta Stop(), igual que fakeDecoder.
+// decoderWithTimeout is a fake decoder that also records the timeout
+// AudioListenOnCall sets on it (it implements audioDecoderTimeoutSetter).
+// It blocks in Decode until Stop(), like fakeDecoder.
 type decoderWithTimeout struct {
-	*fakeDecoder // puntero: evita copiar el sync.Mutex embebido
+	*fakeDecoder // pointer: avoids copying the embedded sync.Mutex
 	mu           sync.Mutex
 	timeout      time.Duration
 	set          chan struct{}
@@ -588,7 +586,7 @@ func (d *decoderWithTimeout) waitSet(t *testing.T) {
 	select {
 	case <-d.set:
 	case <-time.After(2 * time.Second):
-		t.Fatal("SetTimeout nunca fue invocado")
+		t.Fatal("SetTimeout was never called")
 	}
 }
 
@@ -601,7 +599,7 @@ func TestAudioListenSetsDefaultDecoderTimeoutWithoutGuard(t *testing.T) {
 	dec.waitSet(t)
 
 	if got := dec.getTimeout(); got != defaultAudioListenDecoderTimeout {
-		t.Fatalf("esperaba timeout por defecto %s, got %s", defaultAudioListenDecoderTimeout, got)
+		t.Fatalf("expected default timeout %s, got %s", defaultAudioListenDecoderTimeout, got)
 	}
 
 	l.Stop()
@@ -617,7 +615,7 @@ func TestAudioListenSetsDecoderTimeoutFromGuard(t *testing.T) {
 	dec.waitSet(t)
 
 	if got := dec.getTimeout(); got != 5*time.Minute {
-		t.Fatalf("esperaba timeout = guard (5m), got %s", got)
+		t.Fatalf("expected timeout = guard (5m), got %s", got)
 	}
 
 	l.Stop()
@@ -631,26 +629,25 @@ func TestAudioListenGuardCanceledByStop(t *testing.T) {
 	l.Start("a")
 	dec.waitInvoked(t)
 	l.Stop()
-	time.Sleep(80 * time.Millisecond) // el guard ya habría vencido
+	time.Sleep(80 * time.Millisecond) // the guard would have expired by now
 
 	if _, stops := tap.counts(); stops != 1 {
-		t.Fatalf("el guard cancelado no debe parar otra vez (stops=%d)", stops)
+		t.Fatalf("the cancelled guard must not stop again (stops=%d)", stops)
 	}
 
 	l.Start("b")
 	dec.waitInvoked(t)
 	if !l.IsActive() {
-		t.Fatal("esperaba activo tras re-Start")
+		t.Fatal("expected active after re-Start")
 	}
 	l.Stop()
 }
 
-// blockingStartTap es un tap cuyo Start() BLOQUEA hasta que el test cierra
-// release, para reproducir de forma determinista la ventana de carrera del
-// hallazgo 1 (revisión final de rama feat/audio-tap-5000): Start() marca
-// active=true, suelta el lock, y SOLO ENTONCES llama a tap.Start() (aquí
-// bloqueado). entered se cierra en cuanto Start() entra (ANTES de bloquear),
-// para que el test sepa que ya está en la ventana sin usar sleeps.
+// blockingStartTap is a tap whose Start() BLOCKS until the test closes
+// release, to reproduce deterministically the race window: Start() sets
+// active=true, releases the lock, and ONLY THEN calls tap.Start() (blocked
+// here). entered is closed as soon as Start() is entered (BEFORE blocking), so
+// the test knows it is in the window without sleeps.
 type blockingStartTap struct {
 	mu      sync.Mutex
 	starts  int
@@ -687,17 +684,16 @@ func (t *blockingStartTap) counts() (starts, stops int) {
 	return t.starts, t.stops
 }
 
-// TestAudioListenStartStopRaceDoesNotLeakTap cubre el hallazgo 1 de la
-// revisión final de rama: si un Stop() concurrente corre entero (bajo lock,
-// active=false, tap.Stop() incluido) MIENTRAS el tap.Start() de un Start()
-// anterior sigue bloqueado (fuera del lock, a propósito — apertura de socket
-// AF_PACKET), el tap.Stop() de ese Stop() no sirve de nada porque el tap
-// todavía no había arrancado desde su punto de vista. Sin el re-chequeo tras
-// tap.Start(), el tap quedaría arrancado para siempre con active=false: el
-// decoder se autodesarma solo en su tope duro, pero el tap (socket AF_PACKET
-// + goroutine) no tiene ningún mecanismo de autodesarme — fuga permanente.
-// Sincronizado enteramente por canales (entered/release/done), sin sleeps
-// como mecanismo de sincronización primario.
+// TestAudioListenStartStopRaceDoesNotLeakTap: if a concurrent Stop() runs
+// fully (under lock, active=false, tap.Stop() included) WHILE the tap.Start()
+// of an earlier Start() is still blocked (outside the lock, on purpose: an
+// AF_PACKET socket open), that Stop()'s tap.Stop() is useless because the tap
+// had not started yet from its point of view. Without the re-check after
+// tap.Start(), the tap would stay started forever with active=false: the
+// decoder disarms itself at its hard limit, but the tap (AF_PACKET socket +
+// goroutine) has no self-disarm at all: a permanent leak. Synced entirely
+// through channels (entered/release/done), no sleeps as the primary sync
+// mechanism.
 func TestAudioListenStartStopRaceDoesNotLeakTap(t *testing.T) {
 	dec := newFakeDecoder()
 	tap := newBlockingStartTap()
@@ -705,40 +701,40 @@ func TestAudioListenStartStopRaceDoesNotLeakTap(t *testing.T) {
 
 	startDone := make(chan struct{})
 	go func() {
-		l.Start("a") // bloquea dentro de tap.Start() hasta que el test libere
+		l.Start("a") // blocks inside tap.Start() until the test releases it
 		close(startDone)
 	}()
 
-	// Esperar a que tap.Start() haya entrado (y esté bloqueado): ahora
-	// active=true pero el tap real, desde fuera, aún no ha "arrancado".
+	// Wait until tap.Start() has been entered (and is blocked): now
+	// active=true, but the real tap has not "started" yet, seen from outside.
 	select {
 	case <-tap.entered:
 	case <-time.After(2 * time.Second):
-		t.Fatal("tap.Start() nunca entró")
+		t.Fatal("tap.Start() was never entered")
 	}
 
-	// Stop() concurrente gana la carrera: corre entero (beginTeardown +
-	// teardown, incluido su propio tap.Stop() — que aquí no incrementa stops
-	// porque Start() sigue bloqueado y starts sigue en 0) mientras tap.Start()
-	// de la sesión sigue bloqueado.
+	// A concurrent Stop() wins the race: it runs fully (beginTeardown +
+	// teardown, including its own tap.Stop(), which does not increase stops
+	// here because Start() is still blocked and starts is still 0) while the
+	// session's tap.Start() is still blocked.
 	l.Stop()
 
 	if l.IsActive() {
-		t.Fatal("esperaba IsActive()=false tras el Stop() que ganó la carrera")
+		t.Fatal("expected IsActive()=false after the Stop() that won the race")
 	}
 	if starts, stops := tap.counts(); starts != 0 || stops != 1 {
-		t.Fatalf("antes de liberar: esperaba tap start=0 stop=1 (el Stop de teardown, sin efecto útil), got start=%d stop=%d", starts, stops)
+		t.Fatalf("before release: expected tap start=0 stop=1 (the teardown Stop, without useful effect), got start=%d stop=%d", starts, stops)
 	}
 
-	// Liberar tap.Start(): "arranca" tarde, después de que Stop() ya corrió
-	// entero. El fix debe detectar que la sesión ya no está activa y parar el
-	// tap inmediatamente, en vez de dejarlo filtrado.
+	// Release tap.Start(): it "starts" late, after Stop() already ran fully.
+	// The fix must notice that the session is no longer active and stop the
+	// tap at once, instead of leaking it.
 	close(tap.release)
 
 	select {
 	case <-startDone:
 	case <-time.After(2 * time.Second):
-		t.Fatal("l.Start() nunca volvió tras liberar tap.Start()")
+		t.Fatal("l.Start() never returned after releasing tap.Start()")
 	}
 
 	deadline := time.Now().Add(2 * time.Second)
@@ -748,29 +744,28 @@ func TestAudioListenStartStopRaceDoesNotLeakTap(t *testing.T) {
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("BUG: tap filtrado tras la carrera — esperaba start=1 stop=2 (el segundo stop del re-chequeo), got start=%d stop=%d", starts, stops)
+			t.Fatalf("BUG: tap leaked after the race: expected start=1 stop=2 (the second stop from the re-check), got start=%d stop=%d", starts, stops)
 		}
 		time.Sleep(2 * time.Millisecond)
 	}
 
 	if l.IsActive() {
-		t.Fatal("esperaba IsActive()=false tras la carrera y el re-chequeo")
+		t.Fatal("expected IsActive()=false after the race and the re-check")
 	}
 }
 
-// staggeredTap es un tap cuya PRIMERA invocación a Start() BLOQUEA hasta que
-// el test cierra release; las invocaciones SIGUIENTES vuelven al instante.
-// Modela LoopbackRTPTap.Start (idempotente: si el tap ya está en marcha,
-// arrancarlo de nuevo no bloquea) para poder reproducir, de forma
-// determinista, una sesión B que se arma y termina de re-chequearse ANTES de
-// que el tap.Start() tardío de una sesión A anterior por fin vuelva.
+// staggeredTap is a tap whose FIRST call to Start() BLOCKS until the test
+// closes release; LATER calls return at once. It models LoopbackRTPTap.Start
+// (idempotent: starting an already running tap again does not block) to
+// reproduce, deterministically, a session B that is armed and finishes its
+// re-check BEFORE the late tap.Start() of an earlier session A finally returns.
 type staggeredTap struct {
 	mu      sync.Mutex
 	calls   int
 	starts  int
 	stops   int
-	entered chan struct{} // se cierra en la PRIMERA entrada a Start()
-	release chan struct{} // el test lo cierra para liberar esa primera llamada
+	entered chan struct{} // closed on the FIRST entry into Start()
+	release chan struct{} // the test closes it to release that first call
 }
 
 func newStaggeredTap() *staggeredTap {
@@ -807,21 +802,18 @@ func (t *staggeredTap) counts() (starts, stops int) {
 	return t.starts, t.stops
 }
 
-// TestAudioListenGenerationMismatchDoesNotStopNewerSession cubre la
-// regresión detectada en la re-revisión: el re-chequeo post-tap.Start() del
-// hallazgo 1 debe fijarse SOLO en `active` (¿alguien reclama el tap
-// compartido ahora mismo?), NUNCA en `generation`. a.tap/a.decoder son
-// instancias ÚNICAS compartidas por TODAS las generaciones (construidas una
-// vez en cmd/main.go, no una por sesión). Si mientras el tap.Start() de la
-// sesión A sigue bloqueado se cuela un Stop()+Start() completo (sesión B,
-// generación distinta), el tap compartido pasa a pertenecer LEGÍTIMAMENTE a
-// B. Cuando el tap.Start() tardío de A por fin vuelve, NO debe pararlo: eso
-// cortaría en silencio el audio de la llamada EN VIVO de B (IsActive()
-// seguiría devolviendo true, porque lo puso B) — una regresión peor que la
-// fuga que el hallazgo 1 corrigió. Sincronizado por canales
-// (entered/release/waitInvoked); los únicos sleeps son márgenes acotados
-// para aserciones NEGATIVAS (ausencia de un Stop indebido), sin usarse como
-// mecanismo de sincronización primario.
+// TestAudioListenGenerationMismatchDoesNotStopNewerSession: the re-check after
+// tap.Start() must look ONLY at `active` (does anyone claim the shared tap
+// right now?), NEVER at `generation`. a.tap/a.decoder are SINGLE instances
+// shared by ALL generations (built once in cmd/main.go, not per session). If
+// a full Stop()+Start() (session B, another generation) slips in while
+// session A's tap.Start() is still blocked, the shared tap LEGITIMATELY
+// belongs to B. When A's late tap.Start() finally returns, it must NOT stop
+// it: that would silently cut the audio of B's LIVE call (IsActive() would
+// still return true, because B set it), a worse regression than the leak the
+// re-check fixed. Synced through channels (entered/release/waitInvoked); the
+// only sleeps are bounded margins for NEGATIVE assertions (absence of a wrong
+// Stop), not the primary sync mechanism.
 func TestAudioListenGenerationMismatchDoesNotStopNewerSession(t *testing.T) {
 	dec := newFakeDecoder()
 	tap := newStaggeredTap()
@@ -829,69 +821,68 @@ func TestAudioListenGenerationMismatchDoesNotStopNewerSession(t *testing.T) {
 
 	startADone := make(chan struct{})
 	go func() {
-		l.Start("a") // sesión A (gen=1): su tap.Start() es la 1ª invocación, bloqueada
+		l.Start("a") // session A (gen=1): its tap.Start() is the 1st call, blocked
 		close(startADone)
 	}()
-	dec.waitInvoked(t) // decode de la sesión A invocado
+	dec.waitInvoked(t) // session A decode called
 
 	select {
 	case <-tap.entered:
 	case <-time.After(2 * time.Second):
-		t.Fatal("tap.Start() de la sesión A nunca entró")
+		t.Fatal("session A's tap.Start() was never entered")
 	}
 
-	// Desarma A por completo (beginTeardown+teardown, incluido su propio
-	// decoder.Stop() — libera el Decode() bloqueado de A) MIENTRAS su
-	// tap.Start() sigue bloqueado.
+	// Disarm A fully (beginTeardown+teardown, including its own
+	// decoder.Stop(), which releases A's blocked Decode()) WHILE its
+	// tap.Start() is still blocked.
 	l.Stop()
 	if l.IsActive() {
-		t.Fatal("esperaba IsActive()=false tras Stop() de la sesión A")
+		t.Fatal("expected IsActive()=false after the Stop() of session A")
 	}
 
-	// Arranca la sesión B (gen=2): su tap.Start() es la 2ª invocación del
-	// tap compartido, que en este fake NO bloquea (modela idempotencia) —
-	// l.Start("b") vuelve ya con el re-chequeo del hallazgo 1 incluido.
+	// Start session B (gen=2): its tap.Start() is the 2nd call of the shared
+	// tap, which in this fake does NOT block (it models idempotence);
+	// l.Start("b") returns with the re-check already done.
 	l.Start("b")
-	dec.waitInvoked(t) // decode de la sesión B invocado
+	dec.waitInvoked(t) // session B decode called
 
 	if !l.IsActive() {
-		t.Fatal("esperaba IsActive()=true tras Start de la sesión B")
+		t.Fatal("expected IsActive()=true after the Start of session B")
 	}
-	// stop=1 es el tap.Stop() del teardown de A (paso previo, sin efecto útil
-	// porque el tap seguía bloqueado): NO debe haber un segundo stop aquí por
-	// el armado de B.
+	// stop=1 is the tap.Stop() of A's teardown (the earlier step, without
+	// useful effect because the tap was still blocked): there must NOT be a
+	// second stop here from arming B.
 	if starts, stops := tap.counts(); starts != 1 || stops != 1 {
-		t.Fatalf("tras armar B (A aún bloqueado): esperaba tap start=1 (solo B) stop=1 (el de teardown de A), got start=%d stop=%d", starts, stops)
+		t.Fatalf("after arming B (A still blocked): expected tap start=1 (B only) stop=1 (A's teardown), got start=%d stop=%d", starts, stops)
 	}
 
-	// Liberar el tap.Start() tardío de A: su propio re-chequeo debe ver
-	// active=true (sesión B activa, aunque generation ya no sea la de A) y
-	// NO debe tocar el tap compartido.
+	// Release A's late tap.Start(): its own re-check must see active=true
+	// (session B active, even though generation is no longer A's) and must
+	// NOT touch the shared tap.
 	close(tap.release)
 
 	select {
 	case <-startADone:
 	case <-time.After(2 * time.Second):
-		t.Fatal("l.Start(a) nunca volvió tras liberar su tap.Start()")
+		t.Fatal("l.Start(a) never returned after releasing its tap.Start()")
 	}
 
-	// Margen para dejar correr (si lo hubiera, incorrectamente) el
-	// tap.Stop()/decoder.Stop() del re-chequeo tardío de A, y confirmar por
-	// AUSENCIA que la sesión B no resultó afectada.
+	// Margin to let A's late re-check run its tap.Stop()/decoder.Stop() (if
+	// it wrongly did), and confirm by ABSENCE that session B was not affected.
 	deadline := time.Now().Add(300 * time.Millisecond)
 	for time.Now().Before(deadline) {
 		time.Sleep(5 * time.Millisecond)
 	}
 
 	if !l.IsActive() {
-		t.Fatal("BUG: la sesión B quedó desarmada por el tap.Start() tardío de A (regresión del re-chequeo por generación)")
+		t.Fatal("BUG: session B was disarmed by A's late tap.Start() (generation re-check regression)")
 	}
-	// stop sigue en 1 (el mismo de antes, el del teardown de A): el
-	// re-chequeo tardío de A NO debe añadir un segundo stop sobre el tap
-	// compartido, que a estas alturas pertenece a la sesión B, activa.
+	// stop is still 1 (the same as before, from A's teardown): A's late
+	// re-check must NOT add a second stop on the shared tap, which by now
+	// belongs to the active session B.
 	if starts, stops := tap.counts(); starts != 2 || stops != 1 {
-		t.Fatalf("esperaba tap start=2 (A tardío + B) stop=1 (SIN un segundo stop indebido sobre el tap de B), got start=%d stop=%d", starts, stops)
+		t.Fatalf("expected tap start=2 (late A + B) stop=1 (WITHOUT a wrong second stop on B's tap), got start=%d stop=%d", starts, stops)
 	}
 
-	l.Stop() // limpieza real de la sesión B
+	l.Stop() // real cleanup of session B
 }

@@ -22,7 +22,7 @@ func TestAudioSenderBuildArgs(t *testing.T) {
 		"srtp_out_params=KEY123",
 	} {
 		if !strings.Contains(joined, want) {
-			t.Fatalf("args no contienen %q. args:\n%s", want, joined)
+			t.Fatalf("args do not contain %q. args:\n%s", want, joined)
 		}
 	}
 }

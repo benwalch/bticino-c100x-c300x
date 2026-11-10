@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// fakeSIPServer acepta una conexión TCP y responde 200 a cualquier REGISTER.
+// fakeSIPServer accepts one TCP connection and answers 200 to any REGISTER.
 func fakeSIPServer(t *testing.T) (addr string, stop func()) {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -36,7 +36,7 @@ func fakeSIPServer(t *testing.T) (addr string, stop func()) {
 	return ln.Addr().String(), func() { ln.Close() }
 }
 
-func TestTCPTransport_RegistraYRecibe(t *testing.T) {
+func TestTCPTransport_RegistersAndReceives(t *testing.T) {
 	addr, stop := fakeSIPServer(t)
 	defer stop()
 	tr, err := NewTCPTransport(addr, logrus.New())
@@ -53,12 +53,12 @@ func TestTCPTransport_RegistraYRecibe(t *testing.T) {
 	select {
 	case m := <-done:
 		if m.StatusCode != "200" {
-			t.Fatalf("esperaba 200, got %q", m.StatusCode)
+			t.Fatalf("expected 200, got %q", m.StatusCode)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("timeout esperando 200")
+		t.Fatal("timeout waiting for 200")
 	}
 	if !strings.Contains(reg, "transport=tcp") {
-		t.Error("REGISTER sin transport=tcp")
+		t.Error("REGISTER without transport=tcp")
 	}
 }

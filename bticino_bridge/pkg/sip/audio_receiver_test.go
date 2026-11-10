@@ -12,12 +12,12 @@ func TestBuildInboundSDP(t *testing.T) {
 	sdp := BuildInboundSDP("127.0.0.1", 40100, ans)
 	for _, want := range []string{
 		"c=IN IP4 127.0.0.1",
-		"m=audio 40100 RTP/SAVP 98", // puerto LOCAL, no el del portero
+		"m=audio 40100 RTP/SAVP 98", // LOCAL port, not the intercom's
 		"a=rtpmap:98 speex/8000",
 		"a=crypto:2 AES_CM_128_HMAC_SHA1_80 inline:KEY123",
 	} {
 		if !strings.Contains(sdp, want) {
-			t.Fatalf("SDP inbound sin %q:\n%s", want, sdp)
+			t.Fatalf("inbound SDP without %q:\n%s", want, sdp)
 		}
 	}
 }
@@ -36,7 +36,7 @@ func TestAudioReceiverBuildArgs(t *testing.T) {
 		"/tmp/out.wav",
 	} {
 		if !strings.Contains(joined, want) {
-			t.Fatalf("args sin %q:\n%s", want, joined)
+			t.Fatalf("args without %q:\n%s", want, joined)
 		}
 	}
 }

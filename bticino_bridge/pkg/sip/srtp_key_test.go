@@ -12,10 +12,10 @@ func TestNewSRTPMasterKeyLength(t *testing.T) {
 	}
 	raw, err := base64.StdEncoding.DecodeString(k)
 	if err != nil {
-		t.Fatalf("no es base64 válido: %v", err)
+		t.Fatalf("not valid base64: %v", err)
 	}
 	if len(raw) != 30 {
-		t.Fatalf("esperaba 30 bytes (16 key + 14 salt), got %d", len(raw))
+		t.Fatalf("expected 30 bytes (16 key + 14 salt), got %d", len(raw))
 	}
 }
 
@@ -23,6 +23,6 @@ func TestNewSRTPMasterKeyIsRandom(t *testing.T) {
 	a, _ := NewSRTPMasterKey()
 	b, _ := NewSRTPMasterKey()
 	if a == b {
-		t.Fatal("dos claves consecutivas no deberían coincidir")
+		t.Fatal("two consecutive keys should not match")
 	}
 }
