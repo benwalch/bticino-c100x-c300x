@@ -1,6 +1,6 @@
 # BTicino Classe 300X - Tested Commands Reference
 
-**Device**: BTicino Classe 300X (C300X-00-03-50-a8-a7-52-YOUR_GATEWAY_ID)  
+**Device**: BTicino Classe 300X (C300X-<MAC>-YOUR_GATEWAY_ID)  
 **Purpose**: Document what works and what doesn't on the real device
 
 ---
@@ -479,5 +479,5 @@ Web Dashboard: 8082
 ---
 
 **Last Updated**: 2026-03-23  
-**Tested On**: BTicino Classe 300X (C300X-00-03-50-a8-a7-52-YOUR_GATEWAY_ID)  
+**Tested On**: BTicino Classe 300X (C300X-<MAC>-YOUR_GATEWAY_ID)  
 **Firmware**: Stock (unmodified)

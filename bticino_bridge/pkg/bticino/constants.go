@@ -180,7 +180,7 @@ const (
 	// These queries use dimension read: *#13**DIM##
 	// Response: *#13**DIM*value1*value2*...##
 	// On localhost (netcat 30006) they do not require HMAC authentication.
-	CmdQueryIP      = "*#13**10##" // IP address (resp: *#13**10*192*168*1*38##)
+	CmdQueryIP      = "*#13**10##" // IP address (resp: *#13**10*192*0*2*10##)
 	CmdQueryNetmask = "*#13**11##" // Netmask (resp: *#13**11*255*255*255*0##)
 	CmdQueryMAC     = "*#13**12##" // MAC address (resp: *#13**12*D1*D2*D3*D4*D5*D6## in decimal)
 	CmdQueryFWVer   = "*#13**16##" // Firmware version (resp: *#13**16*V1*V2*V3##)

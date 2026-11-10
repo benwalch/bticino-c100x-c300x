@@ -37,6 +37,15 @@ Known limits:
   only after the device UI restarts. Ringtones are now read by the object id
   of `settings.xml` (14101 to 14110), the id the native software uses.
 
+- `docs/openwebnet-commands.md` (repository root) lists the WHO 13 system
+  queries, the device setting frames found in the native firmware (ringtone
+  reload, play/stop, volumes, mute, image and display), each marked as
+  observed, verified or firmware-only, and how ports 20000 and 30006 differ.
+  `docs/OPENWEBNET_COMMANDS.md` no longer calls `*#8**33*1##` a SIP status
+  (it is the ringer mute) and says the sessions `*99*0##`/`*99*1##` work on
+  port 20000. A device MAC address and IP left in docs and command examples
+  are replaced by placeholders.
+
 - The Controls tab of the web UI has a Ringtones section: pick a ringtone per
   type, play it in the browser and set it on the device.
   `GET /api/device/ringtones/{id}.wav` serves the files listed in

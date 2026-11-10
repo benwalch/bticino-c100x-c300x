@@ -67,13 +67,13 @@ func NewCommandDatabase() *CommandDatabase {
 	// ============================================
 
 	// SISTEMA 13 - GATEWAY MANAGEMENT (NEWLY DISCOVERED)
-	db.Commands["*#13**10*192*168*1*38##"] = CommandInfo{
+	db.Commands["*#13**10*192*0*2*10##"] = CommandInfo{
 		Description: "Gateway IP Configuration",
 		WHO:         "13",
 		System:      "Gateway Management",
 		Type:        CommandTypeStatus,
 		Safety:      SafetyHigh,
-		Examples:    []string{"*#13**10*192*168*1*38##"},
+		Examples:    []string{"*#13**10*192*0*2*10##"},
 	}
 
 	db.Commands["*#13**11*255*255*255*0##"] = CommandInfo{
@@ -85,13 +85,13 @@ func NewCommandDatabase() *CommandDatabase {
 		Examples:    []string{"*#13**11*255*255*255*0##"},
 	}
 
-	db.Commands["*#13**12*0*3*80*168*167*82##"] = CommandInfo{
+	db.Commands["*#13**12*0*0*94*0*83*1##"] = CommandInfo{
 		Description: "Gateway MAC Address Configuration (CRITICAL)",
 		WHO:         "13",
 		System:      "Gateway Management",
 		Type:        CommandTypeStatus,
 		Safety:      SafetyCritical,
-		Examples:    []string{"*#13**12*0*3*80*168*167*82##"},
+		Examples:    []string{"*#13**12*0*0*94*0*83*1##"},
 	}
 
 	db.Commands["*#13**16*1*7*17##"] = CommandInfo{
@@ -757,14 +757,14 @@ func (db *CommandDatabase) loadKnownCommands() {
 		Examples:    []string{"*#13**12##"},
 	}
 
-	db.Commands["*#13**12*0*3*80*168*167*82##"] = CommandInfo{
+	db.Commands["*#13**12*0*0*94*0*83*1##"] = CommandInfo{
 		Description: "Detailed system status with network parameters",
 		WHO:         "13",
 		System:      "Gateway Management",
 		Type:        CommandTypeStatus,
 		Safety:      SafetyLow,
-		Parameters:  map[string]string{"network": "3.80.168.167.82"},
-		Examples:    []string{"*#13**12*0*3*80*168*167*82##"},
+		Parameters:  map[string]string{"mac": "0.0.94.0.83.1"},
+		Examples:    []string{"*#13**12*0*0*94*0*83*1##"},
 	}
 
 	// System Monitoring Commands (WHO=130)

@@ -1,6 +1,6 @@
 # BTicino Classe 300X - OpenWebNet Command Reference
 
-**Device**: BTicino Classe 300X (C3X-00-03-50-a8-a7-52-YOUR_GATEWAY_ID)  
+**Device**: BTicino Classe 300X (C3X-<MAC>-YOUR_GATEWAY_ID)  
 **OpenWebNet Port**: 127.0.0.1:30006  
 **Test Date**: December 2025  
 
@@ -28,7 +28,7 @@ SIP integration commands are fully accessible, indicating the BTicino system exp
 
 | Command | Description | Response | Context |
 |---------|-------------|----------|---------|
-| `*#8**33*1##` | SIP connection status | `*#*1##` | SIP server connection state |
+| `*#8**33*1##` | Ringer mute state | `*#*1##` | Not SIP: dimension 33 is the ringer mute (`*#8**33*0##` muted, `*#8**33*1##` sound on) |
 | `*#8**37*1##` | SIP codec status variant 1 | `*#*1##` | Codec configuration/status |
 | `*#8**37*2##` | SIP codec status variant 2 | `*#*1##` | Codec configuration/status |
 | `*#8**37*3##` | SIP codec status variant 3 | `*#*1##` | Codec configuration/status |
@@ -40,8 +40,8 @@ These commands require proper OpenWebNet session authentication or higher privil
 
 | Command | Description | Response | Reason |
 |---------|-------------|----------|--------|
-| `*99*0##` | Command session | `*#*0##` | Requires authentication |
-| `*99*1##` | Event session | `*#*0##` | Requires authentication |
+| `*99*0##` | Command session | `*#*0##` | Not accepted on port 30006; port 20000 accepts it (a Classe 100X without a password) |
+| `*99*1##` | Event session | `*#*0##` | Not accepted on port 30006; port 20000 accepts it (the bridge's bus monitor uses it) |
 | `*#1013**1##` | Door status | `*#*0##` | Requires higher privileges |
 | `*#130**1*2##` | System heartbeat | `*#*0##` | System-level access required |
 | `*#13**16*1*7*17##` | Unknown system command | `*#*0##` | System-level access required |
@@ -90,7 +90,7 @@ The BTicino OpenWebNet implementation has a clear security model:
 // Safe commands for continuous monitoring
 workingCommands := []string{
     "*#8**35*0*0*0##", // General audio status
-    "*#8**33*1##",     // SIP connection status
+    "*#8**33*1##",     // Ringer mute state
     "*#8**37*3##",     // SIP codec status
 }
 ```
