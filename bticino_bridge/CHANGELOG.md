@@ -101,7 +101,8 @@ Known limits:
   superseded guides, and `configs/homeassistant/`, whose topics and entities
   no longer exist. The root README has a model status table, a map of the
   repository and a dashboard screenshot
-  (`docs/images/dashboard.png`, made with placeholder data).
+  (`docs/images/dashboard.png`, made with placeholder data), and a screenshot
+  of the Controls page (`docs/images/controls.png`).
 
 - New diagnostic entities in Home Assistant: Flash Usage and Memory Usage
   (%, refreshed every 60 s like the Wi-Fi signal), Last Boot and Bridge

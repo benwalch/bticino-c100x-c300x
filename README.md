@@ -29,6 +29,8 @@ and an SSH watchdog in the firmware. It is tested on a Classe 100X; the Classe
 
 ![Bridge dashboard](bticino_bridge/docs/images/dashboard.png)
 
+![Bridge controls](bticino_bridge/docs/images/controls.png)
+
 Changes: [`bticino_bridge/CHANGELOG.md`](bticino_bridge/CHANGELOG.md).
 
 ## Model status
