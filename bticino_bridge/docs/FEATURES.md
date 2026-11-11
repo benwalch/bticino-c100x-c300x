@@ -77,7 +77,7 @@ BTicino Classe 100X / 300X
   |    - Config management with backup/restore/hot-reload                |
   |                                                                      |
   |  Hardware Monitors                                                   |
-  |    - /dev/input/event0 (keypad), event1 (touchscreen), event2 (GPIO) |
+  |    - input devices from /proc/bus/input/devices (keypad, gpio-keys) |
   |    - 13 GPIO pins via sysfs                                          |
   |    - 9 LED states                                                    |
   |    - CPU temperature                                                 |
@@ -425,10 +425,29 @@ nonce-challenge handshake.
 
 The bridge reads physical hardware events from the intercom device.
 
-**Input devices**:
-- `/dev/input/event0` - Keypad (physical buttons)
-- `/dev/input/event1` - Touchscreen
-- `/dev/input/event2` - GPIO keys
+**Input devices**: the bridge reads every device listed with an `eventN`
+handler in `/proc/bus/input/devices`, so the event numbers may differ per model
+(Classe 100X: `event0` keypad, `event1` gpio-keys). Devices with absolute axes
+are skipped: the Classe 300X touchscreen would otherwise report every touch as
+key `BTN_TOUCH`.
+
+**Key names**:
+- `gpio-keys` keys are named from the device tree
+  (`/proc/device-tree/gpio-keys/*/label` and `linux,code`). The floor call
+  terminals (`floor_call` code 213 on the 100X, `ch_piano` code 6 on the 300X)
+  become `floor_doorbell`; the 100X joystick (`wheel_*`) becomes
+  `joystick_up`/`joystick_down`/`joystick_press` and is logged at debug level
+  only; the 100X handset keys (`horn_up` green, `horn_down` red) become
+  `phone_answer` and `phone_hangup`. Other labels are used as they are.
+- The keypad's driver defines its codes, so they come from a table per
+  `DeviceVariant`: Classe 300X `2`–`5` = `key`, `star`, `eye`, `phone`;
+  Classe 100X `2`–`5` = programmable keys `p1`–`p4`, `6`–`8` = `star`, `key`,
+  `eye`. The Classe 300X has no programmable keys.
+- Both name tables (`GPIOKeyNamesByModel`, `KeypadKeyNamesByModel`) are in
+  `pkg/bticino/constants.go`.
+- Unknown keys are reported as `KEY_<code>`. The last pressed key is published
+  on `bticino/panel/keypad` and written to the activity log (for example
+  "Floor doorbell pressed").
 
 **GPIO monitoring** (sysfs, pin list per `DeviceVariant`):
 300X: pins 12, 13, 47, 49, 52, 54, 56, 58, 60, 154, 155, 176, 180.
@@ -445,8 +464,7 @@ States published to MQTT and SSE.
 
 **Temperature**: Read from the device's thermal zone, published as an MQTT sensor.
 
-**Implementation**: `pkg/input/monitor.go`, `pkg/input/gpio.go`,
-`pkg/input/events.go`
+**Implementation**: `pkg/input/monitor.go`, `pkg/input/devices.go`
 
 ---
 
@@ -581,7 +599,7 @@ Firewall rules for inbound ports are persisted in
 | `pkg/sip` | 7 | SIP client, RTSP server, RTP relay, GStreamer, video manager |
 | `pkg/webserver` | 6 | HTTP server, REST API, SSE, config management handlers |
 | `pkg/events` | 2 | Async event bus with pattern matching |
-| `pkg/input` | 3 | Hardware input: keypad, touchscreen, GPIO via sysfs |
+| `pkg/input` | 3 | Hardware input: keypad, gpio-keys, GPIO via sysfs |
 | `pkg/multicast` | 2 | UDP multicast listener + OWN event handler |
 | `pkg/messageparser` | 1 | Answering machine message and memo parser |
 | `pkg/deviceconfig` | 7 | Device config readers (XML/INI), file watcher, MQTT publisher |

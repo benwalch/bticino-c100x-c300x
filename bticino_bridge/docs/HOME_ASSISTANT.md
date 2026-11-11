@@ -49,7 +49,7 @@ optional restart buttons.
 | New messages *(300X only)* | `sensor` | `bticino/messages/unread` | Unread answering-machine messages |
 | Total messages *(300X only)* | `sensor` | `bticino/messages/total` | |
 | Storage used *(300X only)* | `sensor` | `bticino/messages/storage` | % used |
-| Keypad | `sensor` | `bticino/panel/keypad` | Last physical button pressed |
+| Keypad | `sensor` | `bticino/panel/keypad` | Last physical button pressed: `key`, `star`, `eye`, `floor_doorbell`; 300X `phone`; 100X `p1`–`p4`, `phone_answer`, `phone_hangup`; otherwise `KEY_<code>` |
 | System diagnostics | `sensor` | `bticino/system/diagnostics` | |
 | Activity log | `sensor` | `bticino/bus/log` | + `.../attributes` for history |
 | Firmware version | `sensor` | `bticino/system/network` | State is the firmware version; IP/MAC/kernel in attributes |

@@ -38,11 +38,6 @@ const (
 	TTYSerialDevice  = "/dev/ttymxc2"
 	ThermalZonePath  = "/sys/class/thermal/thermal_zone0/temp"
 
-	// Input devices (/dev/input/)
-	InputDeviceKeypad      = "/dev/input/event0" // I2C_KB_TOUCH: physical keypad (4 buttons)
-	InputDeviceTouchscreen = "/dev/input/event1" // TSC2005: touchscreen
-	InputDeviceGPIOKeys    = "/dev/input/event2" // gpio-keys: GPIO keys
-
 	// Answering Machine Temp Storage
 	AnsweringMachineTemp = "/var/tmp/segreteria"
 
@@ -233,10 +228,14 @@ const (
 	HAKeypadConfig          = "homeassistant/event/intercom/keypad/config"
 )
 
-// ==================== PHYSICAL BUTTONS (verified on /dev/input/event0) ====================
+// ==================== PHYSICAL BUTTONS (keypad) ====================
 //
-// The physical keypad is an I2C_KB_TOUCH connected to /dev/input/event0.
-// Each button generates an EV_KEY event with the following codes.
+// The keypad drivers (300X cypress,i2c_kb_touch; 100X c100_kb_touch) define
+// the EV_KEY codes, the device tree does not, so they are a table per variant.
+// The gpio-keys (floor call, 100X handset keys, joystick) are named from the
+// device tree, see GPIOKeyNamesByModel.
+//
+// Classe 300X:
 //
 // | Button     | Code | Physical function                   | Generated OWN command                          |
 // |------------|------|-------------------------------------|------------------------------------------------|
@@ -249,23 +248,62 @@ const (
 // - Long key press keeps the door relay open longer
 // - Eye activates the camera ~30 seconds, then it turns off automatically
 // - Phone only works when the camera is already active (via eye or incoming call)
-const (
-	KeyCodeKey   = 2 // Key: open door
-	KeyCodeStar  = 3 // Star: staircase light
-	KeyCodeEye   = 4 // Eye: activate camera
-	KeyCodePhone = 5 // Phone: two-way communication
+//
+// Classe 100X (verified by pressing each key): P1–P4 are the programmable
+// keys, whose function the configurator sets.
 
-	EventTypeKeypress = 1
-	EventValuePress   = 1
-	EventValueRelease = 0
-)
+// KeypadKeyNamesByModel maps device variant to keypad key code → name.
+var KeypadKeyNamesByModel = map[string]map[int]string{
+	DeviceVariant300X: {
+		2: "key",
+		3: "star",
+		4: "eye",
+		5: "phone",
+	},
+	DeviceVariant100X: {
+		2: "p1",
+		3: "p2",
+		4: "p3",
+		5: "p4",
+		6: "star",
+		7: "key",
+		8: "eye",
+	},
+}
 
-// KeyNames maps key codes to descriptive names in English
-var KeyNames = map[int]string{
-	KeyCodeKey:   "key",
-	KeyCodeStar:  "star",
-	KeyCodeEye:   "eye",
-	KeyCodePhone: "phone",
+// GPIOKeyNamesByModel maps device variant to gpio-keys device-tree label →
+// name. The codes come from the device tree with the labels; labels without an
+// entry (e.g. "powerfail" in the 300X manufacturing device tree) keep their name.
+var GPIOKeyNamesByModel = map[string]map[string]string{
+	DeviceVariant300X: {
+		"ch_piano": "floor_doorbell", // rear clamp 9
+	},
+	DeviceVariant100X: {
+		"floor_call": "floor_doorbell", // rear clamp 7
+		"horn_up":    "phone_answer",   // green handset key
+		"horn_down":  "phone_hangup",   // red handset key
+		"wheel_up":   "joystick_up",
+		"wheel_down": "joystick_down",
+		"wheel_push": "joystick_press",
+	},
+}
+
+// GPIOKeyNamesForVariant returns the gpio-keys names of the given variant,
+// falling back to c300x for unknown values.
+func GPIOKeyNamesForVariant(variant string) map[string]string {
+	if names, ok := GPIOKeyNamesByModel[variant]; ok {
+		return names
+	}
+	return GPIOKeyNamesByModel[DeviceVariant300X]
+}
+
+// KeypadKeyNamesForVariant returns the keypad key names of the given variant,
+// falling back to c300x for unknown values.
+func KeypadKeyNamesForVariant(variant string) map[int]string {
+	if names, ok := KeypadKeyNamesByModel[variant]; ok {
+		return names
+	}
+	return KeypadKeyNamesByModel[DeviceVariant300X]
 }
 
 // Message Types for Answering Machine

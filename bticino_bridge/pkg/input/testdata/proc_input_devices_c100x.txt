@@ -1,0 +1,20 @@
+I: Bus=0019 Vendor=0001 Product=0001 Version=0100
+N: Name="C100_KB_TOUCH keypad"
+P: Phys=
+S: Sysfs=/devices/soc0/soc/2100000.aips-bus/21a8000.i2c/i2c-2/2-0069/input/input0
+U: Uniq=
+H: Handlers=kbd event0 
+B: PROP=0
+B: EV=3
+B: KEY=1fc
+
+I: Bus=0019 Vendor=0001 Product=0001 Version=0100
+N: Name="gpio-keys"
+P: Phys=gpio-keys/input0
+S: Sysfs=/devices/soc0/gpio-keys/input/input1
+U: Uniq=
+H: Handlers=kbd event1 
+B: PROP=0
+B: EV=3
+B: KEY=4204000 0 0 1080 0 0 10000000
+

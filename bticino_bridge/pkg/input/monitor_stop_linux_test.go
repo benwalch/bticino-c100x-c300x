@@ -37,7 +37,7 @@ func TestStopEndsReadBlockedOnCharacterDevice(t *testing.T) {
 	logger := logrus.New()
 	logger.SetOutput(io.Discard)
 	im := NewInputMonitor(logger)
-	im.EventDevices = []string{openPTYSlavePath(t)}
+	im.EventDevices = []EventDevice{{Name: "pty", Path: openPTYSlavePath(t)}}
 	im.GPIOPins = nil
 
 	if err := im.Start(); err != nil {

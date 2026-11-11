@@ -14,16 +14,15 @@ import (
 	"bticino_bridge/pkg/bticino"
 )
 
-// InputMonitor monitors hardware inputs (buttons, touchscreen, GPIO)
+// InputMonitor monitors hardware inputs (buttons, GPIO)
 type InputMonitor struct {
-	EventDevices []string
+	EventDevices []EventDevice
 	GPIOPins     []int
 	Logger       *logrus.Logger
 
 	// Event callbacks
 	OnButtonPress  func(ButtonEvent)
 	OnScreenChange func(ScreenEvent)
-	OnTouchEvent   func(TouchEvent)
 
 	// Internal state
 	running   bool
@@ -39,20 +38,10 @@ type InputMonitor struct {
 // ButtonEvent represents a physical button press/release
 type ButtonEvent struct {
 	Device    string    `json:"device"`   // "/dev/input/event0"
-	Key       int       `json:"key"`      // KEY_1 (2), KEY_2 (3), KEY_3 (4), KEY_4 (5)
-	KeyName   string    `json:"key_name"` // "KEY_1", "KEY_2", etc.
+	Key       int       `json:"key"`      // Linux key code
+	KeyName   string    `json:"key_name"` // "key", "floor_doorbell", … or "KEY_<code>"
 	Action    string    `json:"action"`   // "press" | "release"
 	Value     int32     `json:"value"`    // 1 = press, 0 = release
-	Timestamp time.Time `json:"timestamp"`
-}
-
-// TouchEvent represents touchscreen interaction
-type TouchEvent struct {
-	Device    string    `json:"device"` // "/dev/input/event1"
-	X         int32     `json:"x"`
-	Y         int32     `json:"y"`
-	Pressure  int32     `json:"pressure"`
-	Action    string    `json:"action"` // "touch", "move", "release"
 	Timestamp time.Time `json:"timestamp"`
 }
 
@@ -74,41 +63,25 @@ type InputEventData struct {
 	Value int32    // 1=press, 0=release, or absolute value
 }
 
-// Key codes for BTicino device buttons
-const (
-	KEY_1 = 2 // Button 1
-	KEY_2 = 3 // Button 2
-	KEY_3 = 4 // Button 3
-	KEY_4 = 5 // Button 4
-)
-
 // Event types
 const (
 	EV_SYN = 0x00 // Synchronization events
 	EV_KEY = 0x01 // Key press/release events
-	EV_ABS = 0x03 // Absolute axis events (touchscreen)
-)
-
-// Absolute axis codes
-const (
-	ABS_X        = 0x00 // X coordinate
-	ABS_Y        = 0x01 // Y coordinate
-	ABS_PRESSURE = 0x18 // Pressure
 )
 
 // NewInputMonitor creates a new input monitor
 func NewInputMonitor(logger *logrus.Logger) *InputMonitor {
+	devices, err := discoverEventDevices()
+	if err != nil {
+		logger.WithError(err).Warn("Cannot list the input devices")
+	}
 	return &InputMonitor{
-		EventDevices: []string{
-			"/dev/input/event0", // I2C_KB_TOUCH keypad
-			"/dev/input/event1", // TSC2005 touchscreen
-			"/dev/input/event2", // gpio-keys
-		},
-		GPIOPins:   bticino.GPIOPinsForVariant(bticino.DeviceVariant),
-		Logger:     logger,
-		stopChan:   make(chan struct{}),
-		openFiles:  make(map[*os.File]bool),
-		gpioStates: make(map[int]bool),
+		EventDevices: devices,
+		GPIOPins:     bticino.GPIOPinsForVariant(bticino.DeviceVariant),
+		Logger:       logger,
+		stopChan:     make(chan struct{}),
+		openFiles:    make(map[*os.File]bool),
+		gpioStates:   make(map[int]bool),
 	}
 }
 
@@ -185,10 +158,10 @@ func (im *InputMonitor) IsRunning() bool {
 
 // monitorEventDevice monitors a specific /dev/input/event* device
 // Includes auto-reconnect logic: if a read fails, wait and retry
-func (im *InputMonitor) monitorEventDevice(device string) {
+func (im *InputMonitor) monitorEventDevice(device EventDevice) {
 	defer im.wg.Done()
 
-	im.Logger.Infof("Monitoring input device: %s", device)
+	im.Logger.Infof("Monitoring input device: %s (%s)", device.Path, device.Name)
 
 	const maxRetries = 0 // 0 = retry indefinitely
 	const retryDelay = 3 * time.Second
@@ -197,21 +170,21 @@ func (im *InputMonitor) monitorEventDevice(device string) {
 
 	for im.IsRunning() {
 		// Check if device exists
-		if _, err := os.Stat(device); os.IsNotExist(err) {
-			im.Logger.Warnf("Input device %s not found, skipping", device)
+		if _, err := os.Stat(device.Path); os.IsNotExist(err) {
+			im.Logger.Warnf("Input device %s not found, skipping", device.Path)
 			return
 		}
 
 		// Open device for reading
-		file, err := os.Open(device)
+		file, err := os.Open(device.Path)
 		if err != nil {
-			im.Logger.Errorf("Failed to open input device %s: %v", device, err)
+			im.Logger.Errorf("Failed to open input device %s: %v", device.Path, err)
 			retryCount++
 			if maxRetries > 0 && retryCount >= maxRetries {
-				im.Logger.Errorf("Max retries reached for %s, giving up", device)
+				im.Logger.Errorf("Max retries reached for %s, giving up", device.Path)
 				return
 			}
-			im.Logger.Infof("Retrying %s in %v (attempt %d)...", device, retryDelay, retryCount)
+			im.Logger.Infof("Retrying %s in %v (attempt %d)...", device.Path, retryDelay, retryCount)
 			select {
 			case <-time.After(retryDelay):
 				continue
@@ -236,7 +209,7 @@ func (im *InputMonitor) monitorEventDevice(device string) {
 		}
 
 		if readErr != nil {
-			im.Logger.Warnf("Event loop ended for %s: %v. Reconnecting in %v...", device, readErr, retryDelay)
+			im.Logger.Warnf("Event loop ended for %s: %v. Reconnecting in %v...", device.Path, readErr, retryDelay)
 			select {
 			case <-time.After(retryDelay):
 				continue
@@ -246,11 +219,11 @@ func (im *InputMonitor) monitorEventDevice(device string) {
 		}
 	}
 
-	im.Logger.Infof("Stopped monitoring device: %s", device)
+	im.Logger.Infof("Stopped monitoring device: %s", device.Path)
 }
 
 // readEventLoop reads events from a device file until error or stop
-func (im *InputMonitor) readEventLoop(device string, file *os.File) error {
+func (im *InputMonitor) readEventLoop(device EventDevice, file *os.File) error {
 	for im.IsRunning() {
 		var event InputEventData
 		err := binary.Read(file, binary.LittleEndian, &event)
@@ -268,23 +241,21 @@ func (im *InputMonitor) readEventLoop(device string, file *os.File) error {
 }
 
 // processInputEvent processes a raw input event
-func (im *InputMonitor) processInputEvent(device string, event *InputEventData) {
+func (im *InputMonitor) processInputEvent(device EventDevice, event *InputEventData) {
 	timestamp := time.Unix(int64(event.Time[0]), int64(event.Time[1])*1000)
 
 	switch event.Type {
 	case EV_KEY:
 		im.processKeyEvent(device, event.Code, event.Value, timestamp)
-	case EV_ABS:
-		im.processAbsoluteEvent(device, event.Code, event.Value, timestamp)
 	case EV_SYN:
 		// Synchronization event - ignore for now
 	default:
-		im.Logger.Debugf("Unknown event type %d from %s", event.Type, device)
+		im.Logger.Debugf("Unknown event type %d from %s", event.Type, device.Path)
 	}
 }
 
 // processKeyEvent processes key press/release events
-func (im *InputMonitor) processKeyEvent(device string, code uint16, value int32, timestamp time.Time) {
+func (im *InputMonitor) processKeyEvent(device EventDevice, code uint16, value int32, timestamp time.Time) {
 	keyCode := int(code)
 	action := "release"
 	if value == 1 {
@@ -292,54 +263,19 @@ func (im *InputMonitor) processKeyEvent(device string, code uint16, value int32,
 	}
 
 	buttonEvent := ButtonEvent{
-		Device:    device,
+		Device:    device.Path,
 		Key:       keyCode,
-		KeyName:   getKeyName(keyCode),
+		KeyName:   keyName(device.KeyNames, keyCode),
 		Action:    action,
 		Value:     value,
 		Timestamp: timestamp,
 	}
 
-	// Log the button event
-	im.Logger.Infof("Button %s: %s (device: %s)", buttonEvent.KeyName, action, device)
+	im.Logger.Debugf("Button %s: %s (device: %s)", buttonEvent.KeyName, action, device.Path)
 
 	// Call callback if set
 	if im.OnButtonPress != nil {
 		go im.OnButtonPress(buttonEvent)
-	}
-}
-
-// processAbsoluteEvent processes absolute position events (touchscreen)
-func (im *InputMonitor) processAbsoluteEvent(device string, code uint16, value int32, timestamp time.Time) {
-	// For now, just log touchscreen events
-	// Full touchscreen tracking would require maintaining state across multiple events
-	if code == ABS_X || code == ABS_Y || code == ABS_PRESSURE {
-		im.Logger.Debugf("Touch event: %s axis=%d value=%d", device, code, value)
-
-		touchEvent := TouchEvent{
-			Device:    device,
-			Timestamp: timestamp,
-		}
-
-		switch code {
-		case ABS_X:
-			touchEvent.X = value
-			touchEvent.Action = "move_x"
-		case ABS_Y:
-			touchEvent.Y = value
-			touchEvent.Action = "move_y"
-		case ABS_PRESSURE:
-			touchEvent.Pressure = value
-			if value > 0 {
-				touchEvent.Action = "touch"
-			} else {
-				touchEvent.Action = "release"
-			}
-		}
-
-		if im.OnTouchEvent != nil {
-			go im.OnTouchEvent(touchEvent)
-		}
 	}
 }
 
@@ -435,9 +371,9 @@ func (im *InputMonitor) readGPIOValue(pin int) (bool, error) {
 	return false, scanner.Err()
 }
 
-// getKeyName converts key code to human-readable BTicino button name
-func getKeyName(keyCode int) string {
-	if name, ok := bticino.KeyNames[keyCode]; ok {
+// keyName returns the device's name for a key code, or "KEY_<code>".
+func keyName(names map[int]string, keyCode int) string {
+	if name, ok := names[keyCode]; ok {
 		return name
 	}
 	return fmt.Sprintf("KEY_%d", keyCode)

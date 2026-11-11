@@ -1,0 +1,18 @@
+I: Bus=0018 Vendor=0000 Product=0000 Version=0000
+N: Name="keypad"
+H: Handlers=kbd event0 
+B: EV=3
+B: KEY=3c
+
+I: Bus=001c Vendor=0000 Product=0000 Version=0000
+N: Name="touchscreen"
+H: Handlers=event1 
+B: EV=b
+B: KEY=400 0 0 0 0 0 0 0 0 0 0
+B: ABS=1000003
+
+I: Bus=0019 Vendor=0001 Product=0001 Version=0100
+N: Name="gpio-keys"
+H: Handlers=kbd event2 
+B: EV=3
+B: KEY=40

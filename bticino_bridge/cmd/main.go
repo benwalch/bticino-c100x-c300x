@@ -921,55 +921,49 @@ func main() {
 
 	// Set button press callback -> publish to EventBus and MQTT
 	inputMonitor.OnButtonPress = func(evt input.ButtonEvent) {
-		logger.WithFields(logrus.Fields{
-			"key":    evt.KeyName,
-			"action": evt.Action,
-			"device": evt.Device,
-		}).Info("Physical button event detected")
-
-		// Map key codes to BTicino button names
-		buttonName := ""
-		switch evt.Key {
-		case bticino.KeyCodeKey:
-			buttonName = "key"
-		case bticino.KeyCodeStar:
-			buttonName = "star"
-		case bticino.KeyCodeEye:
-			buttonName = "eye"
-		case bticino.KeyCodePhone:
-			buttonName = "phone"
-		default:
-			buttonName = evt.KeyName
+		fields := logrus.Fields{"key": evt.KeyName, "action": evt.Action, "device": evt.Device}
+		// The joystick moves with every step through the device menu.
+		if strings.HasPrefix(evt.KeyName, "joystick_") {
+			logger.WithFields(fields).Debug("Joystick event")
+			return
 		}
+		logger.WithFields(fields).Info("Physical button event detected")
 
 		// Publish to EventBus
 		eventBus.PublishWithSource("button.pressed", map[string]interface{}{
-			"key_code":    evt.Key,
-			"key_name":    buttonName,
-			"action":      evt.Action,
-			"device":      evt.Device,
-			"raw_keyname": evt.KeyName,
+			"key_code": evt.Key,
+			"key_name": evt.KeyName,
+			"action":   evt.Action,
+			"device":   evt.Device,
 		}, "input_monitor")
 
 		// Direct MQTT publish for button press
 		if mqttBridge != nil && evt.Action == "press" {
-			mqttBridge.PublishButtonPress(evt.Key, buttonName, evt.Action)
+			mqttBridge.PublishButtonPress(evt.Key, evt.KeyName, evt.Action)
 
 			// Publish a human-readable description to the activity_log
 			var actDesc string
-			switch evt.Key {
-			case bticino.KeyCodeKey:
+			switch evt.KeyName {
+			case "key":
 				actDesc = "Key button pressed (open door)"
-			case bticino.KeyCodeStar:
+			case "star":
 				actDesc = "Star button pressed (staircase light)"
-			case bticino.KeyCodeEye:
+			case "eye":
 				actDesc = "Eye button pressed (activate camera)"
-			case bticino.KeyCodePhone:
+			case "phone":
 				actDesc = "Phone button pressed (intercom)"
+			case "p1", "p2", "p3", "p4":
+				actDesc = fmt.Sprintf("Programmable key %s pressed", strings.ToUpper(evt.KeyName))
+			case "phone_answer":
+				actDesc = "Answer button pressed"
+			case "phone_hangup":
+				actDesc = "Hang-up button pressed"
+			case "floor_doorbell":
+				actDesc = "Floor doorbell pressed"
 			default:
-				actDesc = fmt.Sprintf("Button %s pressed", buttonName)
+				actDesc = fmt.Sprintf("Button %s pressed", evt.KeyName)
 			}
-			mqttBridge.PublishActivityLog(actDesc, "button_press", buttonName)
+			mqttBridge.PublishActivityLog(actDesc, "button_press", evt.KeyName)
 		}
 	}
 
@@ -986,22 +980,9 @@ func main() {
 		}, "input_monitor")
 	}
 
-	// Set touch event callback -> log for device discovery
-	inputMonitor.OnTouchEvent = func(evt input.TouchEvent) {
-		logger.WithFields(logrus.Fields{
-			"device":   evt.Device,
-			"action":   evt.Action,
-			"x":        evt.X,
-			"y":        evt.Y,
-			"pressure": evt.Pressure,
-		}).Info("Touch event detected (discovery)")
-	}
-
 	if err := inputMonitor.Start(); err != nil {
 		logger.WithError(err).Warn("Failed to start input monitor (may not have /dev/input access)")
 		inputMonitor = nil
-	} else {
-		logger.Info("Input Monitor: Monitoring /dev/input/event0 (keypad), event1 (touch), event2 (gpio)")
 	}
 
 	// ==================== COMPONENT 7: OpenWebNet Event Monitor (Port 20000) ====================
@@ -1189,7 +1170,7 @@ func main() {
 	}
 
 	if inputMonitor != nil {
-		logger.Info("  Input Monitor: Active (keypad buttons, touchscreen, 13 GPIO pins)")
+		logger.Info("  Input Monitor: Active")
 	}
 
 	if udpProxy != nil {

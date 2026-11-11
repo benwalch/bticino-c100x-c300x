@@ -46,6 +46,22 @@ Known limits:
   port 20000. A device MAC address and IP left in docs and command examples
   are replaced by placeholders.
 
+- **Breaking (Classe 100X):** physical keys are named per device. The bridge
+  finds the input devices in `/proc/bus/input/devices` instead of assuming
+  `event0`–`event2` from the 300X, and names `gpio-keys` keys from the device
+  tree: the floor call terminals publish `floor_doorbell` on
+  `bticino/panel/keypad` instead of `KEY_213` and log "Floor doorbell pressed";
+  joystick moves are logged at debug level only and no longer reach MQTT or the
+  activity log. The 100X keys have their own codes: `key`, `star` and `eye`
+  are named correctly (before, a 100X reported `KEY_6`–`KEY_8`), the
+  programmable keys publish `p1`–`p4` instead of 300X names, and the
+  handset keys publish `phone_answer` and `phone_hangup` instead of `KEY_218`
+  and `KEY_206`. Migration: automations that compare
+  `sensor.bticino_panel_keypad` with `KEY_<code>` use the new names.
+  Touchscreens are no longer read: on a 300X every touch would have been
+  published as a key press, and the "Touch event detected (discovery)" log
+  lines are gone. The "event2 not found" warning is gone.
+
 - The Controls tab of the web UI has a Ringtones section: pick a ringtone per
   type, play it in the browser and set it on the device.
   `GET /api/device/ringtones/{id}.wav` serves the files listed in

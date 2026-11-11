@@ -32,6 +32,31 @@ of the compiled `bticino.DeviceVariant` is possible with existing code.
 ⚠️ **Do not trust `…/cfg/extra/90/extra.xml`:** its `<sw><name>` says `C300X`
 on this 100X unit (the extra package was authored for the 300X).
 
+### 1.1 Input devices and keys (2026-11-11)
+
+`/proc/bus/input/devices` lists two devices: `C100_KB_TOUCH keypad`
+(`event0`, I2C `c100_kb_touch@69`, key codes 2–8) and `gpio-keys` (`event1`).
+There is no `event2` and no touchscreen.
+
+The device tree names the `gpio-keys` entries (`/proc/device-tree/gpio-keys`):
+
+| Label | Code | Meaning |
+|---|---|---|
+| `floor_call` | 213 | the rear terminals for the external floor pushbutton (manual: clamp 7); a real floor ring produced it, about 3 s before the bus frame `*7*59#14#0#0*##` |
+| `wheel_up` / `wheel_down` / `wheel_push` | 103 / 108 / 28 | the front joystick |
+| `horn_up` / `horn_down` | 218 / 206 | the green (answer) and red (hang up) handset keys, verified by pressing each key twice |
+
+The keypad's device-tree node has no keymap; its driver defines the codes.
+Pressing each front key gave P1–P4 (the programmable keys) = 2–5,
+star = 6, key = 7, eye = 8. The 300X keypad uses 2–5 for key, star, eye and
+phone; its manuals list no programmable keys.
+
+For comparison, the device trees in the official Classe 300X firmware 1.7.19
+(`BTicino ZIA board`) have a single `gpio-keys` entry, `ch_piano` (floor call,
+manual: clamp 9) with code 6 (the manufacturing device tree adds
+`powerfail`, code 7), a `cypress,i2c_kb_touch` keypad without keymap and a
+`ti,tsc2005` touchscreen. No other node produces key codes.
+
 ---
 
 ## 2. Native processes (steady state)
