@@ -21,7 +21,7 @@ func (ws *WebServer) rebootDevice() {
 		ws.rebootDeviceFunc()
 		return
 	}
-	system.RebootDeviceAsync(ws.logger)
+	system.RebootDeviceAsync(ws.logger, "web")
 }
 
 // @Summary Restart the bridge process

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
+	"bticino_bridge/pkg/logging"
 )
 
 // restartScript starts the replacement once the old process ($1) is gone,
@@ -47,9 +49,11 @@ func RestartBridgeAsync(logger *logrus.Logger) {
 }
 
 // RebootDeviceAsync reboots the whole video door phone (/sbin/reboot) after a
-// brief pause (gives time to reply to the requesting client).
-func RebootDeviceAsync(logger *logrus.Logger) {
-	logger.Warn("system: DEVICE REBOOT requested (/sbin/reboot)")
+// brief pause (gives time to reply to the requesting client). source ("web",
+// "mqtt") goes to the crash log on flash, as the log itself is lost on reboot.
+func RebootDeviceAsync(logger *logrus.Logger, source string) {
+	logger.WithField("source", source).Warn("system: DEVICE REBOOT requested (/sbin/reboot)")
+	logging.RecordNote("device reboot requested via " + source)
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 		if err := exec.Command("/sbin/reboot").Run(); err != nil {

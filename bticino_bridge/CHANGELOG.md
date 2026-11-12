@@ -46,6 +46,18 @@ Known limits:
   port 20000. A device MAC address and IP left in docs and command examples
   are replaced by placeholders.
 
+- `bticino_bridge.crash.log` on flash shows why the device rebooted. A reboot
+  requested from the web UI or over MQTT adds `device reboot requested via web`
+  (or `mqtt`) before `/sbin/reboot`. Once per device boot, the bridge adds the
+  boot time and what pstore (ramoops) kept from the previous run: a console
+  ending in `reboot: Restarting system` means a process asked for the reboot,
+  `dmesg-ramoops-*` records mean a kernel panic or oops (their header and cause
+  line are copied, as the next reboot replaces them), and no records mean a power
+  loss or cold start. Other console endings are written as they are, without a
+  verified meaning. The device logs are in RAM and lost on reboot; a reboot that
+  no process of the bridge requested leaves no hint of who asked for it.
+  `logging.RecordProblem` is now `RecordNote`.
+
 - **Breaking (Classe 100X):** physical keys are named per device. The bridge
   finds the input devices in `/proc/bus/input/devices` instead of assuming
   `event0`–`event2` from the 300X, and names `gpio-keys` keys from the device

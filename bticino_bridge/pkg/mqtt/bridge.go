@@ -1777,7 +1777,7 @@ func (b *MQTTBridge) handleRebootDeviceCommand(client pahomqtt.Client, msg pahom
 	}
 	b.logger.Warn("MQTT: DEVICE REBOOT requested (/sbin/reboot)")
 	b.incCommands()
-	system.RebootDeviceAsync(b.logger)
+	system.RebootDeviceAsync(b.logger, "mqtt")
 }
 
 // publishEvent publishes an HA Event entity trigger to <prefix>/<sub>, e.g. doorbell/entrance/event.

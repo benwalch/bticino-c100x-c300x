@@ -195,9 +195,10 @@ func lastCrash(path string) string {
 	return ""
 }
 
-// RecordProblem notes a problem in the crash log, where it can still be read when
-// the log itself fails or the bridge exits before logging is set up.
-func RecordProblem(message string) {
+// RecordNote adds a line to the crash log, where it survives a reboot and can
+// still be read when the log itself fails or the bridge exits before logging is
+// set up.
+func RecordNote(message string) {
 	crashMu.Lock()
 	defer crashMu.Unlock()
 	if crashPath == "" {

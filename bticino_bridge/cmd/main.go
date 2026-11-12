@@ -142,6 +142,7 @@ func main() {
 			// Next to the binary, which on the device means on flash.
 			crashLog := filepath.Join(filepath.Dir(exe), "bticino_bridge.crash.log")
 			previousCrash, crashErr = logging.EnableCrashLog(crashLog, versionpkg.GetVersion())
+			logging.RecordPreviousShutdown()
 		}
 	}
 
@@ -150,7 +151,7 @@ func main() {
 	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
 		message := fmt.Sprintf("cannot load config %s: %v", *configPath, err)
-		logging.RecordProblem(message)
+		logging.RecordNote(message)
 		fmt.Fprintln(os.Stderr, message)
 		os.Exit(1)
 	}
