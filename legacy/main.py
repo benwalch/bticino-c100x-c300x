@@ -21,6 +21,8 @@ import re
 
 SSH_GUARD_PATH = '/usr/sbin/bt_ssh_guard'
 SSH_GUARD_INITTAB_ENTRY = f'sshg:5:respawn:{SSH_GUARD_PATH}'
+BRIDGE_AUTOSTART_PATH = '/etc/init.d/bt_bridge_autostart'
+BRIDGE_AUTOSTART_LINK = '/etc/rc5.d/S99bt_bridge_autostart'
 
 class PrepareFirmware():
     """Firmware prepare class."""
@@ -304,6 +306,8 @@ class PrepareFirmware():
         self.logger.info('Enabled dropbear')
         self.install_ssh_guard(cwd)
         self.logger.info('Installed SSH guard')
+        self.install_bridge_autostart(cwd)
+        self.logger.info('Installed bridge autostart')
         self.save_version(cwd, __version__)
         if self.install_mqtt == 'y':
             ok = self.prepare_mqtt(cwd)
@@ -938,6 +942,17 @@ class PrepareFirmware():
         if not entry_present:
             subprocess.run(['sudo', 'tee', '-a', inittab], input=f'\n{SSH_GUARD_INITTAB_ENTRY}\n',
                            text=True, stdout=subprocess.DEVNULL, check=True)
+        print('installed ✅')
+
+    def install_bridge_autostart(self, cwd):
+        """Install the script that starts the bridge once per boot (if it is deployed)."""
+        print('Installing bridge autostart... ', end='', flush=True)
+        script_in_image = f'{self.mnt_loc}{BRIDGE_AUTOSTART_PATH}'
+        subprocess.run(['sudo', 'cp', f'{cwd}/firmware_scripts/bt_bridge_autostart', script_in_image],
+                       check=True)
+        subprocess.run(['sudo', 'chmod', '755', script_in_image], check=True)
+        subprocess.run(['sudo', 'ln', '-sfn', '../init.d/bt_bridge_autostart',
+                        f'{self.mnt_loc}{BRIDGE_AUTOSTART_LINK}'], check=True)
         print('installed ✅')
 
     def save_version(self, cwd, version):

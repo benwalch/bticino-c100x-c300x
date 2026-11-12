@@ -58,6 +58,19 @@ Known limits:
   no process of the bridge requested leaves no hint of who asked for it.
   `logging.RecordProblem` is now `RecordNote`.
 
+- The bridge starts again after a reboot of the device. The firmware builder
+  installs `firmware_scripts/bt_bridge_autostart` as an `S99` init script; it
+  waits for OpenWebNet and Flexisip (at most 15 min) and a plausible clock (at
+  most 60 s), then starts the bridge once, unless one is running or
+  `bticino_bridge.noautostart` exists. After 3 starts in a row that did not
+  reach 5 min of runtime it waits 10 min first, as a guard against a reboot
+  loop. It never restarts a bridge that stopped. Install on a running device
+  and removal: see `docs/DEPLOY.md`. Tested in the C100X 1.5.8 root filesystem
+  under emulation and on a Classe 100X with a real reboot (start 32 s after
+  boot, SIP and MQTT up, count cleared after 5 min). For the
+  Classe 300X only the 1.7.19 image was checked (same init layout, the tools
+  the script needs, Flexisip on port 5060).
+
 - **Breaking (Classe 100X):** physical keys are named per device. The bridge
   finds the input devices in `/proc/bus/input/devices` instead of assuming
   `event0`–`event2` from the 300X, and names `gpio-keys` keys from the device

@@ -50,7 +50,7 @@ in `legacy/` comes from upstream and was not tested end to end in this fork.
 |---|---|
 | [`bticino_bridge/`](bticino_bridge/README.md) | The bridge: MQTT, HomeKit, web dashboard, REST API, RTSP video |
 | [`legacy/`](legacy/README.md) | Firmware builder (`main.py`) and the MyHOME Suite flashing steps |
-| `firmware_scripts/` | `bt_ssh_guard`, the SSH watchdog built into the firmware |
+| `firmware_scripts/` | Scripts built into the firmware: `bt_ssh_guard` (SSH watchdog) and `bt_bridge_autostart` (starts the bridge after a reboot) |
 | [`docs/`](docs/README.md) | Guides and the OpenWebNet command reference |
 | [`hashes/`](hashes/README.md) | Checksums of official firmware (no firmware itself) |
 | [`mqtt_scripts/`](mqtt_scripts/README.md) | MQTT scripts for use without the bridge |

@@ -72,3 +72,11 @@ dropbear. `init` respawns the guard itself (`sshg` entry in `/etc/inittab`).
 - A dropbear stopped on purpose comes back within about a minute.
 - To remove it, delete the `sshg` line from `/etc/inittab`, run `init q`, then
   delete `/usr/sbin/bt_ssh_guard` (the root filesystem must be writable).
+
+## Bridge autostart
+
+Every firmware built by `main.py` also includes `bt_bridge_autostart`
+(`/etc/init.d`, linked as `S99` in `/etc/rc5.d`). It starts the bridge once
+per boot if one is deployed in `/home/bticino/cfg/extra`; see
+[DEPLOY.md](../bticino_bridge/docs/DEPLOY.md#autostart-after-a-reboot) for
+the waits, the reboot loop guard and the off switch.

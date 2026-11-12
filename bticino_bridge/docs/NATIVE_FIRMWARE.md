@@ -318,9 +318,9 @@ request/answer.
    `scripts/deploy.sh` sends `TERM` first.
 3. **A device reboot is the safe recovery** for any SIP/flexisip mess; it is
    forbidden to the agent (see `AGENTS.md`) and must be done by the operator.
-   Note the bridge has **no autostart** on this unit (no init script, no systemd
-   unit installed): after a reboot it stays down until it is started manually
-   or deployed again.
+   After a reboot the bridge comes back only if `bt_bridge_autostart` is
+   installed (see [DEPLOY.md](DEPLOY.md#autostart-after-a-reboot)); otherwise it
+   stays down until it is started manually or deployed again.
 4. `log-level=error` in Flexisip means "no evidence" — raise it before
    investigating a SIP failure, and revert afterwards.
 

@@ -1,0 +1,94 @@
+#!/bin/sh
+# Starts the bridge once after boot, as soon as the firmware services it needs are up.
+# It never restarts a running or crashed bridge: deploy and the web restart do that.
+# The name must differ from the binary, or pgrep would find this script itself.
+# Off switch: create $DISABLE_FILE (checked at boot and again right before the start).
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+
+BRIDGE_DIR=/home/bticino/cfg/extra
+BRIDGE=bticino_bridge
+DISABLE_FILE=$BRIDGE_DIR/$BRIDGE.noautostart
+EARLY_STARTS_FILE=$BRIDGE_DIR/$BRIDGE.early_starts
+
+# Flexisip starts only once WLAN is up (12 s to 2 min seen); the bridge gives up
+# SIP for the whole run if it starts before.
+SERVICES_LIMIT_SECONDS=900
+# After a power loss the clock is wrong until NTP corrects it (about 2 min).
+CLOCK_LIMIT_SECONDS=60
+# A bridge that still runs after this time counts as healthy.
+HEALTHY_AFTER_SECONDS=300
+# After this many early starts in a row, wait before starting: time to create
+# $DISABLE_FILE over SSH if the bridge keeps the device in a reboot loop.
+MAX_EARLY_STARTS=3
+EARLY_DELAY_SECONDS=600
+
+note() {
+    logger -t bt_bridge_autostart "$1" 2> /dev/null
+}
+
+port_is_listening() {
+    grep -qsE ":$(printf '%04X' "$1") [0-9A-F]+:0000 0A" /proc/net/tcp
+}
+
+services_are_ready() {
+    port_is_listening 20000 && port_is_listening 5060
+}
+
+# After a power loss the clock stands in the past until NTP corrects it.
+clock_is_set() {
+    [ "$(date +%s)" -gt "$(stat -c %Y "$BRIDGE_DIR/$BRIDGE")" ]
+}
+
+wait_for() {
+    limit=$1
+    condition=$2
+    waited=0
+    until "$condition"; do
+        [ "$waited" -ge "$limit" ] && { note "$condition: gave up after $limit s"; return 1; }
+        sleep 5
+        waited=$((waited + 5))
+    done
+}
+
+bridge_is_running() {
+    pgrep -x "$BRIDGE" > /dev/null
+}
+
+start_when_ready() {
+    wait_for "$SERVICES_LIMIT_SECONDS" services_are_ready
+    wait_for "$CLOCK_LIMIT_SECONDS" clock_is_set
+
+    # A bridge that reboots the device soon after each start must not keep it in a loop.
+    early_starts=$(cat "$EARLY_STARTS_FILE" 2> /dev/null)
+    case "$early_starts" in ''|*[!0-9]*) early_starts=0 ;; esac
+    if [ "$early_starts" -ge "$MAX_EARLY_STARTS" ]; then
+        note "$early_starts early starts in a row, waiting $EARLY_DELAY_SECONDS s"
+        sleep "$EARLY_DELAY_SECONDS"
+    fi
+
+    if [ -e "$DISABLE_FILE" ]; then
+        note "off switch set, not starting the bridge"
+        return
+    fi
+    bridge_is_running && return
+    echo $((early_starts + 1)) > "$EARLY_STARTS_FILE"
+    note "starting the bridge"
+    cd "$BRIDGE_DIR" || return
+    "./$BRIDGE" -config config.yaml < /dev/null > /dev/null 2>&1 &
+
+    sleep "$HEALTHY_AFTER_SECONDS"
+    bridge_is_running && rm -f "$EARLY_STARTS_FILE"
+}
+
+case "$1" in
+    start)
+        if [ -x "$BRIDGE_DIR/$BRIDGE" ] && [ ! -e "$DISABLE_FILE" ]; then
+            # setsid: the bridge must not get a SIGHUP when the boot scripts end.
+            setsid "$0" run < /dev/null > /dev/null 2>&1 &
+        fi
+        ;;
+    run)
+        start_when_ready
+        ;;
+esac
+exit 0
